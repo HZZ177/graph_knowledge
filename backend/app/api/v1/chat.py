@@ -1,6 +1,8 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from ...services.chat_service import answer_question
+
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
@@ -22,5 +24,5 @@ async def chat(req: ChatRequest) -> ChatResponse:
     - 调用图谱查询服务获取 process context；
     - 调用 LLM 生成答案。
     """
-    answer = f"这是一个占位回答。你问了: {req.question}"
-    return ChatResponse(answer=answer, process_id=req.process_id)
+    result = answer_question(req.question, req.process_id)
+    return ChatResponse(answer=result["answer"], process_id=result.get("process_id"))
