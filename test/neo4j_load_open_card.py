@@ -32,6 +32,7 @@ from neo4j import GraphDatabase
 DEFAULT_URI = "bolt://localhost:7687"
 DEFAULT_USER = "neo4j"
 DEFAULT_PASSWORD = "Keytop@123"
+DEFAULT_DATABASE = "c-card"
 
 
 @dataclass
@@ -39,13 +40,15 @@ class Neo4jConfig:
     uri: str
     user: str
     password: str
+    database: str
 
 
 def get_neo4j_config() -> Neo4jConfig:
     return Neo4jConfig(
-        uri=os.getenv("NEO4J_URI", DEFAULT_URI),
-        user=os.getenv("NEO4J_USER", DEFAULT_USER),
-        password=os.getenv("NEO4J_PASSWORD", DEFAULT_PASSWORD),
+        uri=DEFAULT_URI,
+        user=DEFAULT_USER,
+        password=DEFAULT_PASSWORD,
+        database=DEFAULT_DATABASE,
     )
 
 
@@ -538,7 +541,7 @@ def main() -> None:
 
     driver = GraphDatabase.driver(cfg.uri, auth=(cfg.user, cfg.password))
     try:
-        with driver.session() as session:
+        with driver.session(database=cfg.database) as session:
             create_constraints(session)
             load_business_processes(session)
             load_business_process_steps(session)
