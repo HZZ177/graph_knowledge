@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Graph Knowledge Admin</title>
+    
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    
+    <!-- Element Plus -->
+    <link rel="stylesheet" href="https://unpkg.com/element-plus/dist/index.css" />
+    <script src="https://unpkg.com/element-plus/dist/index.full.js"></script>
+    <script src="https://unpkg.com/@element-plus/icons-vue"></script>
+
+    <!-- AntV X6 & Dagre Layout -->
+    <script src="https://cdn.jsdelivr.net/npm/@antv/x6@2.18.1/dist/x6.min.js"></script>
+
+    <style>
+        :root {
+            --sidebar-width: 280px;
+            --props-width: 320px;
+            --header-height: 60px;
+            --border-color: #e5e7eb;
+            --bg-color: #f9fafb;
+            --primary-color: #409eff;
+        }
+
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #fff;
+            overflow: hidden;
+        }
+
+        #app {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            height: var(--header-height);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            padding: 0 24px;
+            background: #fff;
+            z-index: 10;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #111827;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Main Layout */
+        .main-container {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* Left Sidebar */
+        .sidebar {
+            width: var(--sidebar-width);
+            border-right: 1px solid var(--border-color);
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            color: #374151;
+            font-size: 14px;
+        }
+
+        .process-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+
+        .process-item {
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 1px solid transparent;
+        }
+
+        .process-item:hover {
+            background-color: #f3f4f6;
+        }
+
+        .process-item.active {
+            background-color: #eff6ff;
+            border-color: #bfdbfe;
+        }
+
+        .process-item .title {
+            font-weight: 500;
+            color: #1f2937;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .process-item .desc {
+            font-size: 12px;
+            color: #6b7280;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Canvas Area */
+        .canvas-wrapper {
+            flex: 1;
+            background-color: var(--bg-color);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+        }
+
+        #graph-container {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+        }
+
+        .toolbar {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: #fff;
+            padding: 8px;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            display: flex;
+            gap: 8px;
+            z-index: 100;
+        }
+
+        /* Right Properties Panel */
+        .properties-panel {
+            width: var(--props-width);
+            border-left: 1px solid var(--border-color);
+            background: #fff;
+            display: flex;
+            flex-direction: column;
+            transition: width 0.3s ease;
+        }
+
+        .props-header {
+            padding: 16px;
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            color: #374151;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .props-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100%;
+            color: #9ca3af;
+            font-size: 14px;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #d1d5db;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #9ca3af;
+        }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <!-- Header -->
+        <header class="header">
+            <h1>
+                <el-icon color="#409eff"><Share /></el-icon>
+                业务图谱管理台
+            </h1>
+            <div style="margin-left: auto;">
+                <el-button type="primary" plain size="small" @click="syncToNeo4j">
+                    <el-icon style="margin-right: 4px"><Refresh /></el-icon>
+                    发布到图谱
+                </el-button>
+                <el-avatar :size="32" src="https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png" style="margin-left: 16px;"></el-avatar>
+            </div>
+        </header>
+
+        <div class="main-container">
+            <!-- Left Sidebar: Process List -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <span>业务流程列表</span>
+                    <el-button type="primary" link size="small" style="float: right;">
+                        <el-icon><Plus /></el-icon>
+                    </el-button>
+                </div>
+                <div class="process-list">
+                    <div 
+                        v-for="proc in processes" 
+                        :key="proc.id"
+                        class="process-item"
+                        :class="{ active: currentProcessId === proc.id }"
+                        @click="selectProcess(proc.id)"
+                    >
+                        <div class="title">{{ proc.name }}</div>
+                        <div class="desc">{{ proc.description }}</div>
+                        <el-tag size="small" style="margin-top: 8px;">{{ proc.id }}</el-tag>
+                    </div>
+                </div>
+            </aside>
+
+            <!-- Center: Canvas -->
+            <main class="canvas-wrapper">
+                <div id="graph-container"></div>
+                
+                <div class="toolbar">
+                    <el-button-group>
+                        <el-button :icon="ZoomIn" size="small" @click="zoomIn" />
+                        <el-button :icon="ZoomOut" size="small" @click="zoomOut" />
+                        <el-button :icon="FullScreen" size="small" @click="fitContent" />
+                    </el-button-group>
+                </div>
+            </main>
+
+            <!-- Right: Properties -->
+            <aside class="properties-panel">
+                <div class="props-header">
+                    <span>{{ selectedNode ? '属性编辑' : '节点详情' }}</span>
+                    <el-button v-if="selectedNode" type="danger" link size="small" @click="selectedNode = null">
+                        <el-icon><Close /></el-icon>
+                    </el-button>
+                </div>
+                <div class="props-content">
+                    <div v-if="selectedNode" class="props-form">
+                        <el-form label-position="top" size="default">
+                            <el-form-item label="节点 ID">
+                                <el-input v-model="selectedNode.data.id" disabled />
+                            </el-form-item>
+                            <el-form-item label="节点名称">
+                                <el-input v-model="selectedNode.data.label" @input="updateNodeLabel" />
+                            </el-form-item>
+                            
+                            <!-- Dynamic fields based on node type -->
+                            <template v-if="selectedNode.data.type === 'step'">
+                                <el-form-item label="步骤顺序 (Order No)">
+                                    <el-input-number v-model="selectedNode.data.order_no" :min="1" />
+                                </el-form-item>
+                                <el-form-item label="角色 (Role)">
+                                    <el-select v-model="selectedNode.data.role" placeholder="Select">
+                                        <el-option label="User" value="user"></el-option>
+                                        <el-option label="System" value="system"></el-option>
+                                    </el-select>
+                                </el-form-item>
+                            </template>
+
+                            <template v-if="selectedNode.data.type === 'implementation'">
+                                <el-form-item label="系统 (System)">
+                                    <el-input v-model="selectedNode.data.system" />
+                                </el-form-item>
+                                <el-form-item label="代码引用 (Code Ref)">
+                                    <el-input type="textarea" :rows="3" v-model="selectedNode.data.code_ref" />
+                                </el-form-item>
+                            </template>
+
+                            <template v-if="selectedNode.data.type === 'resource'">
+                                <el-form-item label="资源类型">
+                                    <el-tag type="warning">{{ selectedNode.data.resource_type }}</el-tag>
+                                </el-form-item>
+                                <el-form-item label="访问模式">
+                                    <el-radio-group v-model="selectedNode.data.access_type">
+                                        <el-radio-button label="read">Read</el-radio-button>
+                                        <el-radio-button label="write">Write</el-radio-button>
+                                    </el-radio-group>
+                                </el-form-item>
+                            </template>
+
+                            <el-form-item label="描述">
+                                <el-input type="textarea" :rows="4" v-model="selectedNode.data.description" />
+                            </el-form-item>
+                        </el-form>
+                    </div>
+                    <div v-else class="empty-state">
+                        <el-icon :size="48" style="margin-bottom: 16px; opacity: 0.5;"><Pointer /></el-icon>
+                        <p>点击画布上的节点查看或编辑属性</p>
+                    </div>
+                </div>
+            </aside>
+        </div>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted, nextTick } = Vue;
+        const { ElMessage } = ElementPlus;
+
+        // --- Mock Data ---
+        const MOCK_DATA = {
+            "c_open_card": {
+                id: "c_open_card",
+                name: "开通月卡流程",
+                description: "用户在C端App发起开通月卡的操作，涉及支付、会员状态变更等。",
+                nodes: [
+                    { id: "start", type: "business", label: "Business Process", x: 0, y: 0, data: { description: "业务流程入口" } },
+                    { id: "step1", type: "step", label: "校验身份", order_no: 10, role: "system", description: "校验用户是否登录且账号正常", x: 0, y: 0 },
+                    { id: "step2", type: "step", label: "检查资格", order_no: 20, role: "system", description: "检查用户是否已开通过", x: 0, y: 0 },
+                    { id: "step3", type: "step", label: "支付订单", order_no: 30, role: "user", description: "调用支付网关扣款", x: 0, y: 0 },
+                    { id: "impl1", type: "implementation", label: "User.verify", system: "user-service", code_ref: "UserService.verifyToken()", x: 0, y: 0 },
+                    { id: "impl2", type: "implementation", label: "Card.check", system: "card-service", code_ref: "CardService.checkEligibility()", x: 0, y: 0 },
+                    { id: "impl3", type: "implementation", label: "Pay.create", system: "pay-service", code_ref: "PayService.createOrder()", x: 0, y: 0 },
+                    { id: "res1", type: "resource", label: "User DB", resource_type: "MySQL", system: "user-db", access_type: "read", x: 0, y: 0 },
+                    { id: "res2", type: "resource", label: "Card Table", resource_type: "MySQL", system: "card-db", access_type: "read", x: 0, y: 0 }
+                ],
+                edges: [
+                    { source: "start", target: "step1", label: "START_AT" },
+                    { source: "step1", target: "step2", label: "NEXT" },
+                    { source: "step2", target: "step3", label: "NEXT" },
+                    { source: "step1", target: "impl1", label: "EXECUTED_BY" },
+                    { source: "step2", target: "impl2", label: "EXECUTED_BY" },
+                    { source: "step3", target: "impl3", label: "EXECUTED_BY" },
+                    { source: "impl1", target: "res1", label: "ACCESS" },
+                    { source: "impl2", target: "res2", label: "ACCESS" }
+                ]
+            },
+            "c_refund_order": {
+                id: "c_refund_order",
+                name: "订单退款流程",
+                description: "用户发起退款申请，系统审核后原路退回。",
+                nodes: [
+                    { id: "start_r", type: "business", label: "Business Process", x: 0, y: 0 },
+                    { id: "step_r1", type: "step", label: "申请退款", order_no: 10, role: "user", x: 0, y: 0 },
+                    { id: "step_r2", type: "step", label: "审核订单", order_no: 20, role: "system", x: 0, y: 0 },
+                    { id: "impl_r2", type: "implementation", label: "Order.audit", system: "order-service", x: 0, y: 0 }
+                ],
+                edges: [
+                    { source: "start_r", target: "step_r1" },
+                    { source: "step_r1", target: "step_r2" },
+                    { source: "step_r2", target: "impl_r2" }
+                ]
+            }
+        };
+
+        const app = createApp({
+            setup() {
+                const processes = ref(Object.values(MOCK_DATA));
+                const currentProcessId = ref("c_open_card");
+                const selectedNode = ref(null);
+                const graph = ref(null);
+                
+                // Icons for binding
+                const ZoomIn = 'ZoomIn';
+                const ZoomOut = 'ZoomOut';
+                const FullScreen = 'FullScreen';
+                const Share = 'Share';
+                const Plus = 'Plus';
+                const Close = 'Close';
+                const Refresh = 'Refresh';
+                const Pointer = 'Pointer';
+
+                const initGraph = () => {
+                    const container = document.getElementById('graph-container');
+                    const x6ns = window.X6 || window["X6"] || window["@antv/x6"];
+                    if (!x6ns || !x6ns.Graph) {
+                        console.error('X6 library is not loaded');
+                        if (container) {
+                            container.innerHTML = '<div style="height:100%;display:flex;align-items:center;justify-content:center;color:#9ca3af;font-size:14px;">X6 图引擎脚本未加载成功，请检查网络或 CDN 访问，然后刷新页面</div>';
+                        }
+                        return;
+                    }
+
+                    graph.value = new x6ns.Graph({
+                        container: container,
+                        autoResize: true,
+                        grid: {
+                            size: 10,
+                            visible: true,
+                            type: 'dot', // 'dot' | 'fixedDot' | 'mesh'
+                            args: { 
+                                color: '#a0a0a0', 
+                                thickness: 1 
+                            },
+                        },
+                        panning: true,
+                        mousewheel: true,
+                        connecting: {
+                            router: 'manhattan',
+                            connector: {
+                                name: 'rounded',
+                                args: {
+                                    radius: 8,
+                                },
+                            },
+                            anchor: 'center',
+                            connectionPoint: 'boundary',
+                            allowBlank: false,
+                            highlight: true,
+                        },
+                        background: {
+                            color: '#f9fafb',
+                        }
+                    });
+
+                    // Register Node Click Event
+                    graph.value.on('node:click', ({ node }) => {
+                        const data = node.getData();
+                        // Update selection
+                        selectedNode.value = {
+                            id: node.id,
+                            data: { ...data, id: node.id } // Copy to reactive object
+                        };
+                        
+                        // Highlight effect
+                        const nodes = graph.value.getNodes();
+                        nodes.forEach(n => {
+                            n.attr('body/stroke', '#e5e7eb');
+                            n.attr('body/strokeWidth', 1);
+                        });
+                        node.attr('body/stroke', '#409eff');
+                        node.attr('body/strokeWidth', 2);
+                    });
+
+                    // Blank click to deselect
+                    graph.value.on('blank:click', () => {
+                        selectedNode.value = null;
+                        const nodes = graph.value.getNodes();
+                        nodes.forEach(n => {
+                            n.attr('body/stroke', '#e5e7eb');
+                            n.attr('body/strokeWidth', 1);
+                        });
+                    });
+                };
+
+                const renderProcess = (processId) => {
+                    if (!graph.value) return;
+                    
+                    const data = MOCK_DATA[processId];
+                    if (!data) return;
+
+                    const cells = [];
+                    
+                    // Convert nodes to X6 model
+                    data.nodes.forEach(n => {
+                        let bgColor = '#fff';
+                        let headerColor = '#909399';
+                        let iconText = '';
+
+                        // Color coding by type
+                        switch(n.type) {
+                            case 'business': 
+                                bgColor = '#ecf5ff'; 
+                                headerColor = '#409eff';
+                                iconText = 'BP';
+                                break;
+                            case 'step': 
+                                bgColor = '#f0f9eb'; 
+                                headerColor = '#67c23a';
+                                iconText = 'ST';
+                                break;
+                            case 'implementation': 
+                                bgColor = '#f4f4f5'; 
+                                headerColor = '#909399';
+                                iconText = 'IM';
+                                break;
+                            case 'resource': 
+                                bgColor = '#fdf6ec'; 
+                                headerColor = '#e6a23c';
+                                iconText = 'DB';
+                                break;
+                        }
+
+                        cells.push(graph.value.createNode({
+                            id: n.id,
+                            width: 180,
+                            height: 80,
+                            shape: 'rect',
+                            data: { ...n }, // Store raw data
+                            attrs: {
+                                body: {
+                                    fill: '#fff',
+                                    stroke: '#e5e7eb',
+                                    strokeWidth: 1,
+                                    rx: 6,
+                                    ry: 6,
+                                    filter: {
+                                        name: 'dropShadow',
+                                        args: { dx: 2, dy: 2, blur: 3, color: '#00000010' }
+                                    }
+                                },
+                                label: {
+                                    text: n.label,
+                                    fill: '#333',
+                                    fontSize: 14,
+                                    fontWeight: 'bold',
+                                    refX: 0.5,
+                                    refY: 0.4,
+                                },
+                                // Colored header strip on the left
+                                header: {
+                                    refWidth: 6,
+                                    refHeight: '100%',
+                                    fill: headerColor,
+                                    stroke: 'none',
+                                    rx: 6, // Only want rounded corners on left... simulating with clip or just rounded
+                                }
+                            },
+                            markup: [
+                                { tagName: 'rect', selector: 'body' },
+                                { tagName: 'rect', selector: 'header' }, // Left strip
+                                { tagName: 'text', selector: 'label' },
+                                { 
+                                    tagName: 'text', 
+                                    selector: 'subLabel',
+                                    attrs: {
+                                        text: n.type.toUpperCase(),
+                                        fontSize: 10,
+                                        fill: '#999',
+                                        refX: 0.5,
+                                        refY: 0.75,
+                                        textAnchor: 'middle'
+                                    }
+                                }
+                            ]
+                        }));
+                    });
+
+                    // Convert edges
+                    data.edges.forEach(e => {
+                        cells.push(graph.value.createEdge({
+                            source: e.source,
+                            target: e.target,
+                            label: e.label,
+                            attrs: {
+                                line: {
+                                    stroke: '#a1a1a1',
+                                    strokeWidth: 1,
+                                    targetMarker: 'classic',
+                                }
+                            },
+                            labels: [
+                                {
+                                    attrs: {
+                                        text: {
+                                            text: e.label || '',
+                                            fill: '#999',
+                                            fontSize: 10,
+                                        },
+                                        rect: {
+                                            fill: '#f9fafb',
+                                            stroke: null
+                                        }
+                                    }
+                                }
+                            ]
+                        }));
+                    });
+
+                    graph.value.resetCells(cells);
+
+                    // Auto Layout using Dagre
+                    const columnOrder = {
+                        business: 0,
+                        step: 1,
+                        implementation: 2,
+                        resource: 3,
+                    };
+                    const colWidth = 220;
+                    const rowHeight = 120;
+                    const paddingX = 80;
+                    const paddingY = 40;
+                    const rowCounter = {};
+
+                    // Apply positions
+                    graph.value.getNodes().forEach(node => {
+                        const data = node.getData() || {};
+                        const type = data.type || 'business';
+                        const col = columnOrder[type] ?? 0;
+                        if (rowCounter[col] == null) {
+                            rowCounter[col] = 0;
+                        }
+                        const row = rowCounter[col]++;
+                        const x = paddingX + col * colWidth;
+                        const y = paddingY + row * rowHeight;
+                        node.setPosition(x, y);
+                    });
+                    
+                    graph.value.centerContent();
+                };
+
+                const selectProcess = (id) => {
+                    currentProcessId.value = id;
+                    selectedNode.value = null;
+                    renderProcess(id);
+                };
+
+                const updateNodeLabel = (val) => {
+                    if (selectedNode.value && graph.value) {
+                        const cell = graph.value.getCellById(selectedNode.value.id);
+                        if (cell) {
+                            cell.attr('label/text', val);
+                            // Update mock data too
+                            selectedNode.value.data.label = val;
+                        }
+                    }
+                };
+
+                // Actions
+                const zoomIn = () => graph.value.zoom(0.1);
+                const zoomOut = () => graph.value.zoom(-0.1);
+                const fitContent = () => graph.value.zoomToFit({ padding: 20 });
+                const syncToNeo4j = () => {
+                    ElMessage.success('已将当前配置同步至 Neo4j 图谱数据库');
+                };
+
+                onMounted(() => {
+                    initGraph();
+                    renderProcess(currentProcessId.value);
+
+                    // Window resize handling
+                    window.addEventListener('resize', () => {
+                        graph.value.resizeContainer();
+                    });
+                });
+
+                return {
+                    processes,
+                    currentProcessId,
+                    selectProcess,
+                    selectedNode,
+                    updateNodeLabel,
+                    // Icons
+                    ZoomIn, ZoomOut, FullScreen, Plus, Close, Refresh, Pointer,
+                    // Actions
+                    zoomIn, zoomOut, fitContent, syncToNeo4j
+                };
+            }
+        });
+
+        // Register Icons
+        for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+            app.component(key, component)
+        }
+
+        app.use(ElementPlus);
+        app.mount('#app');
+    </script>
+</body>
+</html>
