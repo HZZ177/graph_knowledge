@@ -19,6 +19,7 @@ from backend.app.schemas.data_resources import (
     ResourceAccessor,
     AccessChainItem,
 )
+from backend.app.core.logger import logger
 
 
 def list_data_resources(
@@ -100,6 +101,7 @@ def create_data_resource(db: Session, data: DataResourceCreate) -> DataResource:
     if existing:
         raise ValueError(f"DataResource {data.resource_id} already exists")
 
+    logger.info("[DataResourceService] 创建数据资源 resource_id=%s", data.resource_id)
     obj = DataResource(**data.dict())
     db.add(obj)
     db.commit()
@@ -195,12 +197,13 @@ def list_access_chains(
     impl_id: Optional[str] = None,
     step_id: Optional[str] = None,
     process_id: Optional[str] = None,
-) -> List[AccessChainItem]:
-    """Generic access relationship chains filtered by different node ids.
 
-    Each returned item represents one logical chain:
-    Business (process) -> Step -> Implementation -> DataResource.
-    Some parts may be missing (e.g. no business/step binding).
+) -> List[AccessChainItem]:
+    """根据不同的节点 ID（资源/实现/步骤/流程）列出访问链路。
+
+    每条返回记录代表一条逻辑访问链：
+    业务流程(Business) -> 步骤(Step) -> 实现(Implementation) -> 数据资源(DataResource)。
+    某些环节可能不存在（例如实现未绑定到具体流程或步骤）。
     """
 
     query = (

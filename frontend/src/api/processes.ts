@@ -90,3 +90,7 @@ export async function updateProcessEdge(
 export async function deleteProcessEdge(processId: string, edgeId: number): Promise<void> {
   await http.delete(`/processes/${processId}/edges/${edgeId}`)
 }
+
+export async function publishProcess(processId: string): Promise<void> {
+  await http.post(`/processes/${processId}/publish`)
+}

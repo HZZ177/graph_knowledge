@@ -49,3 +49,9 @@ body {
 .mr-8 {
   margin-right: 8px;
 }
+
+.react-flow__node {
+  word-break: break-all;
+  overflow-wrap: break-word;
+  white-space: normal;
+}

@@ -1,10 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Card, Typography, List, Spin, Empty, Space, Tag, Input, Button } from 'antd'
+import { Card, Typography, List, Spin, Empty, Space, Tag, Button } from 'antd'
 import ReactFlow, {
   Background,
   Controls,
   Edge,
   Node,
+  MarkerType,
+  Position,
+  Handle,
   applyNodeChanges,
   applyEdgeChanges,
   type NodeChange,
@@ -16,29 +19,97 @@ import 'reactflow/dist/style.css'
 import {
   listProcesses,
   type ProcessItem,
-  getProcessSteps,
-  type ProcessStep,
-  saveProcessSteps,
-  deleteProcessStep,
-  type ProcessEdge,
-  listProcessEdges,
-  createProcessEdge,
-  updateProcessEdge,
-  deleteProcessEdge,
 } from '../api/processes'
 import {
-  getProcessContext,
-  type GraphProcessContext,
-  type GraphStepEntry,
-} from '../api/graph'
-import { createStepImplementationLink, deleteStepImplementationLink } from '../api/resourceNodes'
-import {
-  createImplementationDataLink,
-  deleteImplementationDataLink,
-  type ImplementationDataLink,
-} from '../api/dataResources'
+  getProcessCanvas,
+  saveProcessCanvas,
+  type ProcessCanvas,
+} from '../api/canvas'
 
 const { Title, Paragraph, Text } = Typography
+
+const layoutGraph = (nodes: Node[], edges: Edge[]) => {
+  const layoutedNodes: Node[] = nodes.map((node) => ({
+    ...node,
+  }))
+
+  const layoutedEdges: Edge[] = edges.map((edge) => ({
+    ...edge,
+    type: 'smoothstep',
+    markerEnd: { type: MarkerType.ArrowClosed },
+  }))
+
+  return { nodes: layoutedNodes, edges: layoutedEdges }
+}
+
+const AllSidesNode = ({ data, style }: any) => {
+  const baseHandleStyle = {
+    width: 0,
+    height: 0,
+    background: '#000',
+    border: 'none',
+    borderRadius: '50%',
+  } as const
+
+  return (
+    <div
+      style={{
+        position: 'relative',
+        ...(style || {}),
+      }}
+    >
+      <Handle
+        type="target"
+        position={Position.Top}
+        id="t-in"
+        style={{ ...baseHandleStyle, top: -7 }}
+      />
+      <Handle
+        type="source"
+        position={Position.Top}
+        id="t-out"
+        style={{ ...baseHandleStyle, top: -7 }}
+      />
+      <Handle
+        type="target"
+        position={Position.Bottom}
+        id="b-in"
+        style={{ ...baseHandleStyle, bottom: -7 }}
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        id="b-out"
+        style={{ ...baseHandleStyle, bottom: -7 }}
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="l-in"
+        style={{ ...baseHandleStyle, left: -7 }}
+      />
+      <Handle
+        type="source"
+        position={Position.Left}
+        id="l-out"
+        style={{ ...baseHandleStyle, left: -7 }}
+      />
+      <Handle
+        type="target"
+        position={Position.Right}
+        id="r-in"
+        style={{ ...baseHandleStyle, right: -7 }}
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="r-out"
+        style={{ ...baseHandleStyle, right: -7 }}
+      />
+      <div>{data?.label}</div>
+    </div>
+  )
+}
 
 type SelectedNode =
   | {
@@ -47,7 +118,7 @@ type SelectedNode =
     }
   | {
       type: 'step'
-      data: GraphStepEntry['step']
+      data: any
       implementations: any[]
       dataResources: any[]
     }
@@ -55,13 +126,13 @@ type SelectedNode =
       type: 'implementation'
       data: any
       dataResources: any[]
-      step?: GraphStepEntry['step']
+      step?: any
     }
   | {
       type: 'data'
       data: any
       implementations: any[]
-      step?: GraphStepEntry['step']
+      step?: any
     }
 
 const BusinessLibraryPage: React.FC = () => {
@@ -69,16 +140,23 @@ const BusinessLibraryPage: React.FC = () => {
   const [loadingProcesses, setLoadingProcesses] = useState(false)
   const [selectedProcessId, setSelectedProcessId] = useState<string | null>(null)
 
-  const [context, setContext] = useState<GraphProcessContext | null>(null)
-  const [loadingContext, setLoadingContext] = useState(false)
+  const [canvas, setCanvas] = useState<ProcessCanvas | null>(null)
+  const [loadingCanvas, setLoadingCanvas] = useState(false)
 
   const [selectedNode, setSelectedNode] = useState<SelectedNode | null>(null)
 
-  const [steps, setSteps] = useState<ProcessStep[]>([])
   const [nodes, setNodes] = useState<Node[]>([])
   const [edges, setEdges] = useState<Edge[]>([])
-  const [stepNameDraft, setStepNameDraft] = useState<string>('')
+  const [highlightNodeId, setHighlightNodeId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [hasChanges, setHasChanges] = useState(false)
+
+  const nodeTypes = useMemo(
+    () => ({
+      allSides: AllSidesNode,
+    }),
+    [],
+  )
 
   const fetchProcesses = useCallback(async () => {
     setLoadingProcesses(true)
@@ -100,86 +178,165 @@ const BusinessLibraryPage: React.FC = () => {
   }, [fetchProcesses])
 
   const buildGraph = useCallback(
-    (stepList: ProcessStep[], ctx: GraphProcessContext | null, edgeList: ProcessEdge[]) => {
-      if (!ctx) {
+    (canvasData: ProcessCanvas) => {
+      if (!canvasData) {
         setNodes([])
         setEdges([])
         return
       }
 
-      const detailByCap = new Map<string, GraphStepEntry>()
-      ctx.steps.forEach((entry) => {
-        if (entry.step.step_id) {
-          detailByCap.set(entry.step.step_id, entry)
+      const stepById = new Map(canvasData.steps.map((s) => [s.step_id, s]))
+      const implById = new Map(canvasData.implementations.map((i) => [i.impl_id, i]))
+      const drById = new Map(canvasData.data_resources.map((d) => [d.resource_id, d]))
+
+      const stepImplMap = new Map<string, string[]>()
+      canvasData.step_impl_links.forEach((link) => {
+        if (!stepImplMap.has(link.step_id)) {
+          stepImplMap.set(link.step_id, [])
         }
+        stepImplMap.get(link.step_id)!.push(link.impl_id)
       })
 
-      // 步骤横向排布
-      const sorted = [...stepList].slice().sort((a, b) => a.order_no - b.order_no)
-      const gapX = 220
-      const stepY = 0
-      const implBaseY = 140
-      const dataBaseY = 260
+      const implDataMap = new Map<string, Array<{ resource_id: string; access_type?: string | null; access_pattern?: string | null }>>()
+      canvasData.impl_data_links.forEach((link) => {
+        if (!implDataMap.has(link.impl_id)) {
+          implDataMap.set(link.impl_id, [])
+        }
+        implDataMap.get(link.impl_id)!.push({
+          resource_id: link.resource_id,
+          access_type: link.access_type,
+          access_pattern: link.access_pattern,
+        })
+      })
+
+      const edgeStepIds = new Set<string>()
+      canvasData.edges.forEach((e) => {
+        edgeStepIds.add(e.from_step_id)
+        edgeStepIds.add(e.to_step_id)
+      })
+
+      // 拓扑排序：根据边关系确定步骤顺序
+      const inDegree = new Map<string, number>()
+      const outEdges = new Map<string, string[]>()
+      
+      edgeStepIds.forEach((id) => {
+        inDegree.set(id, 0)
+        outEdges.set(id, [])
+      })
+      
+      canvasData.edges.forEach((e) => {
+        inDegree.set(e.to_step_id, (inDegree.get(e.to_step_id) || 0) + 1)
+        outEdges.get(e.from_step_id)?.push(e.to_step_id)
+      })
+      
+      // BFS 拓扑排序
+      const queue: string[] = []
+      inDegree.forEach((degree, stepId) => {
+        if (degree === 0) queue.push(stepId)
+      })
+      
+      const sortedStepIds: string[] = []
+      while (queue.length > 0) {
+        const current = queue.shift()!
+        sortedStepIds.push(current)
+        
+        outEdges.get(current)?.forEach((next) => {
+          const newDegree = (inDegree.get(next) || 0) - 1
+          inDegree.set(next, newDegree)
+          if (newDegree === 0) {
+            queue.push(next)
+          }
+        })
+      }
+      
+      const sorted = sortedStepIds
+        .map((id) => canvasData.steps.find((s) => s.step_id === id))
+        .filter((s): s is NonNullable<typeof s> => s !== undefined)
+
+      const stepGapX = 260
+      const centerY = 0
+      const implBaseOffsetY = 140
+      const implGapY = 80
+      const dataBaseOffsetY = 140
+      const dataGapY = 80
 
       const stepNodes: Node[] = []
       const implNodes = new Map<string, Node>()
       const drNodes = new Map<string, Node>()
 
       sorted.forEach((s, index) => {
-        const detail = s.capability_id ? detailByCap.get(s.capability_id) : undefined
-        const stepId = s.capability_id || detail?.step.step_id || String(s.step_id)
-        const displayName = s.name || detail?.step.name || stepId
-        const x = index * gapX
+        const stepId = s.step_id
+        const displayName = s.name || stepId
+        const stepX = index * stepGapX
 
-        // Step 节点
         stepNodes.push({
           id: `step:${stepId}`,
           data: {
             label: `${index + 1}. ${displayName}`,
-            capabilityId: stepId,
+            stepId,
           },
-          position: { x, y: stepY },
-          type: 'default',
+          position: { x: stepX, y: centerY },
+          type: 'allSides',
+          style: {
+            borderRadius: 12,
+            border: '1px solid #1677ff',
+            background: '#ffffff',
+            padding: 4,
+          },
         })
 
-        const entry = detail
-        if (!entry) {
-          return
-        }
-
-        // Implementation 节点：以 impl_id 作为唯一标识
-        ;(entry.implementations || []).forEach((impl: any, implIndex: number) => {
-          const implId = impl.impl_id as string | undefined
-          if (!implId || implNodes.has(implId)) {
-            return
-          }
-          const implLabel = impl.name || impl.entry_name || implId
+        const implIds = stepImplMap.get(stepId) || []
+        implIds.forEach((implId, implIndex) => {
+          if (implNodes.has(implId)) return
+          const impl = implById.get(implId)
+          if (!impl) return
+          const implLabel = impl.name || implId
           implNodes.set(implId, {
             id: `impl:${implId}`,
             data: {
               label: implLabel,
               implId,
             },
-            position: { x, y: implBaseY + implIndex * 80 },
-            type: 'default',
+            position: {
+              x: stepX,
+              y: centerY - (implBaseOffsetY + implIndex * implGapY),
+            },
+            type: 'allSides',
+            style: {
+              borderRadius: 12,
+              border: '1px solid #52c41a',
+              background: '#f6ffed',
+              padding: 4,
+            },
           })
         })
 
-        // DataResource 节点：以 resource_id 作为唯一标识
-        ;(entry.data_resources || []).forEach((dr: any, drIndex: number) => {
-          const resId = dr.resource_id as string | undefined
-          if (!resId || drNodes.has(resId)) {
-            return
-          }
-          const drLabel = dr.name || dr.resource_id || resId
-          drNodes.set(resId, {
-            id: `dr:${resId}`,
-            data: {
-              label: drLabel,
-              resource: dr,
-            },
-            position: { x, y: dataBaseY + drIndex * 80 },
-            type: 'default',
+        implIds.forEach((implId) => {
+          const dataLinks = implDataMap.get(implId) || []
+          dataLinks.forEach((link, drIndex) => {
+            const resId = link.resource_id
+            if (drNodes.has(resId)) return
+            const dr = drById.get(resId)
+            if (!dr) return
+            const drLabel = dr.name || resId
+            drNodes.set(resId, {
+              id: `dr:${resId}`,
+              data: {
+                label: drLabel,
+                resource: dr,
+              },
+              position: {
+                x: stepX,
+                y: centerY + (dataBaseOffsetY + drIndex * dataGapY),
+              },
+              type: 'allSides',
+              style: {
+                borderRadius: 12,
+                border: '1px solid #faad14',
+                background: '#fff7e6',
+                padding: 4,
+              },
+            })
           })
         })
       })
@@ -190,84 +347,93 @@ const BusinessLibraryPage: React.FC = () => {
         ...Array.from(drNodes.values()),
       ]
 
-      // 1) 步骤之间的可编辑边（基于 ProcessStepEdge）
-      const stepEdges: Edge[] = edgeList.map((edge) => ({
-        id: `edge:process:${edge.id}`,
+      const stepEdges: Edge[] = canvasData.edges.map((edge, idx) => ({
+        id: `edge:process:${edge.id || idx}`,
         source: `step:${edge.from_step_id}`,
         target: `step:${edge.to_step_id}`,
-        label: edge.label,
+        sourceHandle: edge.from_handle || undefined,
+        targetHandle: edge.to_handle || undefined,
+        label: edge.label || undefined,
+        style: {
+          stroke: '#1677ff',
+        },
         data: {
           kind: 'process',
-          dbId: edge.id,
           edge_type: edge.edge_type,
           condition: edge.condition,
           label: edge.label,
         },
       }))
 
-      // 2) Step → Implementation 边（基于 step_impl_links）
-      const stepImplEdges: Edge[] = (ctx.step_impl_links || []).map((link) => ({
-        id: `edge:step-impl:${link.id}`,
+      const stepImplEdges: Edge[] = canvasData.step_impl_links.map((link, idx) => ({
+        id: `edge:step-impl:${link.id || idx}`,
         source: `step:${link.step_id}`,
         target: `impl:${link.impl_id}`,
+        sourceHandle: link.step_handle || undefined,
+        targetHandle: link.impl_handle || undefined,
+        style: {
+          stroke: '#52c41a',
+        },
         data: {
           kind: 'step-impl',
-          dbId: link.id,
         },
       }))
 
-      // 3) Implementation → DataResource 边（基于 impl_data_links）
-      const implDrEdges: Edge[] = (ctx.impl_data_links || []).map((link) => ({
-        id: `edge:impl-dr:${link.id}`,
+      const implDrEdges: Edge[] = canvasData.impl_data_links.map((link, idx) => ({
+        id: `edge:impl-dr:${link.id || idx}`,
         source: `impl:${link.impl_id}`,
         target: `dr:${link.resource_id}`,
+        sourceHandle: link.impl_handle || undefined,
+        targetHandle: link.resource_handle || undefined,
+        style: {
+          stroke: '#faad14',
+        },
         data: {
           kind: 'impl-dr',
-          dbId: link.id,
           access_type: link.access_type,
           access_pattern: link.access_pattern,
         },
       }))
 
-      setNodes(allNodes)
-      setEdges([...stepEdges, ...stepImplEdges, ...implDrEdges])
+      const allEdges: Edge[] = [...stepEdges, ...stepImplEdges, ...implDrEdges]
+      const { nodes: layoutedNodes, edges: layoutedEdges } = layoutGraph(allNodes, allEdges)
+
+      setNodes(layoutedNodes)
+      setEdges(layoutedEdges)
     },
     [],
   )
 
-  useEffect(() => {
+  const loadCanvas = useCallback(async () => {
     if (!selectedProcessId) {
-      setContext(null)
-      setSteps([])
+      setCanvas(null)
       setNodes([])
       setEdges([])
       setSelectedNode(null)
+      setHasChanges(false)
       return
     }
 
-    setLoadingContext(true)
+    setLoadingCanvas(true)
     setSelectedNode(null)
 
-    ;(async () => {
-      try {
-        const [ctx, stepItems, edgeItems] = await Promise.all([
-          getProcessContext(selectedProcessId),
-          getProcessSteps(selectedProcessId),
-          listProcessEdges(selectedProcessId),
-        ])
-        setContext(ctx)
-        setSteps(stepItems)
-        buildGraph(stepItems, ctx, edgeItems)
-      } catch (e) {
-        setContext(null)
-        setSteps([])
-        setNodes([])
-        setEdges([])
-      } finally {
-        setLoadingContext(false)
-      }
-    })()
+    try {
+      const canvasData = await getProcessCanvas(selectedProcessId)
+      setCanvas(canvasData)
+      buildGraph(canvasData)
+      setHasChanges(false)
+    } catch (e) {
+      setCanvas(null)
+      setNodes([])
+      setEdges([])
+    } finally {
+      setLoadingCanvas(false)
+    }
   }, [buildGraph, selectedProcessId])
+
+  useEffect(() => {
+    loadCanvas()
+  }, [loadCanvas])
 
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
@@ -278,78 +444,54 @@ const BusinessLibraryPage: React.FC = () => {
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
-      // 查找需要删除的边并同步到后端
-      const removedIds = changes
-        .filter((c) => c.type === 'remove')
-        .map((c) => c.id)
-
-      if (removedIds.length && selectedProcessId) {
-        removedIds.forEach((id) => {
-          const edge = edges.find((e) => e.id === id)
-          const data = edge?.data as any
-          const kind = data?.kind as string | undefined
-          const dbId = data?.dbId as number | undefined
-          if (!dbId) {
-            return
-          }
-          if (kind === 'process') {
-            deleteProcessEdge(selectedProcessId, dbId).catch(() => undefined)
-          } else if (kind === 'step-impl') {
-            deleteStepImplementationLink(dbId).catch(() => undefined)
-          } else if (kind === 'impl-dr') {
-            deleteImplementationDataLink(dbId).catch(() => undefined)
-          }
-        })
-      }
-
       setEdges((eds) => applyEdgeChanges(changes, eds))
+      setHasChanges(true)
     },
-    [edges, selectedProcessId],
+    [],
   )
 
-  const flowNodes: Node[] = useMemo(() => {
-    if (!context || !context.steps || context.steps.length === 0) {
-      return []
+  const displayEdges: Edge[] = useMemo(() => {
+    if (!highlightNodeId) {
+      return edges
     }
-
-    const gapX = 220
-    const baseY = 0
-
-    return context.steps.map((entry, index) => {
-      const id = entry.step.step_id
-      const label = entry.step.name || id
+    return edges.map((edge) => {
+      const isConnected =
+        edge.source === highlightNodeId || edge.target === highlightNodeId
       return {
-        id: `step:${id}`,
-        data: { label: `${index + 1}. ${label}` },
-        position: { x: index * gapX, y: baseY },
-        type: 'default',
+        ...edge,
+        style: {
+          ...(edge.style || {}),
+          opacity: isConnected ? 1 : 0.15,
+        },
       }
     })
-  }, [context])
+  }, [edges, highlightNodeId])
 
-  const flowEdges: Edge[] = useMemo(() => {
-    if (!context || !context.steps || context.steps.length < 2) {
-      return []
+  const displayNodes: Node[] = useMemo(() => {
+    if (!highlightNodeId) {
+      return nodes
     }
 
-    const edges: Edge[] = []
-
-    context.steps.forEach((entry, index) => {
-      const next = context.steps[index + 1]
-      if (!next) {
-        return
+    const connectedIds = new Set<string>()
+    connectedIds.add(highlightNodeId)
+    edges.forEach((edge) => {
+      if (edge.source === highlightNodeId || edge.target === highlightNodeId) {
+        connectedIds.add(edge.source)
+        connectedIds.add(edge.target)
       }
-      const currentId = `step:${entry.step.step_id}`
-      const nextId = `step:${next.step.step_id}`
-      edges.push({
-        id: `e:${currentId}->${nextId}`,
-        source: currentId,
-        target: nextId,
-      })
     })
 
-    return edges
-  }, [context])
+    return nodes.map((node) => {
+      const isConnected = connectedIds.has(node.id)
+      return {
+        ...node,
+        style: {
+          ...(node.style || {}),
+          opacity: isConnected ? 1 : 0.3,
+        },
+      }
+    })
+  }, [nodes, edges, highlightNodeId])
 
   const currentProcess: ProcessItem | null = useMemo(() => {
     if (!selectedProcessId) {
@@ -359,253 +501,221 @@ const BusinessLibraryPage: React.FC = () => {
     if (found) {
       return found
     }
-    const raw = context?.process as ProcessItem | undefined
-    return raw || null
-  }, [context, processes, selectedProcessId])
+    if (canvas?.process) {
+      return {
+        process_id: canvas.process.process_id,
+        name: canvas.process.name,
+        channel: canvas.process.channel || undefined,
+        description: canvas.process.description || undefined,
+        entrypoints: canvas.process.entrypoints,
+      }
+    }
+    return null
+  }, [canvas, processes, selectedProcessId])
 
   const handleSelectProcess = (item: ProcessItem) => {
+    if (hasChanges) {
+      const ok = window.confirm('有未保存的更改，是否放弃？')
+      if (!ok) return
+    }
     setSelectedProcessId(item.process_id)
     setSelectedNode({
       type: 'process',
       data: item,
     })
-    setStepNameDraft('')
   }
 
   const handleNodeClick = (_: React.MouseEvent, node: Node) => {
-    if (!context || !context.steps) {
-      return
-    }
+    setHighlightNodeId(node.id)
+    if (!canvas) return
 
-    // Step 节点：与之前逻辑相同
     if (node.id.startsWith('step:')) {
       const stepId = node.id.slice('step:'.length)
-      const entry = context.steps.find((s) => s.step.step_id === stepId)
-      const row = steps.find((s) => s.capability_id === stepId)
+      const step = canvas.steps.find((s) => s.step_id === stepId)
+      if (!step) return
 
-      const baseStep = entry?.step
-      const mergedStep: any = {
-        ...(baseStep || {}),
-        step_id: stepId,
-        order_no: row?.order_no ?? baseStep?.order_no,
-        name: row?.name ?? baseStep?.name ?? stepId,
-      }
+      const implIds = canvas.step_impl_links
+        .filter((l) => l.step_id === stepId)
+        .map((l) => l.impl_id)
+      const implementations = canvas.implementations.filter((i) =>
+        implIds.includes(i.impl_id),
+      )
+
+      const dataResourceIds = new Set<string>()
+      implIds.forEach((implId) => {
+        canvas.impl_data_links
+          .filter((l) => l.impl_id === implId)
+          .forEach((l) => dataResourceIds.add(l.resource_id))
+      })
+      const dataResources = canvas.data_resources.filter((d) =>
+        dataResourceIds.has(d.resource_id),
+      )
 
       setSelectedNode({
         type: 'step',
-        data: mergedStep,
-        implementations: entry?.implementations || [],
-        dataResources: entry?.data_resources || [],
+        data: step,
+        implementations,
+        dataResources,
       })
-      setStepNameDraft(mergedStep.name || '')
       return
     }
 
-    // Implementation 节点：id = impl:{impl_id}
     if (node.id.startsWith('impl:')) {
       const implId = node.id.slice('impl:'.length)
-      if (!implId) {
-        return
-      }
+      const impl = canvas.implementations.find((i) => i.impl_id === implId)
+      if (!impl) return
 
-      // 找到该实现所属的 Step（优先使用 step_impl_links）
-      const link = (context.step_impl_links || []).find((l) => l.impl_id === implId)
-      let entry: GraphStepEntry | undefined
-      if (link) {
-        entry = context.steps.find((s) => s.step.step_id === link.step_id)
-      }
-      if (!entry) {
-        entry = context.steps.find((s) =>
-          (s.implementations || []).some((impl: any) => impl.impl_id === implId),
-        )
-      }
-      if (!entry) {
-        return
-      }
+      const link = canvas.step_impl_links.find((l) => l.impl_id === implId)
+      const step = link ? canvas.steps.find((s) => s.step_id === link.step_id) : undefined
 
-      const impl = (entry.implementations || []).find((i: any) => i.impl_id === implId)
-      if (!impl) {
-        return
-      }
+      const dataResourceIds = canvas.impl_data_links
+        .filter((l) => l.impl_id === implId)
+        .map((l) => l.resource_id)
+      const dataResources = canvas.data_resources.filter((d) =>
+        dataResourceIds.includes(d.resource_id),
+      )
 
       setSelectedNode({
         type: 'implementation',
         data: impl,
-        dataResources: entry.data_resources || [],
-        step: entry.step,
+        dataResources,
+        step,
       })
       return
     }
 
-    // DataResource 节点：id = dr:{resource_id}
     if (node.id.startsWith('dr:')) {
       const resourceId = node.id.slice('dr:'.length)
-      if (!resourceId) {
-        return
-      }
+      const dr = canvas.data_resources.find((d) => d.resource_id === resourceId)
+      if (!dr) return
 
-      // 找到包含该数据资源的 Step
-      let entry: GraphStepEntry | undefined
-      let dr: any | undefined
-      for (const s of context.steps) {
-        const found = (s.data_resources || []).find(
-          (r: any) => r.resource_id === resourceId,
-        )
-        if (found) {
-          entry = s
-          dr = found
-          break
-        }
-      }
-      if (!entry || !dr) {
-        return
-      }
+      const implIds = canvas.impl_data_links
+        .filter((l) => l.resource_id === resourceId)
+        .map((l) => l.impl_id)
+      const implementations = canvas.implementations.filter((i) =>
+        implIds.includes(i.impl_id),
+      )
 
-      // 构建 impl_id -> impl 对象的索引
-      const implById = new Map<string, any>()
-      context.steps.forEach((s) => {
-        ;(s.implementations || []).forEach((impl: any) => {
-          if (impl.impl_id) {
-            implById.set(impl.impl_id, impl)
-          }
-        })
-      })
-
-      // 根据 impl_data_links 找到访问该资源的实现列表
-      const impls: any[] = []
-      ;(context.impl_data_links || []).forEach((link) => {
-        if (link.resource_id === resourceId) {
-          const impl = implById.get(link.impl_id)
-          if (impl) {
-            impls.push(impl)
-          }
-        }
-      })
+      const stepId = canvas.step_impl_links.find((l) =>
+        implIds.includes(l.impl_id),
+      )?.step_id
+      const step = stepId ? canvas.steps.find((s) => s.step_id === stepId) : undefined
 
       setSelectedNode({
         type: 'data',
         data: dr,
-        implementations: impls,
-        step: entry.step,
+        implementations,
+        step,
       })
     }
   }
 
-  const handleStepNameChange = useCallback(
-    (value: string) => {
-      setStepNameDraft(value)
+  const handleSaveCanvas = useCallback(async () => {
+    if (!selectedProcessId || !canvas) return
 
-      const current = selectedNode
-      if (!current || current.type !== 'step') {
-        return
+    const edgesByKind = {
+      process: [] as any[],
+      stepImpl: [] as any[],
+      implDr: [] as any[],
+    }
+
+    edges.forEach((edge) => {
+      const kind = (edge.data as any)?.kind
+      if (kind === 'process') {
+        const fromStepId = edge.source.slice('step:'.length)
+        const toStepId = edge.target.slice('step:'.length)
+        edgesByKind.process.push({
+          from_step_id: fromStepId,
+          to_step_id: toStepId,
+          from_handle: (edge as any).sourceHandle || null,
+          to_handle: (edge as any).targetHandle || null,
+          edge_type: (edge.data as any)?.edge_type,
+          condition: (edge.data as any)?.condition,
+          label: edge.label || (edge.data as any)?.label,
+        })
+      } else if (kind === 'step-impl') {
+        const sourceIsStep = edge.source.startsWith('step:')
+        const sourceIsImpl = edge.source.startsWith('impl:')
+
+        const stepId = sourceIsStep
+          ? edge.source.slice('step:'.length)
+          : edge.target.slice('step:'.length)
+        const implId = sourceIsImpl
+          ? edge.source.slice('impl:'.length)
+          : edge.target.slice('impl:'.length)
+
+        const sourceHandle = (edge as any).sourceHandle || null
+        const targetHandle = (edge as any).targetHandle || null
+
+        const stepHandle = sourceIsStep ? sourceHandle : targetHandle
+        const implHandle = sourceIsImpl ? sourceHandle : targetHandle
+
+        edgesByKind.stepImpl.push({
+          step_id: stepId,
+          impl_id: implId,
+          step_handle: stepHandle,
+          impl_handle: implHandle,
+        })
+      } else if (kind === 'impl-dr') {
+        const sourceIsImpl = edge.source.startsWith('impl:')
+        const sourceIsDr = edge.source.startsWith('dr:')
+
+        const implId = sourceIsImpl
+          ? edge.source.slice('impl:'.length)
+          : edge.target.slice('impl:'.length)
+        const resourceId = sourceIsDr
+          ? edge.source.slice('dr:'.length)
+          : edge.target.slice('dr:'.length)
+
+        const sourceHandle = (edge as any).sourceHandle || null
+        const targetHandle = (edge as any).targetHandle || null
+
+        const implHandle = sourceIsImpl ? sourceHandle : targetHandle
+        const resourceHandle = sourceIsDr ? sourceHandle : targetHandle
+
+        edgesByKind.implDr.push({
+          impl_id: implId,
+          resource_id: resourceId,
+          impl_handle: implHandle,
+          resource_handle: resourceHandle,
+          access_type: (edge.data as any)?.access_type,
+          access_pattern: (edge.data as any)?.access_pattern,
+        })
       }
-      const capabilityId = current.data.step_id
+    })
 
-      // 更新步骤列表中的名称
-      setSteps((prev) =>
-        prev.map((s) =>
-          s.capability_id === capabilityId ? { ...s, name: value } : s,
-        ),
-      )
-
-      // 更新画布节点上的 label 文本
-      setNodes((prev) =>
-        prev.map((node) => {
-          const nodeCapId = (node.data as any)?.capabilityId as string | undefined
-          if (nodeCapId !== capabilityId) {
-            return node
-          }
-          const oldLabel = String((node.data as any)?.label ?? '')
-          const dotIndex = oldLabel.indexOf('.')
-          const prefix = dotIndex >= 0 ? oldLabel.slice(0, dotIndex) : ''
-          const newLabel = prefix ? `${prefix}. ${value}` : value
-          return {
-            ...node,
-            data: {
-              ...(node.data as any),
-              label: newLabel,
-            },
-          }
-        }),
-      )
-
-      // 更新右侧已选节点的名称
-      setSelectedNode((prev) =>
-        prev && prev.type === 'step'
-          ? { ...prev, data: { ...prev.data, name: value } }
-          : prev,
-      )
-    },
-    [selectedNode],
-  )
-
-  const handleSaveSteps = useCallback(async () => {
-    if (!selectedProcessId || steps.length === 0) {
-      return
-    }
-    setSaving(true)
-    try {
-      const payload = steps.map((s) => ({ ...s, name: s.name }))
-      const saved = await saveProcessSteps(selectedProcessId, payload)
-      setSteps(saved)
-    } finally {
-      setSaving(false)
-    }
-  }, [selectedProcessId, steps])
-
-  const handleDeleteStepClick = useCallback(async () => {
-    if (!selectedProcessId || !selectedNode || selectedNode.type !== 'step') {
-      return
-    }
-    const ok = window.confirm('确认删除该步骤？')
-    if (!ok) {
-      return
-    }
-    const capabilityId = selectedNode.data.step_id
-    const row = steps.find((s) => s.capability_id === capabilityId)
-    if (!row) {
-      return
+    const payload: ProcessCanvas = {
+      process: canvas.process,
+      steps: canvas.steps,
+      edges: edgesByKind.process,
+      implementations: canvas.implementations,
+      step_impl_links: edgesByKind.stepImpl,
+      data_resources: canvas.data_resources,
+      impl_data_links: edgesByKind.implDr,
     }
 
     setSaving(true)
     try {
-      await deleteProcessStep(selectedProcessId, row.step_id)
-      const remaining = steps.filter((s) => s.step_id !== row.step_id)
-      setSteps(remaining)
-
-      // 同步移除画布上的节点和相关连线
-      setNodes((prev) =>
-        prev.filter((node) => {
-          const nodeCapId = (node.data as any)?.capabilityId as string | undefined
-          return nodeCapId !== capabilityId
-        }),
-      )
-      setEdges((prev) =>
-        prev.filter(
-          (edge) =>
-            !edge.source.endsWith(`:${capabilityId}`) &&
-            !edge.target.endsWith(`:${capabilityId}`),
-        ),
-      )
-
-      setSelectedNode(null)
-      setStepNameDraft('')
+      const saved = await saveProcessCanvas(selectedProcessId, payload)
+      setCanvas(saved)
+      setHasChanges(false)
     } finally {
       setSaving(false)
     }
-  }, [selectedNode, selectedProcessId, steps])
+  }, [selectedProcessId, canvas, edges])
+
+  const handleCancelChanges = useCallback(() => {
+    if (!hasChanges) return
+    const ok = window.confirm('确认放弃所有更改？')
+    if (!ok) return
+    loadCanvas()
+  }, [hasChanges, loadCanvas])
 
   const handleConnect = useCallback(
-    async (connection: Connection) => {
-      if (!selectedProcessId) {
-        return
-      }
-
+    (connection: Connection) => {
       const rawSource = connection.source || ''
       const rawTarget = connection.target || ''
-      if (!rawSource || !rawTarget) {
-        return
-      }
+      if (!rawSource || !rawTarget) return
 
       const sourceIsStep = rawSource.startsWith('step:')
       const sourceIsImpl = rawSource.startsWith('impl:')
@@ -614,266 +724,113 @@ const BusinessLibraryPage: React.FC = () => {
       const targetIsImpl = rawTarget.startsWith('impl:')
       const targetIsDr = rawTarget.startsWith('dr:')
 
-      // 1) Step ↔ Step：流程边
+      let newEdge: Edge | null = null
+
       if (sourceIsStep && targetIsStep) {
-        const fromStepId = rawSource.slice('step:'.length)
-        const toStepId = rawTarget.slice('step:'.length)
-        if (!fromStepId || !toStepId) {
-          return
-        }
-        try {
-          const created = await createProcessEdge(selectedProcessId, {
-            from_step_id: fromStepId,
-            to_step_id: toStepId,
+        newEdge = {
+          id: `edge:process:${Date.now()}`,
+          source: rawSource,
+          target: rawTarget,
+          sourceHandle: connection.sourceHandle || undefined,
+          targetHandle: connection.targetHandle || undefined,
+          type: 'smoothstep',
+          markerEnd: { type: MarkerType.ArrowClosed },
+          data: {
+            kind: 'process',
             edge_type: undefined,
             condition: undefined,
             label: undefined,
-          })
-          setEdges((prev) => [
-            ...prev,
-            {
-              id: `edge:process:${created.id}`,
-              source: `step:${created.from_step_id}`,
-              target: `step:${created.to_step_id}`,
-              label: created.label,
-              data: {
-                kind: 'process',
-                dbId: created.id,
-                edge_type: created.edge_type,
-                condition: created.condition,
-                label: created.label,
-              },
-            },
-          ])
-        } catch (e) {
-          // ignore
+          },
         }
-        return
-      }
-
-      // 2) Step ↔ Implementation：Step-Implementation 关系
-      if (
+      } else if (
         (sourceIsStep && targetIsImpl) ||
         (sourceIsImpl && targetIsStep)
       ) {
-        const stepId = (sourceIsStep ? rawSource : rawTarget).slice('step:'.length)
-        const implId = (sourceIsImpl ? rawSource : rawTarget).slice('impl:'.length)
-        if (!stepId || !implId) {
-          return
+        newEdge = {
+          id: `edge:step-impl:${Date.now()}`,
+          source: rawSource,
+          target: rawTarget,
+          sourceHandle: connection.sourceHandle || undefined,
+          targetHandle: connection.targetHandle || undefined,
+          type: 'smoothstep',
+          markerEnd: { type: MarkerType.ArrowClosed },
+          style: { stroke: '#52c41a' },
+          data: { kind: 'step-impl' },
         }
-        try {
-          const link = await createStepImplementationLink(stepId, implId)
-          setEdges((prev) => [
-            ...prev,
-            {
-              id: `edge:step-impl:${link.id}`,
-              source: `step:${link.step_id}`,
-              target: `impl:${link.impl_id}`,
-              data: {
-                kind: 'step-impl',
-                dbId: link.id,
-              },
-            },
-          ])
-        } catch (e) {
-          // ignore
-        }
-        return
-      }
-
-      // 3) Implementation ↔ DataResource：Implementation-DataResource 关系
-      if (
+      } else if (
         (sourceIsImpl && targetIsDr) ||
         (sourceIsDr && targetIsImpl)
       ) {
-        const implId = (sourceIsImpl ? rawSource : rawTarget).slice('impl:'.length)
-        const resId = (sourceIsDr ? rawSource : rawTarget).slice('dr:'.length)
-        if (!implId || !resId) {
-          return
+        newEdge = {
+          id: `edge:impl-dr:${Date.now()}`,
+          source: rawSource,
+          target: rawTarget,
+          sourceHandle: connection.sourceHandle || undefined,
+          targetHandle: connection.targetHandle || undefined,
+          type: 'smoothstep',
+          markerEnd: { type: MarkerType.ArrowClosed },
+          style: { stroke: '#faad14' },
+          data: { kind: 'impl-dr' },
         }
-        try {
-          const link = await createImplementationDataLink({
-            impl_id: implId,
-            resource_id: resId,
-            access_type: undefined,
-            access_pattern: undefined,
-          })
-          setEdges((prev) => [
-            ...prev,
-            {
-              id: `edge:impl-dr:${link.id}`,
-              source: `impl:${link.impl_id}`,
-              target: `dr:${link.resource_id}`,
-              data: {
-                kind: 'impl-dr',
-                dbId: link.id,
-                access_type: link.access_type,
-                access_pattern: link.access_pattern,
-              },
-            },
-          ])
-        } catch (e) {
-          // ignore
-        }
-        return
       }
 
-      // 其它组合不允许
+      if (newEdge) {
+        setEdges((prev) => [...prev, newEdge!])
+        setHasChanges(true)
+      }
     },
-    [selectedProcessId],
+    [],
   )
 
   const handleEdgeUpdate = useCallback(
-    async (oldEdge: Edge, connection: Connection) => {
-      if (!selectedProcessId) {
-        return
-      }
-      const data = oldEdge.data as any
-      const kind = data?.kind as string | undefined
-      const dbId = data?.dbId as number | undefined
+    (oldEdge: Edge, connection: Connection) => {
       const rawSource = connection.source || ''
       const rawTarget = connection.target || ''
+      if (!rawSource || !rawTarget) return
 
-      if (!dbId) {
-        return
+      const kind = (oldEdge.data as any)?.kind
+      if (!kind) return
+
+      const sourceIsStep = rawSource.startsWith('step:')
+      const sourceIsImpl = rawSource.startsWith('impl:')
+      const sourceIsDr = rawSource.startsWith('dr:')
+      const targetIsStep = rawTarget.startsWith('step:')
+      const targetIsImpl = rawTarget.startsWith('impl:')
+      const targetIsDr = rawTarget.startsWith('dr:')
+
+      let valid = false
+      if (kind === 'process' && sourceIsStep && targetIsStep) {
+        valid = true
+      } else if (
+        kind === 'step-impl' &&
+        ((sourceIsStep && targetIsImpl) || (sourceIsImpl && targetIsStep))
+      ) {
+        valid = true
+      } else if (
+        kind === 'impl-dr' &&
+        ((sourceIsImpl && targetIsDr) || (sourceIsDr && targetIsImpl))
+      ) {
+        valid = true
       }
 
-      // 1) 流程边：Step ↔ Step
-      if (kind === 'process') {
-        if (!rawSource.startsWith('step:') || !rawTarget.startsWith('step:')) {
-          return
-        }
-        const fromStepId = rawSource.slice('step:'.length)
-        const toStepId = rawTarget.slice('step:'.length)
-        if (!fromStepId || !toStepId) {
-          return
-        }
-        try {
-          const updated = await updateProcessEdge(selectedProcessId, dbId, {
-            from_step_id: fromStepId,
-            to_step_id: toStepId,
-          })
-          setEdges((prev) =>
-            prev.map((e) =>
-              e.id === oldEdge.id
-                ? {
-                    ...e,
-                    id: `edge:process:${updated.id}`,
-                    source: `step:${updated.from_step_id}`,
-                    target: `step:${updated.to_step_id}`,
-                    label: updated.label,
-                    data: {
-                      kind: 'process',
-                      dbId: updated.id,
-                      edge_type: updated.edge_type,
-                      condition: updated.condition,
-                      label: updated.label,
-                    },
-                  }
-                : e,
-            ),
-          )
-        } catch (e) {
-          // ignore
-        }
-        return
-      }
+      if (!valid) return
 
-      // 2) Step-Implementation：通过删旧建新实现拖动修改
-      if (kind === 'step-impl') {
-        const sourceIsStep = rawSource.startsWith('step:')
-        const sourceIsImpl = rawSource.startsWith('impl:')
-        const targetIsStep = rawTarget.startsWith('step:')
-        const targetIsImpl = rawTarget.startsWith('impl:')
-        if (
-          !(
-            (sourceIsStep && targetIsImpl) ||
-            (sourceIsImpl && targetIsStep)
-          )
-        ) {
-          return
-        }
-        const stepId = (sourceIsStep ? rawSource : rawTarget).slice('step:'.length)
-        const implId = (sourceIsImpl ? rawSource : rawTarget).slice('impl:'.length)
-        if (!stepId || !implId) {
-          return
-        }
-        try {
-          await deleteStepImplementationLink(dbId)
-          const link = await createStepImplementationLink(stepId, implId)
-          setEdges((prev) =>
-            prev.map((e) =>
-              e.id === oldEdge.id
-                ? {
-                    ...e,
-                    id: `edge:step-impl:${link.id}`,
-                    source: `step:${link.step_id}`,
-                    target: `impl:${link.impl_id}`,
-                    data: {
-                      kind: 'step-impl',
-                      dbId: link.id,
-                    },
-                  }
-                : e,
-            ),
-          )
-        } catch (e) {
-          // ignore
-        }
-        return
-      }
-
-      // 3) Implementation-DataResource：同样通过删旧建新
-      if (kind === 'impl-dr') {
-        const sourceIsImpl = rawSource.startsWith('impl:')
-        const sourceIsDr = rawSource.startsWith('dr:')
-        const targetIsImpl = rawTarget.startsWith('impl:')
-        const targetIsDr = rawTarget.startsWith('dr:')
-        if (
-          !(
-            (sourceIsImpl && targetIsDr) ||
-            (sourceIsDr && targetIsImpl)
-          )
-        ) {
-          return
-        }
-        const implId = (sourceIsImpl ? rawSource : rawTarget).slice('impl:'.length)
-        const resId = (sourceIsDr ? rawSource : rawTarget).slice('dr:'.length)
-        if (!implId || !resId) {
-          return
-        }
-        try {
-          await deleteImplementationDataLink(dbId)
-          const link: ImplementationDataLink = await createImplementationDataLink({
-            impl_id: implId,
-            resource_id: resId,
-            access_type: data?.access_type,
-            access_pattern: data?.access_pattern,
-          })
-          setEdges((prev) =>
-            prev.map((e) =>
-              e.id === oldEdge.id
-                ? {
-                    ...e,
-                    id: `edge:impl-dr:${link.id}`,
-                    source: `impl:${link.impl_id}`,
-                    target: `dr:${link.resource_id}`,
-                    data: {
-                      kind: 'impl-dr',
-                      dbId: link.id,
-                      access_type: link.access_type,
-                      access_pattern: link.access_pattern,
-                    },
-                  }
-                : e,
-            ),
-          )
-        } catch (e) {
-          // ignore
-        }
-      }
+      setEdges((prev) =>
+        prev.map((e) =>
+          e.id === oldEdge.id
+            ? {
+                ...e,
+                source: rawSource,
+                target: rawTarget,
+                sourceHandle: connection.sourceHandle || undefined,
+                targetHandle: connection.targetHandle || undefined,
+              }
+            : e,
+        ),
+      )
+      setHasChanges(true)
     },
-    [selectedProcessId],
+    [],
   )
 
   const showSidebar = !!selectedNode
@@ -960,14 +917,33 @@ const BusinessLibraryPage: React.FC = () => {
           size="small"
           title={currentProcess?.name || '业务流程画布'}
           extra={
-            currentProcess?.channel ? (
-              <Tag color="geekblue">{currentProcess.channel}</Tag>
-            ) : null
+            <Space>
+              {hasChanges && <Tag color="orange">未保存</Tag>}
+              {currentProcess?.channel ? (
+                <Tag color="geekblue">{currentProcess.channel}</Tag>
+              ) : null}
+              <Button
+                type="primary"
+                size="small"
+                loading={saving}
+                disabled={!hasChanges}
+                onClick={handleSaveCanvas}
+              >
+                保存画布
+              </Button>
+              <Button
+                size="small"
+                disabled={!hasChanges}
+                onClick={handleCancelChanges}
+              >
+                取消
+              </Button>
+            </Space>
           }
           style={{ height: '100%' }}
           bodyStyle={{ height: '100%' }}
         >
-          {loadingContext ? (
+          {loadingCanvas ? (
             <div
               style={{
                 height: '100%',
@@ -992,15 +968,19 @@ const BusinessLibraryPage: React.FC = () => {
           ) : (
             <div style={{ width: '100%', height: '100%' }}>
               <ReactFlow
-                nodes={nodes}
-                edges={edges}
+                nodes={displayNodes}
+                edges={displayEdges}
                 fitView
+                nodeTypes={nodeTypes}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={handleConnect}
                 onEdgeUpdate={handleEdgeUpdate}
                 onNodeClick={handleNodeClick}
-                onPaneClick={() => setSelectedNode(null)}
+                onPaneClick={() => {
+                  setSelectedNode(null)
+                  setHighlightNodeId(null)
+                }}
               >
                 <Background />
                 <Controls />
@@ -1075,12 +1055,7 @@ const BusinessLibraryPage: React.FC = () => {
                 </Paragraph>
                 <Paragraph>
                   <Text strong>名称：</Text>
-                  <Input
-                    size="small"
-                    value={stepNameDraft}
-                    onChange={(e) => handleStepNameChange(e.target.value)}
-                    style={{ marginTop: 4 }}
-                  />
+                  <Text>{selectedNode.data.name}</Text>
                 </Paragraph>
                 {typeof selectedNode.data.order_no !== 'undefined' && (
                   <Paragraph>
@@ -1128,7 +1103,14 @@ const BusinessLibraryPage: React.FC = () => {
                               </Text>
                             )}
                             {impl.code_ref && (
-                              <Text type="secondary" style={{ fontSize: 12 }}>
+                              <Text
+                                type="secondary"
+                                style={{
+                                  fontSize: 12,
+                                  wordBreak: 'break-all',
+                                  overflowWrap: 'break-word',
+                                }}
+                              >
                                 代码位置：{impl.code_ref}
                               </Text>
                             )}
@@ -1217,7 +1199,14 @@ const BusinessLibraryPage: React.FC = () => {
                 {selectedNode.data.code_ref && (
                   <Paragraph>
                     <Text strong>代码位置：</Text>
-                    <Text>{selectedNode.data.code_ref}</Text>
+                    <Text
+                      style={{
+                        wordBreak: 'break-all',
+                        overflowWrap: 'break-word',
+                      }}
+                    >
+                      {selectedNode.data.code_ref}
+                    </Text>
                   </Paragraph>
                 )}
 
@@ -1337,7 +1326,14 @@ const BusinessLibraryPage: React.FC = () => {
                               </Text>
                             )}
                             {impl.code_ref && (
-                              <Text type="secondary" style={{ fontSize: 12 }}>
+                              <Text
+                                type="secondary"
+                                style={{
+                                  fontSize: 12,
+                                  wordBreak: 'break-all',
+                                  overflowWrap: 'break-word',
+                                }}
+                              >
                                 代码位置：{impl.code_ref}
                               </Text>
                             )}
@@ -1349,29 +1345,6 @@ const BusinessLibraryPage: React.FC = () => {
                 </div>
               </div>
             )}
-
-            <div style={{ marginTop: 24 }}>
-              <Space>
-                <Button
-                  type="primary"
-                  size="small"
-                  loading={saving}
-                  onClick={handleSaveSteps}
-                >
-                  保存步骤
-                </Button>
-                {selectedNode.type === 'step' && (
-                  <Button
-                    danger
-                    size="small"
-                    loading={saving}
-                    onClick={handleDeleteStepClick}
-                  >
-                    删除该步骤
-                  </Button>
-                )}
-              </Space>
-            </div>
           </div>
         )}
       </div>

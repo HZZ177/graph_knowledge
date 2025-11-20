@@ -2,7 +2,14 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from backend.app.api.v1 import processes, chat, graph, data_resources, resource_nodes
+from backend.app.api.v1 import (
+    processes,
+    chat,
+    graph,
+    data_resources,
+    resource_nodes,
+    canvas,
+)
 
 from backend.app.db.sqlite import Base, engine, SessionLocal
 from backend.app.db.init_db import init_db
@@ -23,6 +30,7 @@ app.include_router(chat.router, prefix="/api/v1")
 app.include_router(graph.router, prefix="/api/v1")
 app.include_router(data_resources.router, prefix="/api/v1")
 app.include_router(resource_nodes.router, prefix="/api/v1")
+app.include_router(canvas.router, prefix="/api/v1")
 
 
 @app.on_event("startup")
@@ -51,5 +59,5 @@ if __name__ == "__main__":
         host="0.0.0.0",
         port=8000,
         reload=True,
-        # access_log=False  # 禁用uvicorn访问日志，避免与自定义中间件重复
+        access_log=False  # 禁用uvicorn访问日志，避免与自定义中间件重复
     )
