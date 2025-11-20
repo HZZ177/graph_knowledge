@@ -17,8 +17,8 @@ import {
   Pagination,
 } from 'antd'
 
-import ReactFlow, { Background, Controls, Edge, Node } from 'reactflow'
-import 'reactflow/dist/style.css'
+import { ReactFlow, Background, Controls, Edge, Node } from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
 
 import {
   BusinessSimple,

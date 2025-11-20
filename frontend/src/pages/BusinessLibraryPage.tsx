@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, Typography, List, Spin, Empty, Space, Tag, Button } from 'antd'
-import ReactFlow, {
+import {
+  ReactFlow,
   Background,
   Controls,
   Edge,
@@ -8,13 +9,15 @@ import ReactFlow, {
   MarkerType,
   Position,
   Handle,
+  NodeResizer,
   applyNodeChanges,
   applyEdgeChanges,
+  reconnectEdge,
   type NodeChange,
   type EdgeChange,
   type Connection,
-} from 'reactflow'
-import 'reactflow/dist/style.css'
+} from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
 
 import {
   listProcesses,
@@ -35,81 +38,154 @@ const layoutGraph = (nodes: Node[], edges: Edge[]) => {
 
   const layoutedEdges: Edge[] = edges.map((edge) => ({
     ...edge,
-    type: 'smoothstep',
+    type: edge.type || 'simplebezier',
     markerEnd: { type: MarkerType.ArrowClosed },
   }))
 
   return { nodes: layoutedNodes, edges: layoutedEdges }
 }
 
-const AllSidesNode = ({ data, style }: any) => {
+const AllSidesNode = React.memo(({ data, selected }: any) => {
+  const [hovered, setHovered] = useState(false)
   const baseHandleStyle = {
-    width: 0,
-    height: 0,
-    background: '#000',
-    border: 'none',
+    width: 4,
+    height: 4,
+    background: '#bfbfbf',
+    border: '1px solid #d9d9d9',
     borderRadius: '50%',
   } as const
 
+  const nodeType = data?.nodeType as 'step' | 'implementation' | 'data' | undefined
+  let headerBg = '#f5f5f5'
+  let headerColor = '#595959'
+
+  if (nodeType === 'step') {
+    headerBg = '#e6f4ff'
+    headerColor = '#0958d9'
+  } else if (nodeType === 'implementation') {
+    headerBg = '#f6ffed'
+    headerColor = '#237804'
+  } else if (nodeType === 'data') {
+    headerBg = '#fff7e6'
+    headerColor = '#ad6800'
+  }
+
   return (
-    <div
-      style={{
-        position: 'relative',
-        ...(style || {}),
-      }}
-    >
+    <>
+      <NodeResizer
+        isVisible={selected}
+        minWidth={120}
+        minHeight={40}
+        lineStyle={{ border: 'none' }}
+        handleStyle={{
+          width: 6,
+          height: 6,
+          borderRadius: 2,
+          border: '1px solid #d9d9d9',
+          background: '#ffffff',
+        }}
+      />
       <Handle
         type="target"
         position={Position.Top}
         id="t-in"
-        style={{ ...baseHandleStyle, top: -7 }}
+        style={{ ...baseHandleStyle, top: -1 }}
       />
       <Handle
         type="source"
         position={Position.Top}
         id="t-out"
-        style={{ ...baseHandleStyle, top: -7 }}
+        style={{ ...baseHandleStyle, top: -1 }}
       />
       <Handle
         type="target"
         position={Position.Bottom}
         id="b-in"
-        style={{ ...baseHandleStyle, bottom: -7 }}
+        style={{ ...baseHandleStyle, bottom: -1 }}
       />
       <Handle
         type="source"
         position={Position.Bottom}
         id="b-out"
-        style={{ ...baseHandleStyle, bottom: -7 }}
+        style={{ ...baseHandleStyle, bottom:-1 }}
       />
       <Handle
         type="target"
         position={Position.Left}
         id="l-in"
-        style={{ ...baseHandleStyle, left: -7 }}
+        style={{ ...baseHandleStyle, left: -1 }}
       />
       <Handle
         type="source"
         position={Position.Left}
         id="l-out"
-        style={{ ...baseHandleStyle, left: -7 }}
+        style={{ ...baseHandleStyle, left: -1 }}
       />
       <Handle
         type="target"
         position={Position.Right}
         id="r-in"
-        style={{ ...baseHandleStyle, right: -7 }}
+        style={{ ...baseHandleStyle, right: -1 }}
       />
       <Handle
         type="source"
         position={Position.Right}
         id="r-out"
-        style={{ ...baseHandleStyle, right: -7 }}
+        style={{ ...baseHandleStyle, right: -1 }}
       />
-      <div>{data?.label}</div>
-    </div>
+      <div
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        style={{
+          borderRadius: 14,
+          background: '#ffffff',
+          overflow: 'hidden',
+          width: '100%',
+          height: '100%',
+          display: 'flex',
+          flexDirection: 'column',
+          boxShadow: selected
+            ? '0 6px 16px rgba(0, 0, 0, 0.25)'
+            : hovered
+            ? '0 4px 12px rgba(0, 0, 0, 0.2)'
+            : '0 2px 8px rgba(0, 0, 0, 0.15)',
+          border: selected ? '1px solid #1677ff' : '1px solid transparent',
+          transform: hovered && !selected ? 'translateY(-1px)' : 'translateY(0)',
+          transition: 'box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease',
+        }}
+      >
+        {data?.typeLabel && (
+          <div
+            style={{
+              padding: '4px 8px',
+              background: headerBg,
+              color: headerColor,
+              borderBottom: '1px solid #f0f0f0',
+              fontWeight: 500,
+              fontSize: 11,
+              borderTopLeftRadius: 12,
+              borderTopRightRadius: 12,
+            }}
+          >
+            {data.typeLabel}
+          </div>
+        )}
+        <div
+          style={{
+            padding: 8,
+            fontSize: 12,
+            flex: 1,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          {data?.label}
+        </div>
+      </div>
+    </>
   )
-}
+})
 
 type SelectedNode =
   | {
@@ -254,15 +330,14 @@ const BusinessLibraryPage: React.FC = () => {
         .filter((s): s is NonNullable<typeof s> => s !== undefined)
 
       const stepGapX = 260
-      const centerY = 0
-      const implBaseOffsetY = 140
-      const implGapY = 80
-      const dataBaseOffsetY = 140
-      const dataGapY = 80
+      const stepY = 0
+      const implY = 180
+      const dataY = 360
 
       const stepNodes: Node[] = []
       const implNodes = new Map<string, Node>()
       const drNodes = new Map<string, Node>()
+      const implXMap = new Map<string, number>()
 
       sorted.forEach((s, index) => {
         const stepId = s.step_id
@@ -274,67 +349,85 @@ const BusinessLibraryPage: React.FC = () => {
           data: {
             label: `${index + 1}. ${displayName}`,
             stepId,
+            nodeType: 'step',
+            typeLabel: '步骤',
           },
-          position: { x: stepX, y: centerY },
+          position: { x: stepX, y: stepY },
           type: 'allSides',
           style: {
-            borderRadius: 12,
-            border: '1px solid #1677ff',
-            background: '#ffffff',
-            padding: 4,
+            padding: 0,
+            border: 'none',
+            background: 'transparent',
+            boxShadow: 'none',
           },
         })
 
         const implIds = stepImplMap.get(stepId) || []
+        const implCount = implIds.length
         implIds.forEach((implId, implIndex) => {
           if (implNodes.has(implId)) return
           const impl = implById.get(implId)
           if (!impl) return
           const implLabel = impl.name || implId
+          const implOffsetX =
+            implCount > 1 ? (implIndex - (implCount - 1) / 2) * 120 : 0
+          const implX = stepX + implOffsetX
+
           implNodes.set(implId, {
             id: `impl:${implId}`,
             data: {
               label: implLabel,
               implId,
+              nodeType: 'implementation',
+              typeLabel: '实现',
             },
             position: {
-              x: stepX,
-              y: centerY - (implBaseOffsetY + implIndex * implGapY),
+              x: implX,
+              y: implY,
             },
             type: 'allSides',
             style: {
-              borderRadius: 12,
-              border: '1px solid #52c41a',
-              background: '#f6ffed',
-              padding: 4,
+              padding: 0,
+              border: 'none',
+              background: 'transparent',
+              boxShadow: 'none',
             },
           })
+          implXMap.set(implId, implX)
         })
 
         implIds.forEach((implId) => {
           const dataLinks = implDataMap.get(implId) || []
+          const dataCount = dataLinks.length
           dataLinks.forEach((link, drIndex) => {
             const resId = link.resource_id
             if (drNodes.has(resId)) return
             const dr = drById.get(resId)
             if (!dr) return
             const drLabel = dr.name || resId
+            const baseImplX = implXMap.get(implId) ?? stepX
+            const drOffsetX =
+              dataCount > 1 ? (drIndex - (dataCount - 1) / 2) * 120 : 0
+            const drX = baseImplX + drOffsetX
+
             drNodes.set(resId, {
               id: `dr:${resId}`,
               data: {
                 label: drLabel,
                 resource: dr,
+                nodeType: 'data',
+                typeLabel: '数据资源',
               },
               position: {
-                x: stepX,
-                y: centerY + (dataBaseOffsetY + drIndex * dataGapY),
+                x: drX,
+                y: dataY,
               },
               type: 'allSides',
               style: {
-                borderRadius: 12,
-                border: '1px solid #faad14',
-                background: '#fff7e6',
-                padding: 4,
+                padding: 0,
+                border: 'none',
+                background: 'transparent',
+                boxShadow: 'none',
               },
             })
           })
@@ -451,17 +544,40 @@ const BusinessLibraryPage: React.FC = () => {
   )
 
   const displayEdges: Edge[] = useMemo(() => {
-    if (!highlightNodeId) {
-      return edges
-    }
     return edges.map((edge) => {
+      const isSelected = !!edge.selected
       const isConnected =
-        edge.source === highlightNodeId || edge.target === highlightNodeId
+        !!highlightNodeId &&
+        (edge.source === highlightNodeId || edge.target === highlightNodeId)
+
+      const baseStyle = edge.style || {}
+
+      let stroke = baseStyle.stroke
+      let strokeWidth = (baseStyle as any).strokeWidth ?? 1.5
+      let opacity = (baseStyle as any).opacity ?? 1
+      let strokeDasharray = baseStyle.strokeDasharray as string | undefined
+
+      if (highlightNodeId) {
+        opacity = isConnected ? 1 : 0.15
+        strokeDasharray = isConnected ? '6 3' : undefined
+      }
+
+      if (isSelected) {
+        stroke = '#40a9ff'
+        strokeWidth = 2.5
+        opacity = 1
+        strokeDasharray = undefined
+      }
+
       return {
         ...edge,
+        animated: isConnected || isSelected,
         style: {
-          ...(edge.style || {}),
-          opacity: isConnected ? 1 : 0.15,
+          ...baseStyle,
+          stroke,
+          strokeWidth,
+          opacity,
+          strokeDasharray,
         },
       }
     })
@@ -733,7 +849,7 @@ const BusinessLibraryPage: React.FC = () => {
           target: rawTarget,
           sourceHandle: connection.sourceHandle || undefined,
           targetHandle: connection.targetHandle || undefined,
-          type: 'smoothstep',
+          type: 'simplebezier',
           markerEnd: { type: MarkerType.ArrowClosed },
           data: {
             kind: 'process',
@@ -752,7 +868,7 @@ const BusinessLibraryPage: React.FC = () => {
           target: rawTarget,
           sourceHandle: connection.sourceHandle || undefined,
           targetHandle: connection.targetHandle || undefined,
-          type: 'smoothstep',
+          type: 'simplebezier',
           markerEnd: { type: MarkerType.ArrowClosed },
           style: { stroke: '#52c41a' },
           data: { kind: 'step-impl' },
@@ -767,7 +883,7 @@ const BusinessLibraryPage: React.FC = () => {
           target: rawTarget,
           sourceHandle: connection.sourceHandle || undefined,
           targetHandle: connection.targetHandle || undefined,
-          type: 'smoothstep',
+          type: 'simplebezier',
           markerEnd: { type: MarkerType.ArrowClosed },
           style: { stroke: '#faad14' },
           data: { kind: 'impl-dr' },
@@ -782,7 +898,7 @@ const BusinessLibraryPage: React.FC = () => {
     [],
   )
 
-  const handleEdgeUpdate = useCallback(
+  const handleReconnect = useCallback(
     (oldEdge: Edge, connection: Connection) => {
       const rawSource = connection.source || ''
       const rawTarget = connection.target || ''
@@ -815,19 +931,7 @@ const BusinessLibraryPage: React.FC = () => {
 
       if (!valid) return
 
-      setEdges((prev) =>
-        prev.map((e) =>
-          e.id === oldEdge.id
-            ? {
-                ...e,
-                source: rawSource,
-                target: rawTarget,
-                sourceHandle: connection.sourceHandle || undefined,
-                targetHandle: connection.targetHandle || undefined,
-              }
-            : e,
-        ),
-      )
+      setEdges((prev) => reconnectEdge(oldEdge, connection, prev))
       setHasChanges(true)
     },
     [],
@@ -975,7 +1079,7 @@ const BusinessLibraryPage: React.FC = () => {
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
                 onConnect={handleConnect}
-                onEdgeUpdate={handleEdgeUpdate}
+                onReconnect={handleReconnect}
                 onNodeClick={handleNodeClick}
                 onPaneClick={() => {
                   setSelectedNode(null)
