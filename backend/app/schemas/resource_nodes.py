@@ -11,7 +11,7 @@ class BusinessBase(BaseModel):
 
 
 class BusinessCreate(BusinessBase):
-    process_id: str
+    pass
 
 
 class BusinessUpdate(BaseModel):
@@ -42,7 +42,7 @@ class StepBase(BaseModel):
 
 
 class StepCreate(StepBase):
-    step_id: str
+    pass
 
 
 class StepUpdate(BaseModel):
@@ -74,7 +74,7 @@ class ImplementationBase(BaseModel):
 
 
 class ImplementationCreate(ImplementationBase):
-    impl_id: str
+    pass
 
 
 class ImplementationUpdate(BaseModel):

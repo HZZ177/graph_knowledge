@@ -9,6 +9,7 @@ from backend.app.api.v1 import (
     data_resources,
     resource_nodes,
     canvas,
+    health,
 )
 
 from backend.app.db.sqlite import Base, engine, SessionLocal
@@ -31,6 +32,7 @@ app.include_router(graph.router, prefix="/api/v1")
 app.include_router(data_resources.router, prefix="/api/v1")
 app.include_router(resource_nodes.router, prefix="/api/v1")
 app.include_router(canvas.router, prefix="/api/v1")
+app.include_router(health.router, prefix="/api/v1")
 
 
 @app.on_event("startup")

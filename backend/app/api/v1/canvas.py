@@ -31,7 +31,11 @@ def get_canvas(process_id: str, db: Session = Depends(get_db)) -> dict:
 
 @router.put("/{process_id}")
 def save_canvas(process_id: str, payload: dict, db: Session = Depends(get_db)) -> dict:
-    """保存流程画布：包含步骤、连线、实现与数据资源关系。"""
+    """保存流程画布：包含步骤、连线、实现与数据资源关系。
+    
+    Returns:
+        包含画布数据和同步状态的信息
+    """
 
     logger.info(
         f"保存流程画布开始 process_id={process_id}, steps={len((payload or {}).get('steps', []))}, edges={len((payload or {}).get('edges', []))}"
@@ -39,17 +43,39 @@ def save_canvas(process_id: str, payload: dict, db: Session = Depends(get_db)) -
     try:
         # 1. 保存到 SQLite
         data = save_process_canvas(db, process_id, payload)
+        logger.info(f"保存到SQLite成功 process_id={process_id}")
         
         # 2. 同步到 Neo4j
+        sync_result = None
         try:
             logger.info(f"同步流程到图数据库 process_id={process_id}")
-            sync_process(db, process_id)
+            sync_result = sync_process(db, process_id)
+            logger.info(f"同步到Neo4j成功 process_id={process_id}")
         except Exception as e:
             logger.warning(f"同步到 Neo4j 失败 process_id={process_id}, error={e}")
-            # 继续返回结果，不影响 SQLite 保存
+            from backend.app.services.graph_sync_service import SyncError
+            if isinstance(e, SyncError):
+                sync_result = {
+                    "success": False,
+                    "message": e.message,
+                    "error_type": e.error_type,
+                    "synced_at": None
+                }
+            else:
+                sync_result = {
+                    "success": False,
+                    "message": str(e),
+                    "error_type": "unknown_error",
+                    "synced_at": None
+                }
         
-        logger.info(f"保存流程画布成功 process_id={process_id}")
-        return data
+        logger.info(f"保存流程画布完成 process_id={process_id}")
+        
+        # 返回画布数据和同步状态
+        return {
+            **data,
+            "sync_result": sync_result
+        }
     except ValueError:
         logger.warning(f"保存画布失败，流程不存在 process_id={process_id}")
         raise HTTPException(status_code=404, detail="Process not found")

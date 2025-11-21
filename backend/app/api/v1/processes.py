@@ -279,6 +279,11 @@ async def delete_process_edge(
 
 @router.post("/{process_id}/publish")
 async def publish_process(process_id: str, db: Session = Depends(get_db)) -> dict:
+    """发布流程到Neo4j图数据库
+    
+    Returns:
+        包含同步结果的详细信息：success, message, synced_at, stats, error等
+    """
     record = process_service.get_process(db, process_id)
     if record is None:
         raise HTTPException(
@@ -287,11 +292,27 @@ async def publish_process(process_id: str, db: Session = Depends(get_db)) -> dic
         )
 
     try:
-        sync_process(db, process_id)
-    except ValueError:
+        result = sync_process(db, process_id)
+        logger.info(f"发布流程成功 process_id={process_id}")
+        return result
+    except ValueError as e:
+        logger.error(f"发布流程失败 process_id={process_id}, error={e}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail="Process not found",
+            detail=str(e),
         )
-
-    return {"status": "ok"}
+    except Exception as e:
+        logger.error(f"发布流程失败 process_id={process_id}, error={e}")
+        # 返回错误信息而不是抛出异常，让前端能看到详细错误
+        from backend.app.services.graph_sync_service import SyncError
+        if isinstance(e, SyncError):
+            return {
+                "success": False,
+                "message": e.message,
+                "error_type": e.error_type,
+                "synced_at": None
+            }
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"同步失败: {str(e)}",
+        )

@@ -35,7 +35,7 @@ const MainLayout: React.FC = () => {
   ]
 
   return (
-    <Layout style={{ minHeight: '100vh' }}>
+    <Layout style={{ height: '100vh', overflow: 'hidden' }}>
       <Sider
         theme="light"
         collapsible
@@ -89,7 +89,14 @@ const MainLayout: React.FC = () => {
         />
       </Sider>
 
-      <Layout style={{ marginLeft: collapsed ? 80 : 220, transition: 'margin-left 0.2s' }}>
+      <Layout
+        style={{
+          marginLeft: collapsed ? 80 : 220,
+          transition: 'margin-left 0.2s',
+          height: '100vh',
+          overflow: 'hidden',
+        }}
+      >
         <Header
           style={{
             padding: 0,
@@ -117,9 +124,13 @@ const MainLayout: React.FC = () => {
           style={{
             margin: '24px 16px',
             padding: 24,
-            overflow: 'auto',
             borderRadius: 8,
             background: '#fff',
+            display: 'flex',
+            flexDirection: 'column',
+            // 100vh 减去 Header 高度(64px)、Content 上下 margin(48px)、Content 上下 padding(48px)
+            height: 'calc(100vh - 64px - 48px - 48px)',
+            overflow: 'hidden',
           }}
         >
           <Outlet />

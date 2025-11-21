@@ -9,12 +9,15 @@ class DataResourceBase(BaseModel):
     type: Optional[str] = None
     system: Optional[str] = None
     location: Optional[str] = None
-    entity_id: Optional[str] = None
     description: Optional[str] = None
 
 
-class DataResourceCreate(DataResourceBase):
-    pass
+class DataResourceCreate(BaseModel):
+    name: str
+    type: Optional[str] = None
+    system: Optional[str] = None
+    location: Optional[str] = None
+    description: Optional[str] = None
 
 
 class DataResourceUpdate(BaseModel):
@@ -22,7 +25,6 @@ class DataResourceUpdate(BaseModel):
     type: Optional[str] = None
     system: Optional[str] = None
     location: Optional[str] = None
-    entity_id: Optional[str] = None
     description: Optional[str] = None
 
 

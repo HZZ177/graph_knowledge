@@ -61,12 +61,7 @@ def get_business(db: Session, process_id: str) -> Optional[Business]:
 
 
 def create_business(db: Session, data: BusinessCreate) -> Business:
-    existing = get_business(db, data.process_id)
-    if existing:
-        raise ValueError(f"Business {data.process_id} already exists")
-
     obj = Business(
-        process_id=data.process_id,
         name=data.name,
         channel=data.channel,
         description=data.description,
@@ -179,12 +174,7 @@ def get_step(db: Session, step_id: str) -> Optional[Step]:
 
 
 def create_step(db: Session, data: StepCreate) -> Step:
-    existing = get_step(db, data.step_id)
-    if existing:
-        raise ValueError(f"Step {data.step_id} already exists")
-
     obj = Step(
-        step_id=data.step_id,
         name=data.name,
         description=data.description,
         step_type=data.step_type,
@@ -270,12 +260,7 @@ def get_implementation(db: Session, impl_id: str) -> Optional[Implementation]:
 
 
 def create_implementation(db: Session, data: ImplementationCreate) -> Implementation:
-    existing = get_implementation(db, data.impl_id)
-    if existing:
-        raise ValueError(f"Implementation {data.impl_id} already exists")
-
     obj = Implementation(
-        impl_id=data.impl_id,
         name=data.name,
         type=data.type,
         system=data.system,

@@ -35,28 +35,35 @@ def get_process_canvas(db: Session, process_id: str) -> Dict[str, Any]:
         logger.warning(f"流程不存在，无法加载画布 process_id={process_id}")
         raise ValueError("Process not found")
 
-    # 2. 获取流程边
+    # 2. 从canvas_node_ids字段读取节点ID列表
+    import json
+    step_ids: Set[str] = set()
+    impl_ids: Set[str] = set()
+    resource_ids: Set[str] = set()
+    
+    if process.canvas_node_ids:
+        try:
+            node_ids_data = json.loads(process.canvas_node_ids)
+            step_ids = set(node_ids_data.get("step_ids", []))
+            impl_ids = set(node_ids_data.get("impl_ids", []))
+            resource_ids = set(node_ids_data.get("resource_ids", []))
+        except json.JSONDecodeError as e:
+            logger.warning(f"无法解析canvas_node_ids字段 process_id={process_id}, error={e}")
+    
+    # 3. 获取流程边
     edges = repo.get_process_edges(process_id)
     
-    # 3. 收集所有步骤 ID
-    step_ids: Set[str] = set()
-    for edge in edges:
-        step_ids.add(edge.from_step_id)
-        step_ids.add(edge.to_step_id)
-
     # 4. 获取步骤信息
     steps = repo.get_steps_by_ids(step_ids)
     
-    # 5. 获取步骤-实现关联
-    step_impl_rows = repo.get_step_implementations(step_ids)
-    impl_ids: Set[str] = {link.impl_id for link in step_impl_rows}
+    # 5. 获取步骤-实现关联（限定process_id）
+    step_impl_rows = repo.get_step_implementations_by_process(process_id, step_ids)
     
     # 6. 获取实现信息
     implementations = repo.get_implementations_by_ids(impl_ids)
     
-    # 7. 获取实现-数据资源关联
-    impl_data_rows = repo.get_implementation_data_resources(impl_ids)
-    resource_ids: Set[str] = {link.resource_id for link in impl_data_rows}
+    # 7. 获取实现-数据资源关联（限定process_id）
+    impl_data_rows = repo.get_implementation_data_resources_by_process(process_id, impl_ids)
     
     # 8. 获取数据资源信息
     data_resources = repo.get_data_resources_by_ids(resource_ids)
@@ -114,7 +121,6 @@ def get_process_canvas(db: Session, process_id: str) -> Dict[str, Any]:
                 "type": res.type,
                 "system": res.system,
                 "location": res.location,
-                "entity_id": res.entity_id,
                 "description": res.description,
             }
             for res in data_resources
@@ -159,6 +165,18 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
     incoming_impl_ids: Set[str] = {
         item["impl_id"] for item in implementations_data if item.get("impl_id")
     }
+    
+    incoming_resource_ids: Set[str] = {
+        item["resource_id"] for item in data_resources_data if item.get("resource_id")
+    }
+
+    # 构造节点ID列表JSON
+    import json
+    canvas_node_ids_json = json.dumps({
+        "step_ids": list(incoming_step_ids),
+        "impl_ids": list(incoming_impl_ids),
+        "resource_ids": list(incoming_resource_ids),
+    })
 
     logger.info(
         f"保存画布开始 process_id={process_id}, steps={len(steps_data)}, edges={len(edges_data)}, impls={len(implementations_data)}, data_res={len(data_resources_data)}"
@@ -167,13 +185,14 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
     repo = SQLiteRepository(db)
 
     with db.begin():
-        # 1. 创建或更新业务流程
+        # 1. 创建或更新业务流程（包含节点ID列表）
         repo.create_or_update_business(
             process_id=process_id,
             name=process_data.get("name"),
             channel=process_data.get("channel"),
             description=process_data.get("description"),
             entrypoints=entrypoints_str,
+            canvas_node_ids=canvas_node_ids_json,
         )
 
         # 2. 创建或更新步骤
@@ -231,18 +250,18 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
                 type_=res_item.get("type"),
                 system=res_item.get("system"),
                 location=res_item.get("location"),
-                entity_id=res_item.get("entity_id"),
                 description=res_item.get("description"),
             )
 
         # 6. 重建步骤-实现关联
-        repo.delete_step_implementations(incoming_step_ids)
+        repo.delete_step_implementations(process_id, incoming_step_ids)
         for link_item in step_impl_links_data:
             step_id = link_item.get("step_id")
             impl_id = link_item.get("impl_id")
             if not step_id or not impl_id:
                 continue
             repo.create_step_implementation(
+                process_id=process_id,
                 step_id=step_id,
                 impl_id=impl_id,
                 step_handle=link_item.get("step_handle"),
@@ -250,13 +269,14 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
             )
 
         # 7. 重建实现-数据资源关联
-        repo.delete_implementation_data_resources(incoming_impl_ids)
+        repo.delete_implementation_data_resources(process_id, incoming_impl_ids)
         for link_item in impl_data_links_data:
             impl_id = link_item.get("impl_id")
             resource_id = link_item.get("resource_id")
             if not impl_id or not resource_id:
                 continue
             repo.create_implementation_data_resource(
+                process_id=process_id,
                 impl_id=impl_id,
                 resource_id=resource_id,
                 impl_handle=link_item.get("impl_handle"),

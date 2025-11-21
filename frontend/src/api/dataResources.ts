@@ -6,9 +6,10 @@ export interface DataResource {
   type?: string
   system?: string
   location?: string
-  entity_id?: string
   description?: string
 }
+
+export type DataResourceCreatePayload = Omit<DataResource, 'resource_id'>
 
 export interface PaginatedDataResources {
   page: number
@@ -83,7 +84,7 @@ export async function listDataResources(params: ListDataResourcesParams) {
   return data
 }
 
-export async function createDataResource(payload: DataResource) {
+export async function createDataResource(payload: DataResourceCreatePayload) {
   const { data } = await http.post<DataResource>('/data-resources', payload)
   return data
 }

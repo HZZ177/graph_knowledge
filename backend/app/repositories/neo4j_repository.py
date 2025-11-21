@@ -38,48 +38,59 @@ class Neo4jRepository:
     def clear_process_graph(self, process_id: str) -> None:
         """清除流程相关的图数据"""
         with self.driver.session(database=DEFAULT_NEO4J_DATABASE) as session:
-            # 删除业务流程节点及其关系
-            session.run(
-                "MATCH (b:Business {process_id: $pid}) DETACH DELETE b",
-                pid=process_id,
-            )
-            
-            # 删除流程步骤之间的关系
+            # 删除该流程的所有边（按process_id过滤）
             session.run(
                 """
-                MATCH (:Step)-[r:NEXT {process_id: $pid}]->(:Step)
+                MATCH ()-[r {process_id: $pid}]->()
                 DELETE r
                 """,
                 pid=process_id,
             )
+            
+            # 删除Business节点的START_AT关系（这个关系没有process_id）
+            session.run(
+                """
+                MATCH (b:Business {process_id: $pid})-[r:START_AT]->()
+                DELETE r
+                """,
+                pid=process_id,
+            )
+            
+            # 删除Business节点
+            session.run(
+                "MATCH (b:Business {process_id: $pid}) DELETE b",
+                pid=process_id,
+            )
 
-    def clear_step_implementation_relations(self, step_ids: List[str]) -> None:
-        """清除步骤-实现关系"""
+    def clear_step_implementation_relations(self, process_id: str, step_ids: List[str]) -> None:
+        """清除步骤-实现关系（按process_id过滤）"""
         if not step_ids:
             return
         
         with self.driver.session(database=DEFAULT_NEO4J_DATABASE) as session:
             session.run(
                 """
-                MATCH (s:Step)-[r:EXECUTED_BY]->(i:Implementation)
+                MATCH (s:Step)-[r:EXECUTED_BY {process_id: $process_id}]->(i:Implementation)
                 WHERE s.step_id IN $step_ids
                 DELETE r
                 """,
+                process_id=process_id,
                 step_ids=step_ids,
             )
 
-    def clear_implementation_resource_relations(self, impl_ids: List[str]) -> None:
-        """清除实现-数据资源关系"""
+    def clear_implementation_resource_relations(self, process_id: str, impl_ids: List[str]) -> None:
+        """清除实现-数据资源关系（按process_id过滤）"""
         if not impl_ids:
             return
         
         with self.driver.session(database=DEFAULT_NEO4J_DATABASE) as session:
             session.run(
                 """
-                MATCH (i:Implementation)-[r:ACCESSES_RESOURCE]->(d:DataResource)
+                MATCH (i:Implementation)-[r:ACCESSES_RESOURCE {process_id: $process_id}]->(d:DataResource)
                 WHERE i.impl_id IN $impl_ids
                 DELETE r
                 """,
+                process_id=process_id,
                 impl_ids=impl_ids,
             )
 
@@ -89,7 +100,7 @@ class Neo4jRepository:
         name: str,
         channel: str,
         description: str,
-        entrypoints: List[str],
+        entrypoints: str,
     ) -> None:
         """创建或更新业务流程节点"""
         with self.driver.session(database=DEFAULT_NEO4J_DATABASE) as session:
@@ -212,10 +223,12 @@ class Neo4jRepository:
                 """
                 MATCH (from:Step {step_id: $from_step_id})
                 MATCH (to:Step {step_id: $to_step_id})
-                MERGE (from)-[r:NEXT {process_id: $process_id}]->(to)
-                SET r.edge_type = $edge_type,
-                    r.condition = $condition,
-                    r.label = $label
+                CREATE (from)-[r:NEXT {
+                    process_id: $process_id,
+                    edge_type: $edge_type,
+                    condition: $condition,
+                    label: $label
+                }]->(to)
                 """,
                 from_step_id=from_step_id,
                 to_step_id=to_step_id,
@@ -225,21 +238,23 @@ class Neo4jRepository:
                 label=label,
             )
 
-    def create_step_implementation_relation(self, step_id: str, impl_id: str) -> None:
+    def create_step_implementation_relation(self, process_id: str, step_id: str, impl_id: str) -> None:
         """创建步骤-实现关系"""
         with self.driver.session(database=DEFAULT_NEO4J_DATABASE) as session:
             session.run(
                 """
                 MATCH (s:Step {step_id: $step_id})
                 MATCH (i:Implementation {impl_id: $impl_id})
-                MERGE (s)-[:EXECUTED_BY]->(i)
+                CREATE (s)-[r:EXECUTED_BY {process_id: $process_id}]->(i)
                 """,
+                process_id=process_id,
                 step_id=step_id,
                 impl_id=impl_id,
             )
 
     def create_implementation_resource_relation(
         self,
+        process_id: str,
         impl_id: str,
         resource_id: str,
         access_type: str,
@@ -251,10 +266,13 @@ class Neo4jRepository:
                 """
                 MATCH (i:Implementation {impl_id: $impl_id})
                 MATCH (r:DataResource {resource_id: $resource_id})
-                MERGE (i)-[rel:ACCESSES_RESOURCE]->(r)
-                SET rel.access_type = $access_type,
-                    rel.access_pattern = $access_pattern
+                CREATE (i)-[rel:ACCESSES_RESOURCE {
+                    process_id: $process_id,
+                    access_type: $access_type,
+                    access_pattern: $access_pattern
+                }]->(r)
                 """,
+                process_id=process_id,
                 impl_id=impl_id,
                 resource_id=resource_id,
                 access_type=access_type,

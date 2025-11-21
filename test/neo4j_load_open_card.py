@@ -62,10 +62,7 @@ SAMPLE_DATA: Dict[str, List[Dict[str, Any]]] = {
             "channel": "app",
             "domain": "membership/month_card",
             "description": "用户在C端App发起开通月卡的操作，从下单、支付到卡生效的完整流程。",
-            "entrypoints": [
-                "POST /api/v1/month_card/open",
-                "PAGE:App.MonthCard.Open",
-            ],
+            "entrypoints": "用户在C端App点击开通月卡按钮，进入开卡流程页面",
         }
     ],
     "business_process_steps": [
@@ -165,7 +162,6 @@ SAMPLE_DATA: Dict[str, List[Dict[str, Any]]] = {
             "type": "db_table",
             "system": "member-service",
             "location": "member_db.user_card",
-            "entity_id": "card",
             "description": "月卡实例表，记录每张月卡的用户、车场、产品、状态、生效时间与到期时间等信息。",
         },
         {
@@ -174,7 +170,6 @@ SAMPLE_DATA: Dict[str, List[Dict[str, Any]]] = {
             "type": "db_table",
             "system": "payment-service",
             "location": "pay_db.pay_order",
-            "entity_id": "payment_order",
             "description": "支付订单表，记录订单金额、支付渠道、支付状态、业务关联（如月卡ID）等信息。",
         },
         {
@@ -183,7 +178,6 @@ SAMPLE_DATA: Dict[str, List[Dict[str, Any]]] = {
             "type": "db_table",
             "system": "member-service",
             "location": "member_db.card_plate_bind",
-            "entity_id": "plate",
             "description": "月卡与车牌的绑定关系表，支持一张月卡绑定多车牌或一车牌绑定多张卡的配置。",
         },
     ],
@@ -301,7 +295,7 @@ def load_business_processes(session) -> None:
             "name": p["name"],
             "channel": p["channel"],
             "description": p["description"],
-            "entrypoints": p["entrypoints"],
+            "entrypoints": p.get("entrypoints", ""),
         }
         session.run(
             """

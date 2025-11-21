@@ -91,6 +91,19 @@ export async function deleteProcessEdge(processId: string, edgeId: number): Prom
   await http.delete(`/processes/${processId}/edges/${edgeId}`)
 }
 
-export async function publishProcess(processId: string): Promise<void> {
-  await http.post(`/processes/${processId}/publish`)
+export interface PublishResult {
+  success: boolean
+  message: string
+  synced_at?: string
+  error_type?: string
+  stats?: {
+    steps: number
+    implementations: number
+    data_resources: number
+  }
+}
+
+export async function publishProcess(processId: string): Promise<PublishResult> {
+  const res = await http.post<PublishResult>(`/processes/${processId}/publish`)
+  return res.data
 }

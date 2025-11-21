@@ -37,6 +37,7 @@ class SQLiteRepository:
         channel: Optional[str] = None,
         description: Optional[str] = None,
         entrypoints: Optional[str] = None,
+        canvas_node_ids: Optional[str] = None,
     ) -> Business:
         """创建或更新业务流程"""
         business = self.get_business(process_id)
@@ -52,6 +53,8 @@ class SQLiteRepository:
             business.description = description
         if entrypoints is not None:
             business.entrypoints = entrypoints
+        if canvas_node_ids is not None:
+            business.canvas_node_ids = canvas_node_ids
         
         return business
 
@@ -189,17 +192,33 @@ class SQLiteRepository:
             .order_by(StepImplementation.id)
             .all()
         )
+    
+    def get_step_implementations_by_process(self, process_id: str, step_ids: Set[str]) -> List[StepImplementation]:
+        """获取指定流程的步骤-实现关联"""
+        if not step_ids:
+            return []
+        return (
+            self.db.query(StepImplementation)
+            .filter(
+                StepImplementation.process_id == process_id,
+                StepImplementation.step_id.in_(step_ids)
+            )
+            .order_by(StepImplementation.id)
+            .all()
+        )
 
-    def delete_step_implementations(self, step_ids: Set[str]) -> None:
-        """删除步骤-实现关联"""
+    def delete_step_implementations(self, process_id: str, step_ids: Set[str]) -> None:
+        """删除指定流程的步骤-实现关联"""
         if not step_ids:
             return
         self.db.query(StepImplementation).filter(
+            StepImplementation.process_id == process_id,
             StepImplementation.step_id.in_(step_ids)
         ).delete(synchronize_session=False)
 
     def create_step_implementation(
         self,
+        process_id: str,
         step_id: str,
         impl_id: str,
         step_handle: Optional[str] = None,
@@ -207,6 +226,7 @@ class SQLiteRepository:
     ) -> StepImplementation:
         """创建步骤-实现关联"""
         link = StepImplementation(
+            process_id=process_id,
             step_id=step_id,
             impl_id=impl_id,
             step_handle=step_handle,
@@ -235,7 +255,6 @@ class SQLiteRepository:
         type_: Optional[str] = None,
         system: Optional[str] = None,
         location: Optional[str] = None,
-        entity_id: Optional[str] = None,
         description: Optional[str] = None,
     ) -> DataResource:
         """创建或更新数据资源"""
@@ -256,8 +275,6 @@ class SQLiteRepository:
             resource.system = system
         if location is not None:
             resource.location = location
-        if entity_id is not None:
-            resource.entity_id = entity_id
         if description is not None:
             resource.description = description
         
@@ -277,17 +294,35 @@ class SQLiteRepository:
             .order_by(ImplementationDataResource.id)
             .all()
         )
+    
+    def get_implementation_data_resources_by_process(
+        self, process_id: str, impl_ids: Set[str]
+    ) -> List[ImplementationDataResource]:
+        """获取指定流程的实现-数据资源关联"""
+        if not impl_ids:
+            return []
+        return (
+            self.db.query(ImplementationDataResource)
+            .filter(
+                ImplementationDataResource.process_id == process_id,
+                ImplementationDataResource.impl_id.in_(impl_ids)
+            )
+            .order_by(ImplementationDataResource.id)
+            .all()
+        )
 
-    def delete_implementation_data_resources(self, impl_ids: Set[str]) -> None:
-        """删除实现-数据资源关联"""
+    def delete_implementation_data_resources(self, process_id: str, impl_ids: Set[str]) -> None:
+        """删除指定流程的实现-数据资源关联"""
         if not impl_ids:
             return
         self.db.query(ImplementationDataResource).filter(
+            ImplementationDataResource.process_id == process_id,
             ImplementationDataResource.impl_id.in_(impl_ids)
         ).delete(synchronize_session=False)
 
     def create_implementation_data_resource(
         self,
+        process_id: str,
         impl_id: str,
         resource_id: str,
         impl_handle: Optional[str] = None,
@@ -297,6 +332,7 @@ class SQLiteRepository:
     ) -> ImplementationDataResource:
         """创建实现-数据资源关联"""
         link = ImplementationDataResource(
+            process_id=process_id,
             impl_id=impl_id,
             resource_id=resource_id,
             impl_handle=impl_handle,

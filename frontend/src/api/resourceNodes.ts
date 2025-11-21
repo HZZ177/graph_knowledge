@@ -15,12 +15,16 @@ export interface BusinessNode {
   entrypoints?: string | null
 }
 
+export type BusinessCreatePayload = Omit<BusinessNode, 'process_id'>
+
 export interface StepNode {
   step_id: string
   name: string
   description?: string | null
   step_type?: string | null
 }
+
+export type StepCreatePayload = Omit<StepNode, 'step_id'>
 
 export interface ImplementationNode {
   impl_id: string
@@ -30,6 +34,8 @@ export interface ImplementationNode {
   description?: string | null
   code_ref?: string | null
 }
+
+export type ImplementationCreatePayload = Omit<ImplementationNode, 'impl_id'>
 
 export interface StepImplementationLink {
   id: number
@@ -44,7 +50,7 @@ export async function listBusinessesPaged(q: string, page: number, pageSize: num
   return data
 }
 
-export async function createBusiness(payload: BusinessNode) {
+export async function createBusiness(payload: BusinessCreatePayload) {
   const { data } = await http.post<BusinessNode>('/resource-nodes/businesses', payload)
   return data
 }
@@ -65,7 +71,7 @@ export async function listStepsPaged(q: string, page: number, pageSize: number) 
   return data
 }
 
-export async function createStep(payload: StepNode) {
+export async function createStep(payload: StepCreatePayload) {
   const { data } = await http.post<StepNode>('/resource-nodes/steps', payload)
   return data
 }
@@ -86,7 +92,7 @@ export async function listImplementationsPaged(q: string, page: number, pageSize
   return data
 }
 
-export async function createImplementation(payload: ImplementationNode) {
+export async function createImplementation(payload: ImplementationCreatePayload) {
   const { data } = await http.post<ImplementationNode>('/resource-nodes/implementations', payload)
   return data
 }

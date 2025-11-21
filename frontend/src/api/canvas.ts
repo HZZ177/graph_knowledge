@@ -5,7 +5,7 @@ export interface CanvasProcess {
   name: string
   channel?: string | null
   description?: string | null
-  entrypoints?: string[]
+  entrypoints?: string | null
 }
 
 export interface CanvasStep {
@@ -49,7 +49,6 @@ export interface CanvasDataResource {
   type?: string | null
   system?: string | null
   location?: string | null
-  entity_id?: string | null
   description?: string | null
 }
 

@@ -97,12 +97,14 @@ def get_data_resource(db: Session, resource_id: str) -> Optional[DataResource]:
 
 
 def create_data_resource(db: Session, data: DataResourceCreate) -> DataResource:
-    existing = get_data_resource(db, data.resource_id)
-    if existing:
-        raise ValueError(f"DataResource {data.resource_id} already exists")
-
-    logger.info(f"创建数据资源 resource_id={data.resource_id}")
-    obj = DataResource(**data.dict())
+    logger.info("创建数据资源")
+    obj = DataResource(
+        name=data.name,
+        type=data.type,
+        system=data.system,
+        location=data.location,
+        description=data.description,
+    )
     db.add(obj)
     db.commit()
     db.refresh(obj)
