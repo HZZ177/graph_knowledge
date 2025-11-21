@@ -1,17 +1,9 @@
-from typing import Any, Dict, List, Optional, Sequence, Set
+from typing import Any, Dict, List, Set
 
 from sqlalchemy.orm import Session
 
-from backend.app.models.resource_graph import (
-    Business,
-    DataResource,
-    Implementation,
-    ImplementationDataResource,
-    ProcessStepEdge,
-    Step,
-    StepImplementation,
-)
-from backend.app.services.graph_sync_service import sync_process
+from backend.app.models.resource_graph import Business
+from backend.app.repositories.sqlite_repository import SQLiteRepository
 from backend.app.core.logger import logger
 
 
@@ -32,80 +24,44 @@ def _business_to_dict(obj: Business) -> Dict[str, Any]:
 
 
 def get_process_canvas(db: Session, process_id: str) -> Dict[str, Any]:
-    """从 sqlite 中加载指定流程的画布结构。"""
-
+    """从 SQLite 中加载指定流程的画布结构。"""
     logger.info(f"加载流程画布 process_id={process_id}")
-
-    process = (
-        db.query(Business)
-        .filter(Business.process_id == process_id)
-        .first()
-    )
+    
+    repo = SQLiteRepository(db)
+    
+    # 1. 获取流程基本信息
+    process = repo.get_business(process_id)
     if not process:
         logger.warning(f"流程不存在，无法加载画布 process_id={process_id}")
         raise ValueError("Process not found")
 
-    edges: List[ProcessStepEdge] = (
-        db.query(ProcessStepEdge)
-        .filter(ProcessStepEdge.process_id == process_id)
-        .order_by(ProcessStepEdge.id)
-        .all()
-    )
-
+    # 2. 获取流程边
+    edges = repo.get_process_edges(process_id)
+    
+    # 3. 收集所有步骤 ID
     step_ids: Set[str] = set()
     for edge in edges:
         step_ids.add(edge.from_step_id)
         step_ids.add(edge.to_step_id)
 
-    steps: List[Step] = []
-    if step_ids:
-        steps = (
-            db.query(Step)
-            .filter(Step.step_id.in_(step_ids))
-            .order_by(Step.step_id)
-            .all()
-        )
+    # 4. 获取步骤信息
+    steps = repo.get_steps_by_ids(step_ids)
+    
+    # 5. 获取步骤-实现关联
+    step_impl_rows = repo.get_step_implementations(step_ids)
+    impl_ids: Set[str] = {link.impl_id for link in step_impl_rows}
+    
+    # 6. 获取实现信息
+    implementations = repo.get_implementations_by_ids(impl_ids)
+    
+    # 7. 获取实现-数据资源关联
+    impl_data_rows = repo.get_implementation_data_resources(impl_ids)
+    resource_ids: Set[str] = {link.resource_id for link in impl_data_rows}
+    
+    # 8. 获取数据资源信息
+    data_resources = repo.get_data_resources_by_ids(resource_ids)
 
-    step_impl_rows: Sequence[StepImplementation] = []
-    if step_ids:
-        step_impl_rows = (
-            db.query(StepImplementation)
-            .filter(StepImplementation.step_id.in_(step_ids))
-            .order_by(StepImplementation.id)
-            .all()
-        )
-
-    impl_ids: Set[str] = set(link.impl_id for link in step_impl_rows)
-
-    implementations: List[Implementation] = []
-    if impl_ids:
-        implementations = (
-            db.query(Implementation)
-            .filter(Implementation.impl_id.in_(impl_ids))
-            .order_by(Implementation.impl_id)
-            .all()
-        )
-
-    impl_data_rows: Sequence[ImplementationDataResource] = []
-    if impl_ids:
-        impl_data_rows = (
-            db.query(ImplementationDataResource)
-            .filter(ImplementationDataResource.impl_id.in_(impl_ids))
-            .order_by(ImplementationDataResource.id)
-            .all()
-        )
-
-    resource_ids: Set[str] = set(link.resource_id for link in impl_data_rows)
-
-    data_resources: List[DataResource] = []
-    if resource_ids:
-        data_resources = (
-            db.query(DataResource)
-            .filter(DataResource.resource_id.in_(resource_ids))
-            .order_by(DataResource.resource_id)
-            .all()
-        )
-
+    # 9. 组装返回结果
     result: Dict[str, Any] = {
         "process": _business_to_dict(process),
         "steps": [
@@ -184,7 +140,7 @@ def get_process_canvas(db: Session, process_id: str) -> Dict[str, Any]:
     return result
 
 def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -> Dict[str, Any]:
-    """保存前端提交的画布定义，并同步到 Neo4j。"""
+    """保存前端提交的画布定义到 SQLite（不包含 Neo4j 同步，由 API 层控制）"""
     process_data: Dict[str, Any] = payload.get("process") or {}
     steps_data: List[Dict[str, Any]] = payload.get("steps") or []
     edges_data: List[Dict[str, Any]] = payload.get("edges") or []
@@ -208,134 +164,106 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
         f"保存画布开始 process_id={process_id}, steps={len(steps_data)}, edges={len(edges_data)}, impls={len(implementations_data)}, data_res={len(data_resources_data)}"
     )
 
+    repo = SQLiteRepository(db)
+
     with db.begin():
-        business: Optional[Business] = (
-            db.query(Business)
-            .filter(Business.process_id == process_id)
-            .first()
+        # 1. 创建或更新业务流程
+        repo.create_or_update_business(
+            process_id=process_id,
+            name=process_data.get("name"),
+            channel=process_data.get("channel"),
+            description=process_data.get("description"),
+            entrypoints=entrypoints_str,
         )
-        if business is None:
-            business = Business(process_id=process_id)
-            db.add(business)
 
-        business.name = process_data.get("name", business.name)
-        business.channel = process_data.get("channel")
-        business.description = process_data.get("description")
-        business.entrypoints = entrypoints_str
-
+        # 2. 创建或更新步骤
         for step_item in steps_data:
             step_id = step_item.get("step_id")
             if not step_id:
                 continue
-            step = db.query(Step).filter(Step.step_id == step_id).first()
-            if step is None:
-                step = Step(step_id=step_id)
-                db.add(step)
-            step.name = step_item.get("name")
-            step.description = step_item.get("description")
-            step.step_type = step_item.get("step_type")
+            repo.create_or_update_step(
+                step_id=step_id,
+                name=step_item.get("name"),
+                description=step_item.get("description"),
+                step_type=step_item.get("step_type"),
+            )
 
-        db.query(ProcessStepEdge).filter(
-            ProcessStepEdge.process_id == process_id
-        ).delete(synchronize_session=False)
-
+        # 3. 重建流程边
+        repo.delete_process_edges(process_id)
         for edge_item in edges_data:
             from_step_id = edge_item.get("from_step_id")
             to_step_id = edge_item.get("to_step_id")
             if not from_step_id or not to_step_id:
                 continue
-            db.add(
-                ProcessStepEdge(
-                    process_id=process_id,
-                    from_step_id=from_step_id,
-                    to_step_id=to_step_id,
-                    from_handle=edge_item.get("from_handle"),
-                    to_handle=edge_item.get("to_handle"),
-                    edge_type=edge_item.get("edge_type"),
-                    condition=edge_item.get("condition"),
-                    label=edge_item.get("label"),
-                )
+            repo.create_edge(
+                process_id=process_id,
+                from_step_id=from_step_id,
+                to_step_id=to_step_id,
+                from_handle=edge_item.get("from_handle"),
+                to_handle=edge_item.get("to_handle"),
+                edge_type=edge_item.get("edge_type"),
+                condition=edge_item.get("condition"),
+                label=edge_item.get("label"),
             )
 
+        # 4. 创建或更新实现
         for impl_item in implementations_data:
             impl_id = impl_item.get("impl_id")
             if not impl_id:
                 continue
-            impl = (
-                db.query(Implementation)
-                .filter(Implementation.impl_id == impl_id)
-                .first()
+            repo.create_or_update_implementation(
+                impl_id=impl_id,
+                name=impl_item.get("name"),
+                type_=impl_item.get("type"),
+                system=impl_item.get("system"),
+                description=impl_item.get("description"),
+                code_ref=impl_item.get("code_ref"),
             )
-            if impl is None:
-                impl = Implementation(impl_id=impl_id)
-                db.add(impl)
-            impl.name = impl_item.get("name")
-            impl.type = impl_item.get("type")
-            impl.system = impl_item.get("system")
-            impl.description = impl_item.get("description")
-            impl.code_ref = impl_item.get("code_ref")
 
+        # 5. 创建或更新数据资源
         for res_item in data_resources_data:
             resource_id = res_item.get("resource_id")
             if not resource_id:
                 continue
-            resource = (
-                db.query(DataResource)
-                .filter(DataResource.resource_id == resource_id)
-                .first()
+            repo.create_or_update_data_resource(
+                resource_id=resource_id,
+                name=res_item.get("name"),
+                type_=res_item.get("type"),
+                system=res_item.get("system"),
+                location=res_item.get("location"),
+                entity_id=res_item.get("entity_id"),
+                description=res_item.get("description"),
             )
-            if resource is None:
-                resource = DataResource(resource_id=resource_id)
-                db.add(resource)
-            resource.name = res_item.get("name")
-            resource.type = res_item.get("type")
-            resource.system = res_item.get("system")
-            resource.location = res_item.get("location")
-            resource.entity_id = res_item.get("entity_id")
-            resource.description = res_item.get("description")
 
-        if incoming_step_ids:
-            db.query(StepImplementation).filter(
-                StepImplementation.step_id.in_(incoming_step_ids)
-            ).delete(synchronize_session=False)
-
+        # 6. 重建步骤-实现关联
+        repo.delete_step_implementations(incoming_step_ids)
         for link_item in step_impl_links_data:
             step_id = link_item.get("step_id")
             impl_id = link_item.get("impl_id")
             if not step_id or not impl_id:
                 continue
-            db.add(
-                StepImplementation(
-                    step_id=step_id,
-                    impl_id=impl_id,
-                    step_handle=link_item.get("step_handle"),
-                    impl_handle=link_item.get("impl_handle"),
-                )
+            repo.create_step_implementation(
+                step_id=step_id,
+                impl_id=impl_id,
+                step_handle=link_item.get("step_handle"),
+                impl_handle=link_item.get("impl_handle"),
             )
 
-        if incoming_impl_ids:
-            db.query(ImplementationDataResource).filter(
-                ImplementationDataResource.impl_id.in_(incoming_impl_ids)
-            ).delete(synchronize_session=False)
-
+        # 7. 重建实现-数据资源关联
+        repo.delete_implementation_data_resources(incoming_impl_ids)
         for link_item in impl_data_links_data:
             impl_id = link_item.get("impl_id")
             resource_id = link_item.get("resource_id")
             if not impl_id or not resource_id:
                 continue
-            db.add(
-                ImplementationDataResource(
-                    impl_id=impl_id,
-                    resource_id=resource_id,
-                    impl_handle=link_item.get("impl_handle"),
-                    resource_handle=link_item.get("resource_handle"),
-                    access_type=link_item.get("access_type"),
-                    access_pattern=link_item.get("access_pattern"),
-                )
+            repo.create_implementation_data_resource(
+                impl_id=impl_id,
+                resource_id=resource_id,
+                impl_handle=link_item.get("impl_handle"),
+                resource_handle=link_item.get("resource_handle"),
+                access_type=link_item.get("access_type"),
+                access_pattern=link_item.get("access_pattern"),
             )
-
-    logger.info(f"开始同步流程到图数据库 process_id={process_id}")
-    sync_process(db, process_id)
 
     logger.info(f"保存画布完成 process_id={process_id}")
     return get_process_canvas(db, process_id)

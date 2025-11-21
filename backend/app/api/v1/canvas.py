@@ -6,6 +6,7 @@ from backend.app.services.canvas_service import (
     get_process_canvas,
     save_process_canvas,
 )
+from backend.app.services.graph_sync_service import sync_process
 from backend.app.core.logger import logger
 
 
@@ -36,7 +37,17 @@ def save_canvas(process_id: str, payload: dict, db: Session = Depends(get_db)) -
         f"保存流程画布开始 process_id={process_id}, steps={len((payload or {}).get('steps', []))}, edges={len((payload or {}).get('edges', []))}"
     )
     try:
+        # 1. 保存到 SQLite
         data = save_process_canvas(db, process_id, payload)
+        
+        # 2. 同步到 Neo4j
+        try:
+            logger.info(f"同步流程到图数据库 process_id={process_id}")
+            sync_process(db, process_id)
+        except Exception as e:
+            logger.warning(f"同步到 Neo4j 失败 process_id={process_id}, error={e}")
+            # 继续返回结果，不影响 SQLite 保存
+        
         logger.info(f"保存流程画布成功 process_id={process_id}")
         return data
     except ValueError:

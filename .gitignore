@@ -209,3 +209,4 @@ __marimo__/
 .idea/
 node_modules/
 */logs
+backend/app/app.db

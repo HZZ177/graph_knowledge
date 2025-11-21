@@ -1,0 +1,87 @@
+/* ========================================== */
+/* 统一确认弹窗样式 - Ant Design 原生风格 */
+/* 适配 Ant Design Modal.confirm 组件 */
+/* ========================================== */
+
+/* 弹窗主体 - 简洁白色背景 */
+.yc-confirm-modal .ant-modal-content {
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.08), 
+              0 3px 6px -4px rgba(0, 0, 0, 0.12), 
+              0 9px 28px 8px rgba(0, 0, 0, 0.05);
+  padding: 20px 24px;
+}
+
+/* 确认框主体布局 */
+.yc-confirm-modal .ant-modal-confirm-body {
+  display: flex;
+  gap: 12px;
+}
+
+/* 图标样式 - Ant Design 原生风格 */
+.yc-confirm-modal .ant-modal-confirm-body > .anticon {
+  font-size: 22px;
+  color: #faad14;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+/* 标题样式 */
+.yc-confirm-modal .ant-modal-confirm-title {
+  font-weight: 600;
+  font-size: 16px;
+  line-height: 1.5;
+  color: rgba(0, 0, 0, 0.88);
+  margin-bottom: 8px;
+}
+
+/* 内容区域 */
+.yc-confirm-modal .ant-modal-confirm-content {
+  font-size: 14px;
+  line-height: 1.5714285714285714;
+  color: rgba(0, 0, 0, 0.65);
+}
+
+/* 底部按钮区域 */
+.yc-confirm-modal .ant-modal-confirm-btns {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.yc-confirm-modal .ant-btn {
+  height: 32px;
+  padding: 4px 15px;
+  font-size: 14px;
+  border-radius: 6px;
+}
+
+/* 暗色模式适配 */
+html.dark .yc-confirm-modal .ant-modal-content,
+.dark .yc-confirm-modal .ant-modal-content,
+[data-theme='dark'] .yc-confirm-modal .ant-modal-content {
+  background: #141414;
+  box-shadow: 0 6px 16px 0 rgba(0, 0, 0, 0.32), 
+              0 3px 6px -4px rgba(0, 0, 0, 0.48), 
+              0 9px 28px 8px rgba(0, 0, 0, 0.2);
+}
+
+html.dark .yc-confirm-modal .ant-modal-confirm-title,
+.dark .yc-confirm-modal .ant-modal-confirm-title,
+[data-theme='dark'] .yc-confirm-modal .ant-modal-confirm-title {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+html.dark .yc-confirm-modal .ant-modal-confirm-content,
+.dark .yc-confirm-modal .ant-modal-confirm-content,
+[data-theme='dark'] .yc-confirm-modal .ant-modal-confirm-content {
+  color: rgba(255, 255, 255, 0.65);
+}
+
+html.dark .yc-confirm-modal .ant-modal-confirm-body > .anticon,
+.dark .yc-confirm-modal .ant-modal-confirm-body > .anticon,
+[data-theme='dark'] .yc-confirm-modal .ant-modal-confirm-body > .anticon {
+  color: #ffc53d;
+}

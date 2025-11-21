@@ -55,3 +55,8 @@ body {
   overflow-wrap: break-word;
   white-space: normal;
 }
+
+/* 隐藏 React Flow 右下角的标识 */
+.react-flow__attribution {
+  display: none !important;
+}

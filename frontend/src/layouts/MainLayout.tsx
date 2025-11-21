@@ -12,7 +12,7 @@ import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 const { Header, Sider, Content } = Layout
 
 const MainLayout: React.FC = () => {
-  const [collapsed, setCollapsed] = useState(false)
+  const [collapsed, setCollapsed] = useState(true)
   const location = useLocation()
   const navigate = useNavigate()
 
@@ -62,9 +62,19 @@ const MainLayout: React.FC = () => {
             justifyContent: collapsed ? 'center' : 'flex-start',
             fontSize: 18,
             fontWeight: 600,
+            gap: 8,
           }}
         >
-          <span style={{ marginLeft: collapsed ? 0 : 4 }}>业务引擎</span>
+          <img 
+            src="/favicon.svg" 
+            alt="Logo" 
+            style={{ 
+              width: 28, 
+              height: 28,
+              flexShrink: 0,
+            }} 
+          />
+          {!collapsed && <span>业务引擎</span>}
         </div>
         <Menu
           theme="light"

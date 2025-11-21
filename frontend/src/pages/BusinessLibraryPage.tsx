@@ -4,6 +4,7 @@ import {
   ReactFlow,
   Background,
   Controls,
+  MiniMap,
   Edge,
   Node,
   MarkerType,
@@ -29,6 +30,9 @@ import {
   type ProcessCanvas,
 } from '../api/canvas'
 
+import { showSuccess, showError } from '../utils/message'
+import { showConfirm } from '../utils/confirm'
+
 const { Title, Paragraph, Text } = Typography
 
 const layoutGraph = (nodes: Node[], edges: Edge[]) => {
@@ -48,8 +52,8 @@ const layoutGraph = (nodes: Node[], edges: Edge[]) => {
 const AllSidesNode = React.memo(({ data, selected }: any) => {
   const [hovered, setHovered] = useState(false)
   const baseHandleStyle = {
-    width: 4,
-    height: 4,
+    width: 8,
+    height: 8,
     background: '#bfbfbf',
     border: '1px solid #d9d9d9',
     borderRadius: '50%',
@@ -74,8 +78,9 @@ const AllSidesNode = React.memo(({ data, selected }: any) => {
     <>
       <NodeResizer
         isVisible={selected}
-        minWidth={120}
-        minHeight={40}
+        minWidth={150}
+        minHeight={60}
+        maxWidth={300}
         lineStyle={{ border: 'none' }}
         handleStyle={{
           width: 6,
@@ -89,49 +94,49 @@ const AllSidesNode = React.memo(({ data, selected }: any) => {
         type="target"
         position={Position.Top}
         id="t-in"
-        style={{ ...baseHandleStyle, top: -1 }}
+        style={{ ...baseHandleStyle, top: -5 }}
       />
       <Handle
         type="source"
         position={Position.Top}
         id="t-out"
-        style={{ ...baseHandleStyle, top: -1 }}
+        style={{ ...baseHandleStyle, top: -5 }}
       />
       <Handle
         type="target"
         position={Position.Bottom}
         id="b-in"
-        style={{ ...baseHandleStyle, bottom: -1 }}
+        style={{ ...baseHandleStyle, bottom: -5 }}
       />
       <Handle
         type="source"
         position={Position.Bottom}
         id="b-out"
-        style={{ ...baseHandleStyle, bottom:-1 }}
+        style={{ ...baseHandleStyle, bottom: -5 }}
       />
       <Handle
         type="target"
         position={Position.Left}
         id="l-in"
-        style={{ ...baseHandleStyle, left: -1 }}
+        style={{ ...baseHandleStyle, left: -5 }}
       />
       <Handle
         type="source"
         position={Position.Left}
         id="l-out"
-        style={{ ...baseHandleStyle, left: -1 }}
+        style={{ ...baseHandleStyle, left: -5 }}
       />
       <Handle
         type="target"
         position={Position.Right}
         id="r-in"
-        style={{ ...baseHandleStyle, right: -1 }}
+        style={{ ...baseHandleStyle, right: -5 }}
       />
       <Handle
         type="source"
         position={Position.Right}
         id="r-out"
-        style={{ ...baseHandleStyle, right: -1 }}
+        style={{ ...baseHandleStyle, right: -5 }}
       />
       <div
         onMouseEnter={() => setHovered(true)}
@@ -172,15 +177,118 @@ const AllSidesNode = React.memo(({ data, selected }: any) => {
         )}
         <div
           style={{
-            padding: 8,
+            padding: 10,
             fontSize: 12,
             flex: 1,
             display: 'flex',
-            alignItems: 'center',
+            flexDirection: 'column',
+            gap: 6,
             justifyContent: 'center',
           }}
         >
-          {data?.label}
+          {/* 主标题 */}
+          <div
+            style={{
+              fontWeight: 500,
+              fontSize: 13,
+              color: '#262626',
+              lineHeight: '18px',
+            }}
+          >
+            {data?.label}
+          </div>
+          
+          {/* 步骤节点：显示描述 */}
+          {nodeType === 'step' && data?.description && (
+            <div
+              style={{
+                fontSize: 11,
+                color: '#8c8c8c',
+                lineHeight: '16px',
+              }}
+            >
+              <span style={{ color: '#bfbfbf', marginRight: 4 }}>描述:</span>
+              <span
+                style={{
+                  display: '-webkit-box',
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}
+              >
+                {data.description}
+              </span>
+            </div>
+          )}
+          
+          {/* 实现节点：显示类型和系统 */}
+          {nodeType === 'implementation' && (
+            <>
+              {data?.type && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    lineHeight: '16px',
+                  }}
+                >
+                  <span style={{ color: '#bfbfbf', marginRight: 4 }}>类型:</span>
+                  <span style={{ color: '#52c41a' }}>{data.type}</span>
+                </div>
+              )}
+              {data?.system && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: '#8c8c8c',
+                    lineHeight: '16px',
+                  }}
+                >
+                  <span style={{ color: '#bfbfbf', marginRight: 4 }}>系统:</span>
+                  {data.system}
+                </div>
+              )}
+            </>
+          )}
+          
+          {/* 数据资源节点：显示类型和描述 */}
+          {nodeType === 'data' && (
+            <>
+              {data?.resourceType && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    lineHeight: '16px',
+                  }}
+                >
+                  <span style={{ color: '#bfbfbf', marginRight: 4 }}>类型:</span>
+                  <span style={{ color: '#faad14' }}>{data.resourceType}</span>
+                </div>
+              )}
+              {data?.description && (
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: '#8c8c8c',
+                    lineHeight: '16px',
+                  }}
+                >
+                  <span style={{ color: '#bfbfbf', marginRight: 4 }}>描述:</span>
+                  <span
+                    style={{
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                  >
+                    {data.description}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
         </div>
       </div>
     </>
@@ -226,6 +334,9 @@ const BusinessLibraryPage: React.FC = () => {
   const [highlightNodeId, setHighlightNodeId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
+  
+  // 标记是否正在加载画布，避免加载期间的节点/边变更触发 hasChanges
+  const isLoadingCanvasRef = React.useRef(false)
 
   const nodeTypes = useMemo(
     () => ({
@@ -244,6 +355,7 @@ const BusinessLibraryPage: React.FC = () => {
       }
     } catch (e) {
       setProcesses([])
+      showError('加载业务流程列表失败')
     } finally {
       setLoadingProcesses(false)
     }
@@ -329,20 +441,45 @@ const BusinessLibraryPage: React.FC = () => {
         .map((id) => canvasData.steps.find((s) => s.step_id === id))
         .filter((s): s is NonNullable<typeof s> => s !== undefined)
 
-      const stepGapX = 260
       const stepY = 0
-      const implY = 180
-      const dataY = 360
+      const implY = 200
+      const dataY = 400
+      const minGap = 150 // 节点之间最小间隔
 
       const stepNodes: Node[] = []
       const implNodes = new Map<string, Node>()
       const drNodes = new Map<string, Node>()
       const implXMap = new Map<string, number>()
+      const stepWidthMap = new Map<string, number>() // 记录每个步骤节点的宽度
+
+      // 第一遍：计算每个步骤节点的宽度（基于内容）
+      const stepWidths: number[] = []
+      sorted.forEach((s) => {
+        const displayName = s.name || s.step_id
+        const hasDescription = !!s.description
+        const nameLen = displayName.length
+        // 根据标题长度线性放大宽度，描述存在时再额外加一点空间
+        const estimatedWidth = Math.min(
+          300,
+          Math.max(150, 150 + nameLen * 10 + (hasDescription ? 40 : 0)),
+        )
+        stepWidths.push(estimatedWidth)
+      })
+
+      // 第二遍：计算累积位置（动态间隔）
+      let currentX = 0
+      const stepPositions: number[] = []
+      stepWidths.forEach((width, index) => {
+        stepPositions.push(currentX)
+        currentX += width + minGap
+      })
 
       sorted.forEach((s, index) => {
         const stepId = s.step_id
         const displayName = s.name || stepId
-        const stepX = index * stepGapX
+        const stepX = stepPositions[index]
+        const stepWidth = stepWidths[index]
+        stepWidthMap.set(stepId, stepWidth)
 
         stepNodes.push({
           id: `step:${stepId}`,
@@ -351,6 +488,7 @@ const BusinessLibraryPage: React.FC = () => {
             stepId,
             nodeType: 'step',
             typeLabel: '步骤',
+            description: s.description,
           },
           position: { x: stepX, y: stepY },
           type: 'allSides',
@@ -359,6 +497,9 @@ const BusinessLibraryPage: React.FC = () => {
             border: 'none',
             background: 'transparent',
             boxShadow: 'none',
+            width: stepWidth,
+            minWidth: 150,
+            maxWidth: 300,
           },
         })
 
@@ -369,9 +510,13 @@ const BusinessLibraryPage: React.FC = () => {
           const impl = implById.get(implId)
           if (!impl) return
           const implLabel = impl.name || implId
+          const implNameLen = implLabel.length
+          // 实现节点宽度估算：随名称长度增长
+          const implWidth = Math.min(300, Math.max(150, 150 + implNameLen * 10))
           const implOffsetX =
-            implCount > 1 ? (implIndex - (implCount - 1) / 2) * 120 : 0
-          const implX = stepX + implOffsetX
+            implCount > 1 ? (implIndex - (implCount - 1) / 2) * (implWidth + 40) : 0
+          // 实现节点居中对齐到步骤节点
+          const implX = stepX + stepWidth / 2 - implWidth / 2 + implOffsetX
 
           implNodes.set(implId, {
             id: `impl:${implId}`,
@@ -380,6 +525,8 @@ const BusinessLibraryPage: React.FC = () => {
               implId,
               nodeType: 'implementation',
               typeLabel: '实现',
+              type: impl.type,
+              system: impl.system,
             },
             position: {
               x: implX,
@@ -391,9 +538,12 @@ const BusinessLibraryPage: React.FC = () => {
               border: 'none',
               background: 'transparent',
               boxShadow: 'none',
+              width: implWidth,
+              minWidth: 150,
+              maxWidth: 300,
             },
           })
-          implXMap.set(implId, implX)
+          implXMap.set(implId, implX + implWidth / 2) // 记录实现节点的中心位置
         })
 
         implIds.forEach((implId) => {
@@ -405,10 +555,14 @@ const BusinessLibraryPage: React.FC = () => {
             const dr = drById.get(resId)
             if (!dr) return
             const drLabel = dr.name || resId
-            const baseImplX = implXMap.get(implId) ?? stepX
+            const drNameLen = drLabel.length
+            // 数据资源节点宽度估算：随名称长度增长
+            const drWidth = Math.min(300, Math.max(150, 150 + drNameLen * 10))
+            const baseImplX = implXMap.get(implId) ?? (stepX + stepWidth / 2)
             const drOffsetX =
-              dataCount > 1 ? (drIndex - (dataCount - 1) / 2) * 120 : 0
-            const drX = baseImplX + drOffsetX
+              dataCount > 1 ? (drIndex - (dataCount - 1) / 2) * (drWidth + 40) : 0
+            // 数据资源节点居中对齐到实现节点
+            const drX = baseImplX - drWidth / 2 + drOffsetX
 
             drNodes.set(resId, {
               id: `dr:${resId}`,
@@ -417,6 +571,8 @@ const BusinessLibraryPage: React.FC = () => {
                 resource: dr,
                 nodeType: 'data',
                 typeLabel: '数据资源',
+                resourceType: dr.type,
+                description: dr.description,
               },
               position: {
                 x: drX,
@@ -428,6 +584,9 @@ const BusinessLibraryPage: React.FC = () => {
                 border: 'none',
                 background: 'transparent',
                 boxShadow: 'none',
+                width: drWidth,
+                minWidth: 150,
+                maxWidth: 300,
               },
             })
           })
@@ -509,6 +668,7 @@ const BusinessLibraryPage: React.FC = () => {
 
     setLoadingCanvas(true)
     setSelectedNode(null)
+    isLoadingCanvasRef.current = true
 
     try {
       const canvasData = await getProcessCanvas(selectedProcessId)
@@ -519,8 +679,13 @@ const BusinessLibraryPage: React.FC = () => {
       setCanvas(null)
       setNodes([])
       setEdges([])
+      showError('加载业务画布失败')
     } finally {
       setLoadingCanvas(false)
+      // 延迟重置加载标记，确保 buildGraph 触发的变更事件已处理完毕
+      setTimeout(() => {
+        isLoadingCanvasRef.current = false
+      }, 100)
     }
   }, [buildGraph, selectedProcessId])
 
@@ -531,6 +696,11 @@ const BusinessLibraryPage: React.FC = () => {
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       setNodes((nds) => applyNodeChanges(changes, nds))
+      // 仅在非选择操作（如位置/尺寸变更）时标记为有改动
+      // 且不在画布加载期间
+      if (!isLoadingCanvasRef.current && changes.some((change) => change.type !== 'select')) {
+        setHasChanges(true)
+      }
     },
     [],
   )
@@ -538,7 +708,11 @@ const BusinessLibraryPage: React.FC = () => {
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
       setEdges((eds) => applyEdgeChanges(changes, eds))
-      setHasChanges(true)
+      // 仅在非选择操作（如新增/删除/重连）时标记为有改动
+      // 且不在画布加载期间
+      if (!isLoadingCanvasRef.current && changes.some((change) => change.type !== 'select')) {
+        setHasChanges(true)
+      }
     },
     [],
   )
@@ -629,10 +803,18 @@ const BusinessLibraryPage: React.FC = () => {
     return null
   }, [canvas, processes, selectedProcessId])
 
-  const handleSelectProcess = (item: ProcessItem) => {
+  const handleSelectProcess = async (item: ProcessItem) => {
     if (hasChanges) {
-      const ok = window.confirm('有未保存的更改，是否放弃？')
+      const ok = await showConfirm({
+        title: '有未保存的更改',
+        content: '当前画布存在未保存的修改，确认放弃这些修改并切换到其它业务吗？',
+        okText: '确认',
+        cancelText: '取消',
+        okType: 'primary',
+      })
       if (!ok) return
+      // 用户确认放弃后，本地视为“已无未保存更改”
+      setHasChanges(false)
     }
     setSelectedProcessId(item.process_id)
     setSelectedNode({
@@ -815,15 +997,26 @@ const BusinessLibraryPage: React.FC = () => {
       const saved = await saveProcessCanvas(selectedProcessId, payload)
       setCanvas(saved)
       setHasChanges(false)
+      showSuccess('画布保存成功')
+    } catch (e) {
+      showError('画布保存失败，请稍后重试')
     } finally {
       setSaving(false)
     }
   }, [selectedProcessId, canvas, edges])
 
-  const handleCancelChanges = useCallback(() => {
+  const handleCancelChanges = useCallback(async () => {
     if (!hasChanges) return
-    const ok = window.confirm('确认放弃所有更改？')
+    const ok = await showConfirm({
+      title: '放弃画布更改',
+      content: '当前画布存在未保存的更改，确认放弃这些更改并还原到上次保存状态吗？',
+      okText: '确认',
+      cancelText: '取消',
+      okType: 'default',
+    })
     if (!ok) return
+    // 用户确认放弃后，立即清除未保存状态
+    setHasChanges(false)
     loadCanvas()
   }, [hasChanges, loadCanvas])
 
@@ -1019,13 +1212,14 @@ const BusinessLibraryPage: React.FC = () => {
       >
         <Card
           size="small"
-          title={currentProcess?.name || '业务流程画布'}
+          title={
+            <Space size={8} align="center">
+              <span>{currentProcess?.name || '业务流程画布'}</span>
+              {hasChanges && <Tag color="orange">未保存</Tag>}
+            </Space>
+          }
           extra={
             <Space>
-              {hasChanges && <Tag color="orange">未保存</Tag>}
-              {currentProcess?.channel ? (
-                <Tag color="geekblue">{currentProcess.channel}</Tag>
-              ) : null}
               <Button
                 type="primary"
                 size="small"
@@ -1070,7 +1264,7 @@ const BusinessLibraryPage: React.FC = () => {
               <Empty description="暂无流程步骤" />
             </div>
           ) : (
-            <div style={{ width: '100%', height: '100%' }}>
+            <div style={{ width: '100%', height: 'calc(100% - 30px)' }}>
               <ReactFlow
                 nodes={displayNodes}
                 edges={displayEdges}
@@ -1088,6 +1282,21 @@ const BusinessLibraryPage: React.FC = () => {
               >
                 <Background />
                 <Controls />
+                <MiniMap 
+                  nodeStrokeWidth={3}
+                  nodeColor={(node) => {
+                    const nodeType = node.data?.nodeType
+                    if (nodeType === 'step') return '#1677ff'
+                    if (nodeType === 'implementation') return '#52c41a'
+                    if (nodeType === 'data') return '#faad14'
+                    return '#d9d9d9'
+                  }}
+                  style={{
+                    backgroundColor: '#f5f5f5',
+                  }}
+                  zoomable
+                  pannable
+                />
               </ReactFlow>
             </div>
           )}
@@ -1121,6 +1330,15 @@ const BusinessLibraryPage: React.FC = () => {
               <Title level={5} style={{ margin: 0 }}>
                 {selectedNode.type === 'process' ? '业务信息' : '步骤详情'}
               </Title>
+              <Button
+                size="small"
+                onClick={() => {
+                  setSelectedNode(null)
+                  setHighlightNodeId(null)
+                }}
+              >
+                关闭
+              </Button>
             </Space>
 
             {selectedNode.type === 'process' && (

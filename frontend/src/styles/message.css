@@ -1,0 +1,173 @@
+/* ========================================== */
+/* 美化全局消息弹窗 - 磨砂玻璃风格 */
+/* 适配 Ant Design Message 组件 */
+/* ========================================== */
+
+/* 主容器样式 - 针对 Ant Design 5.x 的实际 DOM 结构 */
+.ant-message .ant-message-notice .ant-message-notice-content {
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.78) !important;
+  backdrop-filter: saturate(180%) blur(16px);
+  -webkit-backdrop-filter: saturate(180%) blur(16px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16), 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  padding: 10px 16px !important;
+  min-height: auto;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+/* 内容与图标容器 */
+.ant-message .ant-message-notice .ant-message-notice-content > span {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 内容文字优化 */
+.ant-message .ant-message-notice .ant-message-notice-content > span > span:last-child {
+  font-weight: 600;
+  color: #0f172a;
+  letter-spacing: 0.1px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+/* 图标样式 - 圆形彩色背景 */
+.ant-message .ant-message-notice .ant-message-notice-content .anticon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+/* 成功消息样式 */
+.ant-message .ant-message-notice-success .ant-message-notice-content .anticon {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+}
+
+/* 警告消息样式 */
+.ant-message .ant-message-notice-warning .ant-message-notice-content .anticon {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+/* 错误消息样式 */
+.ant-message .ant-message-notice-error .ant-message-notice-content .anticon {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* 信息消息样式 */
+.ant-message .ant-message-notice-info .ant-message-notice-content .anticon {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+/* 加载消息样式 */
+.ant-message .ant-message-notice-loading .ant-message-notice-content .anticon {
+  background-color: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+/* 轻量：只处理间距，不干预 AntD 默认动画 */
+.ant-message .ant-message-notice {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+/* 覆盖 AntD message 的 move-up 动画：使用 transition 而非 animation，配合 rc-motion 的类名 */
+/* 进入开始状态 */
+.ant-message-notice-wrapper.ant-message-move-up-appear,
+.ant-message-notice-wrapper.ant-message-move-up-appear-start {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.95);
+}
+
+/* 进入激活状态 */
+.ant-message-notice-wrapper.ant-message-move-up-appear-active {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+  transition: opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+/* 退出开始状态 */
+.ant-message-notice-wrapper.ant-message-move-up-leave,
+.ant-message-notice-wrapper.ant-message-move-up-leave-start {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* 退出激活状态 */
+.ant-message-notice-wrapper.ant-message-move-up-leave-active {
+  opacity: 0;
+  transform: translateY(-10px) scale(0.98);
+  transition: opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 暗色模式适配 */
+html.dark .ant-message .ant-message-notice .ant-message-notice-content,
+.dark .ant-message .ant-message-notice .ant-message-notice-content,
+[data-theme='dark'] .ant-message .ant-message-notice .ant-message-notice-content {
+  background: rgba(17, 24, 39, 0.78) !important;
+  border-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5), 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+}
+
+html.dark .ant-message .ant-message-notice .ant-message-notice-content > span > span:last-child,
+.dark .ant-message .ant-message-notice .ant-message-notice-content > span > span:last-child,
+[data-theme='dark'] .ant-message .ant-message-notice .ant-message-notice-content > span > span:last-child {
+  color: #e7e9ee;
+}
+
+html.dark .ant-message .ant-message-notice .ant-message-notice-content .anticon,
+.dark .ant-message .ant-message-notice .ant-message-notice-content .anticon,
+[data-theme='dark'] .ant-message .ant-message-notice .ant-message-notice-content .anticon {
+  opacity: 0.9;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .ant-message .ant-message-notice .ant-message-notice-content {
+    max-width: calc(100vw - 32px);
+    padding: 12px 18px !important;
+  }
+
+  .ant-message .ant-message-notice .ant-message-notice-content > span > span:last-child {
+    font-size: 14px;
+  }
+}
+
+/* 确保消息容器居中并垂直堆叠 */
+.ant-message {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 2px !important;
+}
+
+/* 强制移除所有子元素的默认间距 */
+.ant-message > * {
+  margin: 0 !important;
+}
+
+/* 悬停效果 */
+.ant-message .ant-message-notice .ant-message-notice-content:hover {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2), 0 4px 12px rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-2px);
+}
+
+html.dark .ant-message .ant-message-notice .ant-message-notice-content:hover,
+.dark .ant-message .ant-message-notice .ant-message-notice-content:hover,
+[data-theme='dark'] .ant-message .ant-message-notice .ant-message-notice-content:hover {
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.45) !important;
+}
