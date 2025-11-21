@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Tabs, List, Input, Tag, Spin, Empty } from 'antd'
-import { DatabaseOutlined, ApiOutlined, FolderOutlined } from '@ant-design/icons'
+import { DatabaseOutlined, CodeOutlined, NodeIndexOutlined } from '@ant-design/icons'
 import { listStepsPaged, listImplementationsPaged } from '../api/resourceNodes'
 import { listDataResources } from '../api/dataResources'
 
@@ -60,15 +60,16 @@ const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
   }
 
   const renderNodeItem = (node: any, nodeType: string) => {
-    let icon = <FolderOutlined />
-    let color = '#1890ff'
+    // 与 ResourceLibraryPage 中的图标保持同步
+    let icon = <NodeIndexOutlined />
+    let color = '#52c41a' // 步骤：绿色
     
     if (nodeType === 'implementation') {
-      icon = <ApiOutlined />
-      color = '#52c41a'
+      icon = <CodeOutlined />
+      color = '#fa541c' // 实现：橙色
     } else if (nodeType === 'data') {
       icon = <DatabaseOutlined />
-      color = '#faad14'
+      color = '#722ed1' // 数据资源：紫色
     }
 
     return (
@@ -77,12 +78,12 @@ const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
         onDragStart={(e) => handleDragStart(e, nodeType, node)}
         style={{
           cursor: 'grab',
-          padding: '8px 12px',
-          borderRadius: 4,
-          marginBottom: 4,
-          background: '#fafafa',
-          border: '1px solid #f0f0f0',
-          transition: 'all 0.2s',
+          padding: '6px 10px',
+          borderRadius: 6,
+          marginBottom: 6,
+          background: 'transparent',
+          border: '1px solid #e5e7eb',
+          transition: 'background 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease',
         }}
         onMouseDown={(e) => {
           (e.currentTarget as HTMLElement).style.cursor = 'grabbing'
@@ -92,32 +93,46 @@ const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
         }}
         onMouseEnter={(e) => {
           const el = e.currentTarget as HTMLElement
-          el.style.background = '#e6f7ff'
-          el.style.borderColor = '#1890ff'
+          el.style.background = '#f5f7ff'
+          el.style.borderColor = '#d0e2ff'
+          el.style.boxShadow = '0 2px 6px rgba(15, 23, 42, 0.12)'
         }}
         onMouseLeave={(e) => {
           const el = e.currentTarget as HTMLElement
-          el.style.background = '#fafafa'
-          el.style.borderColor = '#f0f0f0'
+          el.style.background = 'transparent'
+          el.style.borderColor = '#e5e7eb'
+          el.style.boxShadow = 'none'
         }}
       >
         <div style={{ width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color }}>{icon}</span>
-            <span style={{ fontWeight: 500, flex: 1, fontSize: 13 }}>{node.name}</span>
+            <span
+              style={{
+                fontWeight: 500,
+                flex: 1,
+                fontSize: 13,
+                lineHeight: '18px',
+                wordBreak: 'break-all',
+              }}
+            >
+              {node.name}
+            </span>
           </div>
-          {node.description && (
-            <div style={{ 
-              fontSize: 12, 
-              color: '#8c8c8c', 
-              marginTop: 4,
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-            }}>
-              {node.description}
-            </div>
-          )}
+          <div style={{ 
+            fontSize: 12,
+            color: '#8c8c8c',
+            marginTop: 4,
+            display: '-webkit-box',
+            WebkitLineClamp: 2,
+            WebkitBoxOrient: 'vertical',
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'normal',
+            wordBreak: 'break-all',
+          }}>
+            {node.description || '暂无说明'}
+          </div>
           {node.system && (
             <Tag style={{ marginTop: 4, fontSize: 11 }} color="blue">
               {node.system}
@@ -133,7 +148,13 @@ const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
       key: 'steps',
       label: '步骤',
       children: (
-        <div>
+        <div
+          style={{
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
           <Search
             placeholder="搜索步骤..."
             value={searchText}
@@ -150,7 +171,7 @@ const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
               dataSource={filterNodes(steps, searchText)}
               renderItem={(item) => renderNodeItem(item, 'step')}
               locale={{ emptyText: <Empty description="暂无步骤" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
-              style={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }}
+              style={{ flex: 1, minHeight: 0, overflow: 'auto' }}
             />
           )}
         </div>
@@ -160,7 +181,13 @@ const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
       key: 'implementations',
       label: '实现',
       children: (
-        <div>
+        <div
+          style={{
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
           <Search
             placeholder="搜索实现..."
             value={searchText}
@@ -177,7 +204,7 @@ const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
               dataSource={filterNodes(implementations, searchText)}
               renderItem={(item) => renderNodeItem(item, 'implementation')}
               locale={{ emptyText: <Empty description="暂无实现" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
-              style={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }}
+              style={{ flex: 1, minHeight: 0, overflow: 'auto' }}
             />
           )}
         </div>
@@ -187,7 +214,13 @@ const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
       key: 'dataResources',
       label: '数据资源',
       children: (
-        <div>
+        <div
+          style={{
+            height: '100%',
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
           <Search
             placeholder="搜索数据资源..."
             value={searchText}
@@ -204,7 +237,7 @@ const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
               dataSource={filterNodes(dataResources, searchText)}
               renderItem={(item) => renderNodeItem(item, 'data')}
               locale={{ emptyText: <Empty description="暂无数据资源" image={Empty.PRESENTED_IMAGE_SIMPLE} /> }}
-              style={{ maxHeight: 'calc(100vh - 300px)', overflow: 'auto' }}
+              style={{ flex: 1, minHeight: 0, overflow: 'auto' }}
             />
           )}
         </div>
@@ -213,24 +246,16 @@ const NodeLibrary: React.FC<NodeLibraryProps> = ({ onDragStart }) => {
   ]
 
   return (
-    <div style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', background: '#fff' }}>
-      <div style={{ padding: '12px 16px', borderBottom: '1px solid #f0f0f0' }}>
-        <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600 }}>组件库</h3>
-        <p style={{ margin: '4px 0 0 0', fontSize: 12, color: '#8c8c8c' }}>拖拽节点到画布</p>
-      </div>
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        <Tabs
-          activeKey={activeTab}
-          onChange={(key) => {
-            setActiveTab(key)
-            setSearchText('')
-          }}
-          items={tabItems}
-          style={{ padding: '0 16px' }}
-          size="small"
-        />
-      </div>
-    </div>
+    <Tabs
+      activeKey={activeTab}
+      onChange={(key) => {
+        setActiveTab(key)
+        setSearchText('')
+      }}
+      items={tabItems}
+      size="small"
+      style={{ height: '100%' }}
+    />
   )
 }
 

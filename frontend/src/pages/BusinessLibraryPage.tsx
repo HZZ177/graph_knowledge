@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Card, Typography, List, Spin, Empty, Space, Tag, Button, message as antdMessage } from 'antd'
-import { SyncOutlined } from '@ant-design/icons'
+import { Card, Typography, List, Spin, Empty, Space, Tag, Button, Modal, Input, Tabs, Tooltip, message as antdMessage } from 'antd'
+import { SyncOutlined, PlusCircleOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons'
 import {
   ReactFlow,
   Background,
@@ -31,6 +31,16 @@ import {
   type ProcessCanvas,
 } from '../api/canvas'
 import { getSyncStatus, type SyncStatusResponse } from '../api/health'
+import {
+  listStepsPaged,
+  listImplementationsPaged,
+  type StepNode,
+  type ImplementationNode,
+} from '../api/resourceNodes'
+import {
+  listDataResources,
+  type DataResource,
+} from '../api/dataResources'
 import SyncStatusBadge from '../components/SyncStatusBadge'
 import SyncProgressModal from '../components/SyncProgressModal'
 import NodeLibrary from '../components/NodeLibrary'
@@ -54,8 +64,10 @@ const layoutGraph = (nodes: Node[], edges: Edge[]) => {
   return { nodes: layoutedNodes, edges: layoutedEdges }
 }
 
-const AllSidesNode = React.memo(({ data, selected }: any) => {
+const AllSidesNode = React.memo(({ data, selected, id }: any) => {
   const [hovered, setHovered] = useState(false)
+  const hideTimerRef = React.useRef<any>(null)
+  
   const baseHandleStyle = {
     width: 8,
     height: 8,
@@ -78,6 +90,61 @@ const AllSidesNode = React.memo(({ data, selected }: any) => {
     headerBg = '#fff7e6'
     headerColor = '#ad6800'
   }
+
+  // 所有节点都显示+按钮
+  const showAddButtons = hovered
+
+  const handleMouseEnter = () => {
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current)
+      hideTimerRef.current = null
+    }
+    setHovered(true)
+  }
+
+  const handleMouseLeave = () => {
+    // 延迟300ms隐藏，给用户时间移动到按钮上
+    hideTimerRef.current = setTimeout(() => {
+      setHovered(false)
+    }, 300)
+  }
+
+  const handleAddClick = (e: React.MouseEvent, direction: 'top' | 'right' | 'bottom' | 'left', handle: string) => {
+    e.stopPropagation()
+    // 触发自定义事件，由父组件处理
+    const event = new CustomEvent('quickAddNode', {
+      detail: { 
+        nodeId: id, 
+        nodeType, 
+        direction, 
+        handle,
+        x: e.clientX,
+        y: e.clientY
+      }
+    })
+    window.dispatchEvent(event)
+  }
+
+  const plusButtonStyle = (position: any) => ({
+    position: 'absolute' as const,
+    ...position,
+    width: 20,
+    height: 20,
+    borderRadius: '50%',
+    background: '#faad14',
+    color: '#fff',
+    border: 'none',
+    cursor: 'pointer',
+    fontSize: 14,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+    opacity: showAddButtons ? 1 : 0,
+    transition: 'opacity 0.2s, transform 0.1s',
+    zIndex: 10,
+    pointerEvents: showAddButtons ? 'auto' as const : 'none' as const,
+  })
 
   return (
     <>
@@ -143,9 +210,53 @@ const AllSidesNode = React.memo(({ data, selected }: any) => {
         id="r-out"
         style={{ ...baseHandleStyle, right: -5 }}
       />
+      
+      {/* 快速添加按钮 - 右侧 */}
+      <button
+        onClick={(e) => handleAddClick(e, 'right', 'r-out')}
+        style={plusButtonStyle({ right: -30, top: '50%', transform: 'translateY(-50%)' })}
+        onMouseDown={(e) => e.stopPropagation()}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        +
+      </button>
+      
+      {/* 快速添加按钮 - 下方 */}
+      <button
+        onClick={(e) => handleAddClick(e, 'bottom', 'b-out')}
+        style={plusButtonStyle({ bottom: -30, left: '50%', transform: 'translateX(-50%)' })}
+        onMouseDown={(e) => e.stopPropagation()}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        +
+      </button>
+      
+      {/* 快速添加按钮 - 左侧 */}
+      <button
+        onClick={(e) => handleAddClick(e, 'left', 'l-out')}
+        style={plusButtonStyle({ left: -30, top: '50%', transform: 'translateY(-50%)' })}
+        onMouseDown={(e) => e.stopPropagation()}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        +
+      </button>
+      
+      {/* 快速添加按钮 - 上方 */}
+      <button
+        onClick={(e) => handleAddClick(e, 'top', 't-out')}
+        style={plusButtonStyle({ top: -30, left: '50%', transform: 'translateX(-50%)' })}
+        onMouseDown={(e) => e.stopPropagation()}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
+      >
+        +
+      </button>
       <div
-        onMouseEnter={() => setHovered(true)}
-        onMouseLeave={() => setHovered(false)}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
         style={{
           borderRadius: 14,
           background: '#ffffff',
@@ -348,6 +459,24 @@ const BusinessLibraryPage: React.FC = () => {
   const [syncModalStatus, setSyncModalStatus] = useState<'saving' | 'syncing' | 'success' | 'error'>('saving')
   const [syncModalResult, setSyncModalResult] = useState<any>(null)
   
+  // 快速添加节点模态框
+  const [quickAddModal, setQuickAddModal] = useState<{
+    visible: boolean
+    sourceNodeId: string
+    sourceNodeType: 'step' | 'implementation' | 'data'
+    direction: 'top' | 'right' | 'bottom' | 'left'
+    sourceHandle: string
+    x: number
+    y: number
+  } | null>(null)
+  const [quickAddSearch, setQuickAddSearch] = useState('')
+  const [processSearch, setProcessSearch] = useState('')
+  
+  // 全局节点库数据
+  const [allSteps, setAllSteps] = useState<StepNode[]>([])
+  const [allImplementations, setAllImplementations] = useState<ImplementationNode[]>([])
+  const [allDataResources, setAllDataResources] = useState<DataResource[]>([])
+  
   // 标记是否正在加载画布，避免加载期间的节点/边变更触发 hasChanges
   const isLoadingCanvasRef = React.useRef(false)
 
@@ -377,6 +506,25 @@ const BusinessLibraryPage: React.FC = () => {
     }
   }, [selectedProcessId])
   
+  // 加载全局节点库数据
+  const fetchAllNodes = useCallback(async () => {
+    try {
+      // 加载所有步骤（分页获取，这里获取足够大的页面）
+      const stepsResult = await listStepsPaged('', 1, 1000)
+      setAllSteps(stepsResult.items)
+      
+      // 加载所有实现
+      const implsResult = await listImplementationsPaged('', 1, 1000)
+      setAllImplementations(implsResult.items)
+      
+      // 加载所有数据资源
+      const resourcesResult = await listDataResources({ page: 1, page_size: 1000 })
+      setAllDataResources(resourcesResult.items)
+    } catch (e) {
+      console.error('加载全局节点库失败:', e)
+    }
+  }, [])
+  
   const fetchSyncStatuses = useCallback(async (processIds: string[]) => {
     const statusMap = new Map<string, SyncStatusResponse>()
     
@@ -396,7 +544,28 @@ const BusinessLibraryPage: React.FC = () => {
 
   useEffect(() => {
     fetchProcesses()
-  }, [fetchProcesses])
+    fetchAllNodes()
+  }, [fetchProcesses, fetchAllNodes])
+
+  // 监听快速添加节点事件
+  useEffect(() => {
+    const handleQuickAdd = (e: any) => {
+      const { nodeId, nodeType, direction, handle, x, y } = e.detail
+      setQuickAddModal({
+        visible: true,
+        sourceNodeId: nodeId,
+        sourceNodeType: nodeType,
+        direction,
+        sourceHandle: handle,
+        x,
+        y,
+      })
+      setQuickAddSearch('')
+    }
+
+    window.addEventListener('quickAddNode', handleQuickAdd)
+    return () => window.removeEventListener('quickAddNode', handleQuickAdd)
+  }, [])
 
   const buildGraph = useCallback(
     (canvasData: ProcessCanvas) => {
@@ -925,6 +1094,25 @@ const BusinessLibraryPage: React.FC = () => {
     return null
   }, [canvas, processes, selectedProcessId])
 
+  const filteredProcesses = useMemo(() => {
+    const keyword = processSearch.trim().toLowerCase()
+    if (!keyword) {
+      return processes
+    }
+    return processes.filter((p) => {
+      const name = p.name?.toLowerCase() || ''
+      const id = p.process_id?.toLowerCase() || ''
+      const desc = p.description?.toLowerCase() || ''
+      const channel = p.channel?.toLowerCase() || ''
+      return (
+        name.includes(keyword) ||
+        id.includes(keyword) ||
+        desc.includes(keyword) ||
+        channel.includes(keyword)
+      )
+    })
+  }, [processes, processSearch])
+
   const handleSelectProcess = async (item: ProcessItem) => {
     if (hasChanges) {
       const ok = await showConfirm({
@@ -1135,6 +1323,159 @@ const BusinessLibraryPage: React.FC = () => {
       }
     },
     []
+  )
+
+  // 处理快速添加节点
+  const handleQuickAddNode = useCallback(
+    (selectedNode: any) => {
+      if (!quickAddModal || !canvas) return
+
+      const sourceNode = nodes.find((n) => n.id === quickAddModal.sourceNodeId)
+      if (!sourceNode) return
+
+      // 计算新节点位置
+      const offset = 300
+      let newPosition = { x: 0, y: 0 }
+      switch (quickAddModal.direction) {
+        case 'right':
+          newPosition = { x: sourceNode.position.x + offset, y: sourceNode.position.y }
+          break
+        case 'bottom':
+          newPosition = { x: sourceNode.position.x, y: sourceNode.position.y + 200 }
+          break
+        case 'left':
+          newPosition = { x: sourceNode.position.x - offset, y: sourceNode.position.y }
+          break
+        case 'top':
+          newPosition = { x: sourceNode.position.x, y: sourceNode.position.y - 200 }
+          break
+      }
+
+      // 创建新节点
+      let newNode: Node
+      let edgeKind: 'process' | 'step-impl' | 'impl-dr' = 'process'
+      let targetHandle = 'l-in' // 默认目标handle
+
+      // 根据方向确定目标handle
+      switch (quickAddModal.direction) {
+        case 'right':
+          targetHandle = 'l-in'
+          break
+        case 'bottom':
+          targetHandle = 't-in'
+          break
+        case 'left':
+          targetHandle = 'r-in'
+          break
+        case 'top':
+          targetHandle = 'b-in'
+          break
+      }
+
+      if (selectedNode.nodeType === 'step') {
+        // 添加步骤节点
+        newNode = {
+          id: `step:${selectedNode.step_id}`,
+          type: 'allSides',
+          position: newPosition,
+          data: {
+            label: selectedNode.name,
+            stepId: selectedNode.step_id,
+            nodeType: 'step',
+            typeLabel: '步骤',
+            description: selectedNode.description,
+          },
+          style: {
+            padding: 0,
+            border: 'none',
+            background: 'transparent',
+            boxShadow: 'none',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+          },
+        }
+        edgeKind = quickAddModal.sourceNodeType === 'step' ? 'process' : 'step-impl'
+      } else if (selectedNode.nodeType === 'implementation') {
+        // 添加实现节点
+        newNode = {
+          id: `impl:${selectedNode.impl_id}`,
+          type: 'allSides',
+          position: newPosition,
+          data: {
+            label: selectedNode.name,
+            implId: selectedNode.impl_id,
+            nodeType: 'implementation',
+            typeLabel: '实现',
+            type: selectedNode.type,
+            system: selectedNode.system,
+            code_ref: selectedNode.code_ref,
+          },
+          style: {
+            padding: 0,
+            border: 'none',
+            background: 'transparent',
+            boxShadow: 'none',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+          },
+        }
+        edgeKind = 'step-impl'
+      } else if (selectedNode.nodeType === 'data') {
+        // 添加数据资源节点
+        newNode = {
+          id: `dr:${selectedNode.resource_id}`,
+          type: 'allSides',
+          position: newPosition,
+          data: {
+            label: selectedNode.name,
+            resource: selectedNode,
+            nodeType: 'data',
+            typeLabel: '数据资源',
+            resourceType: selectedNode.type,
+            description: selectedNode.description,
+          },
+          style: {
+            padding: 0,
+            border: 'none',
+            background: 'transparent',
+            boxShadow: 'none',
+            width: 200,
+            minWidth: 150,
+            maxWidth: 300,
+          },
+        }
+        edgeKind = 'impl-dr'
+      } else {
+        return
+      }
+
+      // 创建连线
+      const newEdge: Edge = {
+        id: `edge-${Date.now()}`,
+        source: quickAddModal.sourceNodeId,
+        target: newNode.id,
+        sourceHandle: quickAddModal.sourceHandle,
+        targetHandle,
+        type: 'simplebezier',
+        markerEnd: { type: MarkerType.ArrowClosed },
+        data: { kind: edgeKind },
+        style: {
+          stroke: edgeKind === 'process' ? '#1677ff' : edgeKind === 'step-impl' ? '#52c41a' : '#faad14',
+        },
+      }
+
+      // 更新节点和边
+      setNodes((nds) => nds.concat(newNode))
+      setEdges((eds) => eds.concat(newEdge))
+      setHasChanges(true)
+
+      // 关闭模态框
+      setQuickAddModal(null)
+      showSuccess('节点添加成功')
+    },
+    [quickAddModal, nodes, canvas]
   )
 
   const handleSaveCanvas = useCallback(async () => {
@@ -1460,150 +1801,227 @@ const BusinessLibraryPage: React.FC = () => {
       >
       <div
         style={{
-          width: 280,
+          width: 300,
           borderRight: '1px solid #f0f0f0',
           padding: 16,
-          overflow: 'auto',
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
         }}
       >
-        <Title level={3} style={{ marginBottom: 16 }}>
-          业务库
-        </Title>
-        <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-          左侧选择业务，中心查看流程画布，点击步骤查看右侧详情。
-        </Paragraph>
-        {loadingProcesses ? (
-          <div
-            style={{
-              paddingTop: 40,
-              textAlign: 'center',
-            }}
-          >
-            <Spin />
-          </div>
-        ) : processes.length === 0 ? (
-          <Empty description="暂无业务流程" />
-        ) : (
-          <List<ProcessItem>
-            size="small"
-            dataSource={processes}
-            rowKey={(item) => item.process_id}
-            renderItem={(item) => {
-              const isSelected = item.process_id === selectedProcessId
-              return (
-                <List.Item
+        <Tabs
+          defaultActiveKey="business"
+          size="small"
+          style={{ flex: 1, minHeight: 0 }}
+          items={[
+            {
+              key: 'business',
+              label: '业务',
+              children: (
+                <div
                   style={{
-                    cursor: 'pointer',
-                    marginBottom: 12,
-                    padding: 0,
-                    border: 'none',
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
                   }}
-                  onClick={() => handleSelectProcess(item)}
                 >
-                  <Card
+                  <Paragraph type="secondary" style={{ marginBottom: 12 }}>
+                    左侧选择业务，中心查看流程画布，点击步骤查看右侧详情。
+                  </Paragraph>
+                  <Input.Search
+                    allowClear
+                    placeholder="按名称或流程ID筛选..."
                     size="small"
-                    hoverable
+                    value={processSearch}
+                    onChange={(e) => setProcessSearch(e.target.value)}
+                    style={{ marginBottom: 8 }}
+                  />
+                  <div
                     style={{
-                      width: '100%',
-                      border: isSelected ? '2px solid #1677ff' : '1px solid #e8e8e8',
-                      borderRadius: 12,
-                      boxShadow: isSelected
-                        ? '0 4px 12px rgba(22, 119, 255, 0.15)'
-                        : '0 1px 2px rgba(0, 0, 0, 0.03)',
-                      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                      background: isSelected ? '#f0f7ff' : '#ffffff',
-                    }}
-                    bodyStyle={{
-                      padding: '16px',
+                      flex: 1,
+                      minHeight: 0,
+                      overflow: 'auto',
+                      paddingRight: 4,
                     }}
                   >
-                    <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                    {loadingProcesses ? (
                       <div
                         style={{
+                          paddingTop: 40,
+                          textAlign: 'center',
+                        }}
+                      >
+                        <Spin />
+                      </div>
+                    ) : processes.length === 0 ? (
+                      <Empty description="暂无业务流程" />
+                    ) : filteredProcesses.length === 0 ? (
+                      <Empty description="未找到匹配的业务" />
+                    ) : (
+                      <List<ProcessItem>
+                        size="small"
+                        dataSource={filteredProcesses}
+                        rowKey={(item) => item.process_id}
+                        renderItem={(item) => {
+                          const isSelected = item.process_id === selectedProcessId
+                          return (
+                            <List.Item
+                              style={{
+                                cursor: 'pointer',
+                                marginBottom: 12,
+                                padding: 0,
+                                border: 'none',
+                              }}
+                              onClick={() => handleSelectProcess(item)}
+                            >
+                              <Card
+                                size="small"
+                                hoverable
+                                style={{
+                                  width: '100%',
+                                  border: isSelected
+                                    ? '2px solid #1677ff'
+                                    : '1px solid #e8e8e8',
+                                  borderRadius: 12,
+                                  boxShadow: isSelected
+                                    ? '0 4px 12px rgba(22, 119, 255, 0.15)'
+                                    : '0 1px 2px rgba(0, 0, 0, 0.03)',
+                                  transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                  background: isSelected ? '#f0f7ff' : '#ffffff',
+                                }}
+                                bodyStyle={{
+                                  padding: '16px',
+                                }}
+                              >
+                                <Space direction="vertical" size={8} style={{ width: '100%' }}>
+                                  <div
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      justifyContent: 'space-between',
+                                      gap: 8,
+                                    }}
+                                  >
+                                    <span
+                                      style={{
+                                        fontWeight: 600,
+                                        fontSize: 15,
+                                        color: isSelected ? '#1677ff' : '#262626',
+                                        lineHeight: '22px',
+                                        flex: 1,
+                                        overflow: 'hidden',
+                                        textOverflow: 'ellipsis',
+                                        whiteSpace: 'nowrap',
+                                      }}
+                                      title={item.name}
+                                    >
+                                      {item.name}
+                                    </span>
+                                    {item.channel && (
+                                      <Tag
+                                        color={isSelected ? 'blue' : 'default'}
+                                        style={{
+                                          margin: 0,
+                                          borderRadius: 6,
+                                          fontSize: 12,
+                                          padding: '2px 8px',
+                                          fontWeight: 500,
+                                        }}
+                                      >
+                                        {item.channel}
+                                      </Tag>
+                                    )}
+                                  </div>
+                                  <Paragraph
+                                    style={{
+                                      marginBottom: 0,
+                                      fontSize: 13,
+                                      color: item.description ? '#8c8c8c' : '#bfbfbf',
+                                      lineHeight: '20px',
+                                      fontStyle: item.description ? 'normal' : 'italic',
+                                    }}
+                                    ellipsis={
+                                      item.description
+                                        ? { rows: 2, tooltip: item.description }
+                                        : false
+                                    }
+                                  >
+                                    {item.description || '暂无说明'}
+                                  </Paragraph>
+                                  <div
+                                    style={{
+                                      marginTop: 4,
+                                    }}
+                                  >
+                                    <SyncStatusBadge
+                                      status={
+                                        syncStatuses.get(item.process_id)?.neo4j_status || 'never_synced'
+                                      }
+                                      lastSyncAt={syncStatuses.get(item.process_id)?.last_sync_at}
+                                      syncError={syncStatuses.get(item.process_id)?.sync_error}
+                                      showText={true}
+                                      size="small"
+                                    />
+                                  </div>
+                                </Space>
+                              </Card>
+                            </List.Item>
+                          )
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+              ),
+            },
+            {
+              key: 'library',
+              label: '组件库',
+              children: (
+                <div
+                  style={{
+                    height: '100%',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <Paragraph
+                    type="secondary"
+                    style={{ marginBottom: 8, fontSize: 12 }}
+                  >
+                    从下方拖拽节点到画布，或使用节点上的 + 按钮进行快速连接
+                  </Paragraph>
+                  <div
+                    style={{
+                      flex: 1,
+                      minHeight: 0,
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {currentProcess ? (
+                      <NodeLibrary />
+                    ) : (
+                      <div
+                        style={{
+                          height: '100%',
                           display: 'flex',
                           alignItems: 'center',
-                          justifyContent: 'space-between',
-                          gap: 8,
+                          justifyContent: 'center',
                         }}
                       >
-                        <span
-                          style={{
-                            fontWeight: 600,
-                            fontSize: 15,
-                            color: isSelected ? '#1677ff' : '#262626',
-                            lineHeight: '22px',
-                            flex: 1,
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                          }}
-                          title={item.name}
-                        >
-                          {item.name}
-                        </span>
-                        {item.channel && (
-                          <Tag
-                            color={isSelected ? 'blue' : 'default'}
-                            style={{
-                              margin: 0,
-                              borderRadius: 6,
-                              fontSize: 12,
-                              padding: '2px 8px',
-                              fontWeight: 500,
-                            }}
-                          >
-                            {item.channel}
-                          </Tag>
-                        )}
-                      </div>
-                      <Paragraph
-                        style={{
-                          marginBottom: 0,
-                          fontSize: 13,
-                          color: item.description ? '#8c8c8c' : '#bfbfbf',
-                          lineHeight: '20px',
-                          fontStyle: item.description ? 'normal' : 'italic',
-                        }}
-                        ellipsis={item.description ? { rows: 2, tooltip: item.description } : false}
-                      >
-                        {item.description || '暂无说明'}
-                      </Paragraph>
-                      
-                      {/* 同步状态 */}
-                      <div
-                        style={{
-                          marginTop: 4,
-                        }}
-                      >
-                        <SyncStatusBadge
-                          status={syncStatuses.get(item.process_id)?.neo4j_status || 'never_synced'}
-                          lastSyncAt={syncStatuses.get(item.process_id)?.last_sync_at}
-                          syncError={syncStatuses.get(item.process_id)?.sync_error}
-                          showText={true}
-                          size="small"
+                        <Empty
+                          description="请选择业务流程"
+                          image={Empty.PRESENTED_IMAGE_SIMPLE}
                         />
                       </div>
-                    </Space>
-                  </Card>
-                </List.Item>
-              )
-            }}
-          />
-        )}
+                    )}
+                  </div>
+                </div>
+              ),
+            },
+          ]}
+        />
       </div>
-
-      {/* 组件库 - 仅在选中流程时显示 */}
-      {currentProcess && (
-        <div
-          style={{
-            width: 280,
-            borderRight: '1px solid #f0f0f0',
-            overflow: 'hidden',
-          }}
-        >
-          <NodeLibrary />
-        </div>
-      )}
 
       <div
         style={{
@@ -1615,34 +2033,8 @@ const BusinessLibraryPage: React.FC = () => {
       >
         <Card
           size="small"
-          title={
-            <Space size={8} align="center">
-              <span>{currentProcess?.name || '业务流程画布'}</span>
-              {hasChanges && <Tag color="orange">未保存</Tag>}
-            </Space>
-          }
-          extra={
-            <Space>
-              <Button
-                type="primary"
-                size="small"
-                loading={saving}
-                disabled={!hasChanges}
-                onClick={handleSaveCanvas}
-              >
-                保存画布
-              </Button>
-              <Button
-                size="small"
-                disabled={!hasChanges}
-                onClick={handleCancelChanges}
-              >
-                取消
-              </Button>
-            </Space>
-          }
           style={{ height: '100%' }}
-          bodyStyle={{ height: '100%' }}
+          bodyStyle={{ height: '100%', padding: 0 }}
         >
           {loadingCanvas ? (
             <div
@@ -1656,7 +2048,95 @@ const BusinessLibraryPage: React.FC = () => {
               <Spin />
             </div>
           ) : (
-            <div style={{ width: '100%', height: 'calc(100% - 30px)', position: 'relative' }}>
+            <div style={{ width: '100%', height: '100%', position: 'relative' }}>
+              {/* 画布右上角悬浮工具条 */}
+              <div
+                style={{
+                  position: 'absolute',
+                  top: 16,
+                  right: 16,
+                  zIndex: 20,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 12,
+                  padding: '8px 18px',
+                  borderRadius: 10,
+                  backgroundColor: '#ffffff',
+                  boxShadow:
+                    '0 8px 20px rgba(15, 23, 42, 0.18), 0 3px 6px rgba(15, 23, 42, 0.12)',
+                  border: '1px solid #f0f0f0',
+                  maxWidth: 460,
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    maxWidth: hasChanges ? 260 : 300,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                  }}
+                  title={currentProcess?.name || '业务流程画布'}
+                >
+                  {currentProcess?.name || '业务流程画布'}
+                </span>
+                {hasChanges && <Tag color="orange">未保存</Tag>}
+                {/* 分隔线 */}
+                <div
+                  style={{
+                    width: 1,
+                    height: 20,
+                    backgroundColor: '#e5e7eb',
+                  }}
+                />
+                <Space size={6}>
+                  <Tooltip title="保存画布">
+                    <Button
+                      type="text"
+                      shape="circle"
+                      size="middle"
+                      icon={<SaveOutlined />}
+                      loading={saving}
+                      disabled={!hasChanges}
+                      onClick={handleSaveCanvas}
+                      style={{
+                        width: 30,
+                        height: 30,
+                        padding: 0,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: 'none',
+                        background: 'transparent',
+                        boxShadow: 'none',
+                      }}
+                    />
+                  </Tooltip>
+                  <Tooltip title="放弃未保存更改">
+                    <Button
+                      type="text"
+                      shape="circle"
+                      size="middle"
+                      icon={<CloseOutlined />}
+                      disabled={!hasChanges}
+                      onClick={handleCancelChanges}
+                      style={{
+                        width: 30,
+                        height: 30,
+                        padding: 0,
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        border: 'none',
+                        background: 'transparent',
+                        boxShadow: 'none',
+                      }}
+                    />
+                  </Tooltip>
+                </Space>
+              </div>
+
               <ReactFlow
                 nodes={displayNodes}
                 edges={displayEdges}
@@ -2101,6 +2581,254 @@ const BusinessLibraryPage: React.FC = () => {
         result={syncModalResult}
         onClose={() => setSyncModalVisible(false)}
       />
+      
+      {/* 快速添加节点面板 */}
+      {quickAddModal?.visible && (
+        <>
+          {/* 透明遮罩，点击关闭 */}
+          <div 
+            style={{
+              position: 'fixed',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              zIndex: 1000,
+            }}
+            onClick={() => setQuickAddModal(null)}
+          />
+          
+          {/* 面板 */}
+          {(() => {
+            const PANEL_WIDTH = 500
+            const MAX_HEIGHT = 600
+            const GAP = 10
+            const FLIP_BUFFER = 50 // 水平翻转缓冲区
+            const { x, y } = quickAddModal
+            
+            let left = x + GAP
+            let top = y - 20
+            let style: React.CSSProperties = {
+              width: PANEL_WIDTH,
+            }
+
+            // 水平方向检测：如果右侧空间不足，则显示在左侧
+            // 增加缓冲区，让翻转更灵敏
+            if (left + PANEL_WIDTH + FLIP_BUFFER > window.innerWidth) {
+              left = x - PANEL_WIDTH - GAP
+            }
+            // 确保左边界安全
+            if (left < GAP) left = GAP
+            style.left = left
+
+            // 垂直方向检测
+            let panelMaxHeight = MAX_HEIGHT
+            const bottomSpace = window.innerHeight - y
+            // 如果下方空间不足 300px 且上方空间充足，则向上显示
+            if (bottomSpace < 300 && y > 300) {
+              style.bottom = window.innerHeight - y + 20
+              panelMaxHeight = Math.min(MAX_HEIGHT, y - GAP * 2)
+              style.transformOrigin = 'bottom left'
+            } else {
+              // 否则向下显示，并限制最大高度防止溢出
+              style.top = top
+              panelMaxHeight = Math.min(MAX_HEIGHT, window.innerHeight - top - GAP)
+              style.transformOrigin = 'top left'
+            }
+            style.maxHeight = panelMaxHeight
+
+            // 计算列表的最大高度
+            // 面板总高度 - 头部(24+16) - 搜索框(32+16) - TabHeader(46) - Padding(16+16) ≈ 170
+            // 预留 180px 给非列表内容
+            const listMaxHeight = Math.max(100, panelMaxHeight - 180)
+
+            return (
+              <div
+                style={{
+                  position: 'fixed',
+                  ...style,
+                  background: '#fff',
+                  borderRadius: 8,
+                  boxShadow: '0 3px 6px -4px rgba(0, 0, 0, 0.12), 0 6px 16px 0 rgba(0, 0, 0, 0.08), 0 9px 28px 8px rgba(0, 0, 0, 0.05)',
+                  zIndex: 1001,
+                  padding: 16,
+                  display: 'flex',
+                  flexDirection: 'column',
+                }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontWeight: 500, fontSize: 16 }}>选择要添加的节点</span>
+                  <Button type="text" size="small" onClick={() => setQuickAddModal(null)}>✕</Button>
+                </div>
+
+                <Input.Search
+                  placeholder="搜索节点..."
+                  value={quickAddSearch}
+                  onChange={(e) => setQuickAddSearch(e.target.value)}
+                  style={{ marginBottom: 16 }}
+                />
+                
+                {(() => {
+                  // 定义连线规则
+                  const getConnectionRules = (sourceType: 'step' | 'implementation' | 'data') => {
+                    const rules = {
+                      step: {
+                        steps: { allowed: true, reason: '' },
+                        implementations: { allowed: true, reason: '' },
+                        data_resources: { allowed: false, reason: '步骤不能直接连接到数据资源，需要通过实现节点' }
+                      },
+                      implementation: {
+                        steps: { allowed: false, reason: '实现不能连接到步骤，应该由步骤连接到实现' },
+                        implementations: { allowed: false, reason: '实现之间不能直接连接' },
+                        data_resources: { allowed: true, reason: '' }
+                      },
+                      data: {
+                        steps: { allowed: false, reason: '数据资源是终点节点，不能作为连线起点' },
+                        implementations: { allowed: false, reason: '数据资源是终点节点，不能作为连线起点' },
+                        data_resources: { allowed: false, reason: '数据资源之间不能连接' }
+                      }
+                    }
+                    return rules[sourceType]
+                  }
+                  
+                  const connectionRules = getConnectionRules(quickAddModal.sourceNodeType)
+                  
+                  // 根据源节点类型和方向智能推荐默认Tab
+                  let defaultTab = 'steps'
+                  
+                  if (quickAddModal.sourceNodeType === 'step') {
+                    if (quickAddModal.direction === 'right' || quickAddModal.direction === 'left') {
+                      defaultTab = 'steps'
+                    } else {
+                      defaultTab = 'implementations'
+                    }
+                  } else if (quickAddModal.sourceNodeType === 'implementation') {
+                    defaultTab = 'data_resources'
+                  } else if (quickAddModal.sourceNodeType === 'data') {
+                    // 数据资源节点所有Tab都禁用，默认显示第一个
+                    defaultTab = 'steps'
+                  }
+                  
+                  // 渲染节点列表的函数
+                  const renderNodeList = (nodes: any[], nodeType: 'step' | 'implementation' | 'data', disabled: boolean) => {
+                    if (disabled) {
+                      return (
+                        <Empty 
+                          description="此类型节点不允许连接" 
+                          style={{ marginTop: 40, color: '#bfbfbf' }} 
+                        />
+                      )
+                    }
+                    
+                    // 过滤搜索
+                    const filteredNodes = nodes.filter((node: any) => {
+                      const searchLower = quickAddSearch.toLowerCase()
+                      return (
+                        node.name?.toLowerCase().includes(searchLower) ||
+                        node.type?.toLowerCase().includes(searchLower) ||
+                        node.system?.toLowerCase().includes(searchLower) ||
+                        node.description?.toLowerCase().includes(searchLower)
+                      )
+                    })
+                    
+                    // 添加nodeType字段
+                    const nodesWithType = filteredNodes.map((node: any) => ({
+                      ...node,
+                      nodeType
+                    }))
+                    
+                    if (nodesWithType.length === 0) {
+                      return <Empty description="没有找到匹配的节点" style={{ marginTop: 40 }} />
+                    }
+                    
+                    return (
+                      <List
+                        dataSource={nodesWithType}
+                        style={{ maxHeight: listMaxHeight, overflow: 'auto' }}
+                        renderItem={(node: any) => (
+                          <List.Item
+                            style={{ cursor: 'pointer', padding: '12px 16px' }}
+                            onClick={() => handleQuickAddNode(node)}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = '#f5f5f5'
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent'
+                            }}
+                          >
+                            <List.Item.Meta
+                              title={node.name}
+                              description={
+                                <Space direction="vertical" size={2}>
+                                  {node.type && <Text type="secondary">类型: {node.type}</Text>}
+                                  {node.system && <Text type="secondary">系统: {node.system}</Text>}
+                                  {node.description && (
+                                    <Text type="secondary" style={{ fontSize: 12 }}>
+                                      {node.description}
+                                    </Text>
+                                  )}
+                                </Space>
+                              }
+                            />
+                          </List.Item>
+                        )}
+                      />
+                    )
+                  }
+                  
+                  const tabItems = [
+                    {
+                      key: 'steps',
+                      label: connectionRules.steps.allowed ? (
+                        `步骤 (${allSteps.length})`
+                      ) : (
+                        <Tooltip title={connectionRules.steps.reason}>
+                          <span style={{ color: '#bfbfbf' }}>步骤 (${allSteps.length})</span>
+                        </Tooltip>
+                      ),
+                      children: renderNodeList(allSteps, 'step', !connectionRules.steps.allowed),
+                      disabled: !connectionRules.steps.allowed
+                    },
+                    {
+                      key: 'implementations',
+                      label: connectionRules.implementations.allowed ? (
+                        `实现 (${allImplementations.length})`
+                      ) : (
+                        <Tooltip title={connectionRules.implementations.reason}>
+                          <span style={{ color: '#bfbfbf' }}>实现 (${allImplementations.length})</span>
+                        </Tooltip>
+                      ),
+                      children: renderNodeList(allImplementations, 'implementation', !connectionRules.implementations.allowed),
+                      disabled: !connectionRules.implementations.allowed
+                    },
+                    {
+                      key: 'data_resources',
+                      label: connectionRules.data_resources.allowed ? (
+                        `数据资源 (${allDataResources.length})`
+                      ) : (
+                        <Tooltip title={connectionRules.data_resources.reason}>
+                          <span style={{ color: '#bfbfbf' }}>数据资源 (${allDataResources.length})</span>
+                        </Tooltip>
+                      ),
+                      children: renderNodeList(allDataResources, 'data', !connectionRules.data_resources.allowed),
+                      disabled: !connectionRules.data_resources.allowed
+                    }
+                  ]
+                  
+                  return (
+                    <Tabs
+                      defaultActiveKey={defaultTab}
+                      items={tabItems}
+                      style={{ flex: 1, overflow: 'hidden' }}
+                    />
+                  )
+                })()}
+              </div>
+            )
+          })()}
+        </>
+      )}
     </>
   )
 }
