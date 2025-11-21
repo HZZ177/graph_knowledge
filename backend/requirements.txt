@@ -1,5 +1,5 @@
-fastapi
+fastapi==0.121.2
 uvicorn[standard]
-neo4j
-sqlalchemy
-loguru
+neo4j==6.0.3
+sqlalchemy==2.0.44
+loguru==0.7.3

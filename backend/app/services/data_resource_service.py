@@ -101,7 +101,7 @@ def create_data_resource(db: Session, data: DataResourceCreate) -> DataResource:
     if existing:
         raise ValueError(f"DataResource {data.resource_id} already exists")
 
-    logger.info("[DataResourceService] 创建数据资源 resource_id=%s", data.resource_id)
+    logger.info(f"创建数据资源 resource_id={data.resource_id}")
     obj = DataResource(**data.dict())
     db.add(obj)
     db.commit()

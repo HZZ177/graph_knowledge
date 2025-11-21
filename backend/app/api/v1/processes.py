@@ -68,25 +68,20 @@ class ProcessEdgeOut(ProcessEdgeBase):
 async def list_processes(db: Session = Depends(get_db)) -> list[dict]:
     """返回流程列表，数据来自 sqlite 数据库。"""
 
-    logger.info("[ProcessAPI] 列出业务流程列表")
     items = process_service.list_processes(db)
-    logger.info("[ProcessAPI] 共返回 %d 条流程记录", len(items))
+    logger.info(f"列出业务流程列表，共返回 {len(items)} 条记录")
     return items
 
 
 @router.post("", status_code=status.HTTP_201_CREATED)
 async def create_process(payload: ProcessCreate, db: Session = Depends(get_db)) -> dict:
-    logger.info("[ProcessAPI] 创建流程 process_id=%s", payload.process_id)
+    logger.info(f"创建流程 process_id={payload.process_id}")
     try:
         data = process_service.create_process(db, payload.dict())
-        logger.info("[ProcessAPI] 创建流程成功 process_id=%s", payload.process_id)
+        logger.info(f"创建流程成功 process_id={payload.process_id}")
         return data
     except ValueError as exc:
-        logger.warning(
-            "[ProcessAPI] 创建流程失败 process_id=%s, error=%s",
-            payload.process_id,
-            exc,
-        )
+        logger.warning(f"创建流程失败 process_id={payload.process_id}, error={exc}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(exc),
@@ -95,10 +90,10 @@ async def create_process(payload: ProcessCreate, db: Session = Depends(get_db)) 
 
 @router.get("/{process_id}")
 async def get_process(process_id: str, db: Session = Depends(get_db)) -> dict:
-    logger.info("[ProcessAPI] 获取流程详情 process_id=%s", process_id)
+    logger.info(f"获取流程详情 process_id={process_id}")
     record = process_service.get_process(db, process_id)
     if record is None:
-        logger.warning("[ProcessAPI] 流程不存在 process_id=%s", process_id)
+        logger.warning(f"流程不存在 process_id={process_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="流程不存在",
@@ -110,17 +105,17 @@ async def get_process(process_id: str, db: Session = Depends(get_db)) -> dict:
 async def update_process(
     process_id: str, payload: ProcessUpdate, db: Session = Depends(get_db)
 ) -> dict:
-    logger.info("[ProcessAPI] 更新流程 process_id=%s", process_id)
+    logger.info(f"更新流程 process_id={process_id}")
     try:
         data = process_service.update_process(
             db,
             process_id,
             payload.dict(exclude_unset=True),
         )
-        logger.info("[ProcessAPI] 更新流程成功 process_id=%s", process_id)
+        logger.info(f"更新流程成功 process_id={process_id}")
         return data
     except ValueError:
-        logger.warning("[ProcessAPI] 更新流程失败，流程不存在 process_id=%s", process_id)
+        logger.warning(f"更新流程失败，流程不存在 process_id={process_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="流程不存在",
@@ -129,24 +124,24 @@ async def update_process(
 
 @router.delete("/{process_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_process(process_id: str, db: Session = Depends(get_db)) -> None:
-    logger.info("[ProcessAPI] 删除流程 process_id=%s", process_id)
+    logger.info(f"删除流程 process_id={process_id}")
     record = process_service.get_process(db, process_id)
     if record is None:
-        logger.warning("[ProcessAPI] 删除流程失败，流程不存在 process_id=%s", process_id)
+        logger.warning(f"删除流程失败，流程不存在 process_id={process_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="流程不存在",
         )
     process_service.delete_process(db, process_id)
-    logger.info("[ProcessAPI] 删除流程成功 process_id=%s", process_id)
+    logger.info(f"删除流程成功 process_id={process_id}")
 
 
 @router.get("/{process_id}/steps")
 async def get_process_steps(process_id: str, db: Session = Depends(get_db)) -> list[dict]:
-    logger.info("[ProcessAPI] 获取流程步骤 process_id=%s", process_id)
+    logger.info(f"获取流程步骤 process_id={process_id}")
     record = process_service.get_process(db, process_id)
     if record is None:
-        logger.warning("[ProcessAPI] 获取流程步骤失败，流程不存在 process_id=%s", process_id)
+        logger.warning(f"获取流程步骤失败，流程不存在 process_id={process_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="流程不存在",
@@ -172,10 +167,10 @@ async def save_process_steps(
 async def delete_process_step(
     process_id: str, step_id: int, db: Session = Depends(get_db)
 ) -> None:
-    logger.info("[ProcessAPI] 删除流程步骤 process_id=%s, step_id=%s", process_id, step_id)
+    logger.info(f"删除流程步骤 process_id={process_id}, step_id={step_id}")
     record = process_service.get_process(db, process_id)
     if record is None:
-        logger.warning("[ProcessAPI] 删除流程步骤失败，流程不存在 process_id=%s", process_id)
+        logger.warning(f"删除流程步骤失败，流程不存在 process_id={process_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="流程不存在",
@@ -224,11 +219,7 @@ async def create_process_edge(
     db.add(edge)
     db.commit()
     db.refresh(edge)
-    logger.info(
-        "[ProcessAPI] 更新流程边成功 process_id=%s, edge_id=%s",
-        process_id,
-        edge_id,
-    )
+    logger.info(f"创建流程边成功 process_id={process_id}")
     return ProcessEdgeOut.from_orm(edge)
 
 
@@ -248,11 +239,7 @@ async def update_process_edge(
         .first()
     )
     if not edge:
-        logger.warning(
-            "[ProcessAPI] 更新流程边失败，未找到边 process_id=%s, edge_id=%s",
-            process_id,
-            edge_id,
-        )
+        logger.warning(f"更新流程边失败，未找到边 process_id={process_id}, edge_id={edge_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="流程边不存在",
@@ -279,11 +266,7 @@ async def delete_process_edge(
         .first()
     )
     if not edge:
-        logger.warning(
-            "[ProcessAPI] 删除流程边失败，未找到边 process_id=%s, edge_id=%s",
-            process_id,
-            edge_id,
-        )
+        logger.warning(f"删除流程边失败，未找到边 process_id={process_id}, edge_id={edge_id}")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="流程边不存在",
@@ -291,11 +274,7 @@ async def delete_process_edge(
 
     db.delete(edge)
     db.commit()
-    logger.info(
-        "[ProcessAPI] 删除流程边成功 process_id=%s, edge_id=%s",
-        process_id,
-        edge_id,
-    )
+    logger.info(f"删除流程边成功 process_id={process_id}, edge_id={edge_id}")
 
 
 @router.post("/{process_id}/publish")

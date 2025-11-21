@@ -34,7 +34,7 @@ def _business_to_dict(obj: Business) -> Dict[str, Any]:
 def get_process_canvas(db: Session, process_id: str) -> Dict[str, Any]:
     """从 sqlite 中加载指定流程的画布结构。"""
 
-    logger.info("[CanvasService] 加载流程画布 process_id=%s", process_id)
+    logger.info(f"加载流程画布 process_id={process_id}")
 
     process = (
         db.query(Business)
@@ -42,7 +42,7 @@ def get_process_canvas(db: Session, process_id: str) -> Dict[str, Any]:
         .first()
     )
     if not process:
-        logger.warning("[CanvasService] 流程不存在，无法加载画布 process_id=%s", process_id)
+        logger.warning(f"流程不存在，无法加载画布 process_id={process_id}")
         raise ValueError("Process not found")
 
     edges: List[ProcessStepEdge] = (
@@ -178,12 +178,7 @@ def get_process_canvas(db: Session, process_id: str) -> Dict[str, Any]:
     }
 
     logger.info(
-        "[CanvasService] 画布加载完成 process_id=%s, steps=%d, edges=%d, impls=%d, data_res=%d",
-        process_id,
-        len(steps),
-        len(edges),
-        len(implementations),
-        len(data_resources),
+        f"画布加载完成 process_id={process_id}, steps={len(steps)}, edges={len(edges)}, impls={len(implementations)}, data_res={len(data_resources)}"
     )
 
     return result
@@ -210,12 +205,7 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
     }
 
     logger.info(
-        "[CanvasService] 保存画布开始 process_id=%s, steps=%d, edges=%d, impls=%d, data_res=%d",
-        process_id,
-        len(steps_data),
-        len(edges_data),
-        len(implementations_data),
-        len(data_resources_data),
+        f"保存画布开始 process_id={process_id}, steps={len(steps_data)}, edges={len(edges_data)}, impls={len(implementations_data)}, data_res={len(data_resources_data)}"
     )
 
     with db.begin():
@@ -344,8 +334,8 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
                 )
             )
 
-    logger.info("[CanvasService] 开始同步流程到图数据库 process_id=%s", process_id)
+    logger.info(f"开始同步流程到图数据库 process_id={process_id}")
     sync_process(db, process_id)
 
-    logger.info("[CanvasService] 保存画布完成 process_id=%s", process_id)
+    logger.info(f"保存画布完成 process_id={process_id}")
     return get_process_canvas(db, process_id)
