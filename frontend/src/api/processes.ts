@@ -28,45 +28,45 @@ export interface ProcessEdge {
 }
 
 export async function listProcesses(): Promise<ProcessItem[]> {
-  const res = await http.get<ProcessItem[]>('/processes')
+  const res = await http.get<ProcessItem[]>('/processes/list_processes')
   return res.data
 }
 
 export async function getProcess(processId: string): Promise<ProcessDetail> {
-  const res = await http.get<ProcessDetail>(`/processes/${processId}`)
+  const res = await http.get<ProcessDetail>(`/processes/get_process/${processId}`)
   return res.data
 }
 
 export async function createProcess(payload: ProcessDetail): Promise<ProcessDetail> {
-  const res = await http.post<ProcessDetail>('/processes', payload)
+  const res = await http.post<ProcessDetail>('/processes/create_process', payload)
   return res.data
 }
 
 export async function updateProcess(processId: string, payload: Partial<ProcessDetail>): Promise<ProcessDetail> {
-  const res = await http.put<ProcessDetail>(`/processes/${processId}`, payload)
+  const res = await http.post<ProcessDetail>(`/processes/update_process/${processId}`, payload)
   return res.data
 }
 
 export async function deleteProcess(processId: string): Promise<void> {
-  await http.delete(`/processes/${processId}`)
+  await http.post(`/processes/delete_process/${processId}`)
 }
 
 export async function getProcessSteps(processId: string): Promise<ProcessStep[]> {
-  const res = await http.get<ProcessStep[]>(`/processes/${processId}/steps`)
+  const res = await http.get<ProcessStep[]>(`/processes/get_process_steps/${processId}`)
   return res.data
 }
 
 export async function saveProcessSteps(processId: string, steps: ProcessStep[]): Promise<ProcessStep[]> {
-  const res = await http.put<ProcessStep[]>(`/processes/${processId}/steps`, steps)
+  const res = await http.post<ProcessStep[]>(`/processes/save_process_steps/${processId}`, steps)
   return res.data
 }
 
 export async function deleteProcessStep(processId: string, stepId: number): Promise<void> {
-  await http.delete(`/processes/${processId}/steps/${stepId}`)
+  await http.post(`/processes/delete_process_step/${processId}/${stepId}`)
 }
 
 export async function listProcessEdges(processId: string): Promise<ProcessEdge[]> {
-  const res = await http.get<ProcessEdge[]>(`/processes/${processId}/edges`)
+  const res = await http.get<ProcessEdge[]>(`/processes/list_process_edges/${processId}`)
   return res.data
 }
 
@@ -74,7 +74,7 @@ export async function createProcessEdge(
   processId: string,
   payload: Omit<ProcessEdge, 'id'>,
 ): Promise<ProcessEdge> {
-  const res = await http.post<ProcessEdge>(`/processes/${processId}/edges`, payload)
+  const res = await http.post<ProcessEdge>(`/processes/create_process_edge/${processId}`, payload)
   return res.data
 }
 
@@ -83,12 +83,12 @@ export async function updateProcessEdge(
   edgeId: number,
   payload: Partial<Omit<ProcessEdge, 'id'>>,
 ): Promise<ProcessEdge> {
-  const res = await http.put<ProcessEdge>(`/processes/${processId}/edges/${edgeId}`, payload)
+  const res = await http.post<ProcessEdge>(`/processes/update_process_edge/${processId}/${edgeId}`, payload)
   return res.data
 }
 
 export async function deleteProcessEdge(processId: string, edgeId: number): Promise<void> {
-  await http.delete(`/processes/${processId}/edges/${edgeId}`)
+  await http.post(`/processes/delete_process_edge/${processId}/${edgeId}`)
 }
 
 export interface PublishResult {
@@ -104,6 +104,6 @@ export interface PublishResult {
 }
 
 export async function publishProcess(processId: string): Promise<PublishResult> {
-  const res = await http.post<PublishResult>(`/processes/${processId}/publish`)
+  const res = await http.post<PublishResult>(`/processes/publish_process/${processId}`)
   return res.data
 }

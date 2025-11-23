@@ -1,22 +1,12 @@
 from fastapi import APIRouter
-from pydantic import BaseModel
 
+from backend.app.schemas.chat import ChatRequest, ChatResponse
 from ...services.chat_service import answer_question
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 
-class ChatRequest(BaseModel):
-    question: str
-    process_id: str | None = None
-
-
-class ChatResponse(BaseModel):
-    answer: str
-    process_id: str | None = None
-
-
-@router.post("", response_model=ChatResponse, summary="示例问答接口")
+@router.post("/ask", response_model=ChatResponse, summary="示例问答接口")
 async def chat(req: ChatRequest) -> ChatResponse:
     """一个最小可跑的占位问答接口。
 

@@ -10,7 +10,7 @@ from backend.app.core.logger import logger
 router = APIRouter(prefix="/health", tags=["health"])
 
 
-@router.get("/neo4j")
+@router.get("/check_neo4j")
 async def check_neo4j() -> dict:
     """检查Neo4j连接健康状态"""
     logger.info("执行Neo4j健康检查")
@@ -19,7 +19,7 @@ async def check_neo4j() -> dict:
     return result
 
 
-@router.get("/sync-status/{process_id}")
+@router.get("/get_sync_status/{process_id}")
 async def get_sync_status(process_id: str, db: Session = Depends(get_db)) -> dict:
     """获取指定流程的同步状态
     
@@ -49,7 +49,7 @@ async def get_sync_status(process_id: str, db: Session = Depends(get_db)) -> dic
     }
 
 
-@router.get("/system")
+@router.get("/get_system_health")
 async def system_health(db: Session = Depends(get_db)) -> dict:
     """获取系统整体健康状态
     

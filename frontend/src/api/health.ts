@@ -41,7 +41,7 @@ export interface SystemHealthResponse {
  * 检查Neo4j连接健康状态
  */
 export const checkNeo4jHealth = async (): Promise<Neo4jHealthResponse> => {
-  const response = await http.get('/health/neo4j')
+  const response = await http.get('/health/check_neo4j')
   return response.data
 }
 
@@ -49,7 +49,7 @@ export const checkNeo4jHealth = async (): Promise<Neo4jHealthResponse> => {
  * 获取指定流程的同步状态
  */
 export const getSyncStatus = async (processId: string): Promise<SyncStatusResponse> => {
-  const response = await http.get(`/health/sync-status/${processId}`)
+  const response = await http.get(`/health/get_sync_status/${processId}`)
   return response.data
 }
 
@@ -57,6 +57,6 @@ export const getSyncStatus = async (processId: string): Promise<SyncStatusRespon
  * 获取系统整体健康状态
  */
 export const getSystemHealth = async (): Promise<SystemHealthResponse> => {
-  const response = await http.get('/health/system')
+  const response = await http.get('/health/get_system_health')
   return response.data
 }

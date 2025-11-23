@@ -85,7 +85,7 @@ export interface ProcessCanvas {
 }
 
 export async function getProcessCanvas(processId: string): Promise<ProcessCanvas> {
-  const { data } = await http.get<ProcessCanvas>(`/canvas/${processId}`)
+  const { data } = await http.get<ProcessCanvas>(`/canvas/get_process_canvas/${processId}`)
   return data
 }
 
@@ -93,6 +93,6 @@ export async function saveProcessCanvas(
   processId: string,
   payload: ProcessCanvas,
 ): Promise<ProcessCanvas> {
-  const { data } = await http.put<ProcessCanvas>(`/canvas/${processId}`, payload)
+  const { data } = await http.post<ProcessCanvas>(`/canvas/save_process_canvas/${processId}`, payload)
   return data
 }

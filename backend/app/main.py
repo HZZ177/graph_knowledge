@@ -6,7 +6,6 @@ from backend.app.api.v1 import (
     processes,
     chat,
     graph,
-    data_resources,
     resource_nodes,
     canvas,
     health,
@@ -29,7 +28,6 @@ app.add_middleware(
 app.include_router(processes.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")
 app.include_router(graph.router, prefix="/api/v1")
-app.include_router(data_resources.router, prefix="/api/v1")
 app.include_router(resource_nodes.router, prefix="/api/v1")
 app.include_router(canvas.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api/v1")

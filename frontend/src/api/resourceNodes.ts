@@ -44,66 +44,66 @@ export interface StepImplementationLink {
 }
 
 export async function listBusinessesPaged(q: string, page: number, pageSize: number) {
-  const { data } = await http.get<PaginatedResult<BusinessNode>>('/resource-nodes/businesses', {
+  const { data } = await http.get<PaginatedResult<BusinessNode>>('/resource-nodes/list_businesses', {
     params: { q: q || undefined, page, page_size: pageSize },
   })
   return data
 }
 
 export async function createBusiness(payload: BusinessCreatePayload) {
-  const { data } = await http.post<BusinessNode>('/resource-nodes/businesses', payload)
+  const { data } = await http.post<BusinessNode>('/resource-nodes/create_business', payload)
   return data
 }
 
 export async function updateBusiness(processId: string, payload: Partial<BusinessNode>) {
-  const { data } = await http.put<BusinessNode>(`/resource-nodes/businesses/${processId}`, payload)
+  const { data } = await http.post<BusinessNode>(`/resource-nodes/update_business/${processId}`, payload)
   return data
 }
 
 export async function deleteBusiness(processId: string) {
-  await http.delete(`/resource-nodes/businesses/${processId}`)
+  await http.post(`/resource-nodes/delete_business/${processId}`)
 }
 
 export async function listStepsPaged(q: string, page: number, pageSize: number) {
-  const { data } = await http.get<PaginatedResult<StepNode>>('/resource-nodes/steps', {
+  const { data } = await http.get<PaginatedResult<StepNode>>('/resource-nodes/list_steps', {
     params: { q: q || undefined, page, page_size: pageSize },
   })
   return data
 }
 
 export async function createStep(payload: StepCreatePayload) {
-  const { data } = await http.post<StepNode>('/resource-nodes/steps', payload)
+  const { data } = await http.post<StepNode>('/resource-nodes/create_step', payload)
   return data
 }
 
 export async function updateStep(stepId: string, payload: Partial<StepNode>) {
-  const { data } = await http.put<StepNode>(`/resource-nodes/steps/${stepId}`, payload)
+  const { data } = await http.post<StepNode>(`/resource-nodes/update_step/${stepId}`, payload)
   return data
 }
 
 export async function deleteStep(stepId: string) {
-  await http.delete(`/resource-nodes/steps/${stepId}`)
+  await http.post(`/resource-nodes/delete_step/${stepId}`)
 }
 
 export async function listImplementationsPaged(q: string, page: number, pageSize: number) {
-  const { data } = await http.get<PaginatedResult<ImplementationNode>>('/resource-nodes/implementations', {
+  const { data } = await http.get<PaginatedResult<ImplementationNode>>('/resource-nodes/list_implementations', {
     params: { q: q || undefined, page, page_size: pageSize },
   })
   return data
 }
 
 export async function createImplementation(payload: ImplementationCreatePayload) {
-  const { data } = await http.post<ImplementationNode>('/resource-nodes/implementations', payload)
+  const { data } = await http.post<ImplementationNode>('/resource-nodes/create_implementation', payload)
   return data
 }
 
 export async function updateImplementation(implId: string, payload: Partial<ImplementationNode>) {
-  const { data } = await http.put<ImplementationNode>(`/resource-nodes/implementations/${implId}`, payload)
+  const { data } = await http.post<ImplementationNode>(`/resource-nodes/update_implementation/${implId}`, payload)
   return data
 }
 
 export async function deleteImplementation(implId: string) {
-  await http.delete(`/resource-nodes/implementations/${implId}`)
+  await http.post(`/resource-nodes/delete_implementation/${implId}`)
 }
 
 export async function createStepImplementationLink(
@@ -111,12 +111,12 @@ export async function createStepImplementationLink(
   implId: string,
 ): Promise<StepImplementationLink> {
   const { data } = await http.post<StepImplementationLink>(
-    '/resource-nodes/step-implementations',
+    '/resource-nodes/create_step_implementation_link',
     { step_id: stepId, impl_id: implId },
   )
   return data
 }
 
 export async function deleteStepImplementationLink(linkId: number): Promise<void> {
-  await http.delete(`/resource-nodes/step-implementations/${linkId}`)
+  await http.post(`/resource-nodes/delete_step_implementation_link/${linkId}`)
 }

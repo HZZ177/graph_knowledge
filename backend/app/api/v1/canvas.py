@@ -13,7 +13,7 @@ from backend.app.core.logger import logger
 router = APIRouter(prefix="/canvas", tags=["canvas"])
 
 
-@router.get("/{process_id}")
+@router.get("/get_process_canvas/{process_id}")
 def get_canvas(process_id: str, db: Session = Depends(get_db)) -> dict:
     """获取指定流程的画布信息。"""
 
@@ -27,9 +27,7 @@ def get_canvas(process_id: str, db: Session = Depends(get_db)) -> dict:
     except ValueError:
         logger.warning(f"获取画布失败，流程不存在 process_id={process_id}")
         raise HTTPException(status_code=404, detail="Process not found")
-
-
-@router.put("/{process_id}")
+@router.post("/save_process_canvas/{process_id}")
 def save_canvas(process_id: str, payload: dict, db: Session = Depends(get_db)) -> dict:
     """保存流程画布：包含步骤、连线、实现与数据资源关系。
     

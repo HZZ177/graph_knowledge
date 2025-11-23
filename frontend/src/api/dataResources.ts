@@ -80,31 +80,31 @@ export interface ListDataResourcesParams {
 }
 
 export async function listDataResources(params: ListDataResourcesParams) {
-  const { data } = await http.get<PaginatedDataResources>('/data-resources', { params })
+  const { data } = await http.get<PaginatedDataResources>('/resource-nodes/list_data_resources', { params })
   return data
 }
 
 export async function createDataResource(payload: DataResourceCreatePayload) {
-  const { data } = await http.post<DataResource>('/data-resources', payload)
+  const { data } = await http.post<DataResource>('/resource-nodes/create_data_resource', payload)
   return data
 }
 
 export async function getDataResource(resourceId: string) {
-  const { data } = await http.get<DataResource>(`/data-resources/${resourceId}`)
+  const { data } = await http.get<DataResource>(`/resource-nodes/get_data_resource/${resourceId}`)
   return data
 }
 
 export async function updateDataResource(resourceId: string, payload: Partial<DataResource>) {
-  const { data } = await http.put<DataResource>(`/data-resources/${resourceId}` , payload)
+  const { data } = await http.post<DataResource>(`/resource-nodes/update_data_resource/${resourceId}` , payload)
   return data
 }
 
 export async function deleteDataResource(resourceId: string) {
-  await http.delete(`/data-resources/${resourceId}`)
+  await http.post(`/resource-nodes/delete_data_resource/${resourceId}`)
 }
 
 export async function getResourceAccessors(resourceId: string) {
-  const { data } = await http.get<ResourceWithAccessors>(`/data-resources/${resourceId}/accessors`)
+  const { data } = await http.get<ResourceWithAccessors>(`/resource-nodes/get_resource_accessors/${resourceId}`)
   return data
 }
 
@@ -112,7 +112,7 @@ export async function createImplementationDataLink(
   payload: Omit<ImplementationDataLink, 'id'>,
 ): Promise<ImplementationDataLink> {
   const { data } = await http.post<ImplementationDataLink>(
-    '/data-resources/implementation-links',
+    '/resource-nodes/create_implementation_data_link',
     payload,
   )
   return data
@@ -122,15 +122,15 @@ export async function updateImplementationDataLink(
   linkId: number,
   payload: Partial<Pick<ImplementationDataLink, 'access_type' | 'access_pattern'>>,
 ): Promise<ImplementationDataLink> {
-  const { data } = await http.put<ImplementationDataLink>(
-    `/data-resources/implementation-links/${linkId}`,
+  const { data } = await http.post<ImplementationDataLink>(
+    `/resource-nodes/update_implementation_data_link/${linkId}`,
     payload,
   )
   return data
 }
 
 export async function deleteImplementationDataLink(linkId: number): Promise<void> {
-  await http.delete(`/data-resources/implementation-links/${linkId}`)
+  await http.post(`/resource-nodes/delete_implementation_data_link/${linkId}`)
 }
 
 type AccessNodeKind = 'resource' | 'impl' | 'step' | 'process'
@@ -146,17 +146,17 @@ export async function listAccessChainsByNode(kind: AccessNodeKind, id: string) {
   const key = paramKeyMap[kind]
   const params: Record<string, string> = { [key]: id }
 
-  const { data } = await http.get<AccessChainItem[]>('/data-resources/access-chains', { params })
+  const { data } = await http.get<AccessChainItem[]>('/resource-nodes/get_access_chains', { params })
   return data
 }
 
 export async function listBusinesses() {
-  const { data } = await http.get<BusinessSimple[]>('/data-resources/meta/businesses')
+  const { data } = await http.get<BusinessSimple[]>('/resource-nodes/list_data_resource_businesses')
   return data
 }
 
 export async function listSteps(processId?: string) {
-  const { data } = await http.get<StepSimple[]>('/data-resources/meta/steps', {
+  const { data } = await http.get<StepSimple[]>('/resource-nodes/list_data_resource_steps', {
     params: processId ? { process_id: processId } : undefined,
   })
   return data
