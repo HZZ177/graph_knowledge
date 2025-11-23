@@ -16,6 +16,7 @@ from backend.app.models.resource_graph import (
     ProcessStepEdge,
     Step,
     StepImplementation,
+    ImplementationLink,
 )
 from backend.app.core.logger import logger
 
@@ -150,6 +151,19 @@ def sync_process(db: Session, process_id: str) -> Dict[str, Any]:
     data_by_impl: Dict[str, List[ImplementationDataResource]] = {}
     for link in da_rows:
         data_by_impl.setdefault(link.impl_id, []).append(link)
+
+    # 获取实现-实现关联（限定process_id）
+    impl_link_rows: List[ImplementationLink] = []
+    if impl_ids:
+        impl_link_rows = (
+            db.query(ImplementationLink)
+            .filter(
+                ImplementationLink.process_id == process_id,
+                ImplementationLink.from_impl_id.in_(impl_ids),
+                ImplementationLink.to_impl_id.in_(impl_ids),
+            )
+            .all()
+        )
 
     # 尝试连接Neo4j并同步
     driver = None
@@ -384,6 +398,37 @@ def sync_process(db: Session, process_id: str) -> Dict[str, Any]:
                     process_id=process_id
                 )
                 logger.info(f"[同步-创建关系] 批量创建{len(access_links)}个ACCESSES_RESOURCE关系完成")
+
+            # 9. 批量创建IMPL_DEPENDS_ON关系（实现-实现关系）
+            impl_link_edges = []
+            for link in impl_link_rows:
+                # 仅当两端实现节点都存在于当前画布集合中时才创建关系
+                if link.from_impl_id in impl_by_id and link.to_impl_id in impl_by_id:
+                    impl_link_edges.append({
+                        "from_impl_id": link.from_impl_id,
+                        "to_impl_id": link.to_impl_id,
+                        "process_id": process_id,
+                        "edge_type": link.edge_type or "",
+                        "condition": link.condition or "",
+                        "label": link.label or "",
+                    })
+
+            if impl_link_edges:
+                session.run(
+                    """
+                    UNWIND $links AS link
+                    MATCH (from:Implementation {impl_id: link.from_impl_id})
+                    MATCH (to:Implementation {impl_id: link.to_impl_id})
+                    CREATE (from)-[r:IMPL_CALL {
+                        process_id: link.process_id,
+                        edge_type: link.edge_type,
+                        condition: link.condition,
+                        label: link.label
+                    }]->(to)
+                    """,
+                    links=impl_link_edges,
+                )
+                logger.info(f"[同步-创建关系] 批量创建{len(impl_link_edges)}个IMPL_CALL关系完成")
             
             # 同步成功
             logger.info(f"[同步成功] process_id={process_id}, steps={len(step_ids)}, implementations={len(impl_ids)}, resources={len(dr_by_id)}, edges={len(edges)}")

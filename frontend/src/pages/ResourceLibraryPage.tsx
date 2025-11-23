@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Card,
   Typography,
@@ -17,6 +17,8 @@ import {
   ConfigProvider,
   Avatar,
   Tooltip,
+  Divider,
+  Badge,
 } from 'antd'
 import {
   DatabaseOutlined,
@@ -43,6 +45,8 @@ import {
   createDataResource,
   updateDataResource,
   deleteDataResource,
+  listAccessChainsByNode,
+  AccessChainItem,
 } from '../api/dataResources'
 
 import {
@@ -80,8 +84,8 @@ const BusinessTab: React.FC = () => {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [editing, setEditing] = useState<BusinessNode | null>(null)
+  const [selectedBusinessId, setSelectedBusinessId] = useState<string | null>(null)
+  const [mode, setMode] = useState<'view' | 'edit' | 'create'>('view')
   const [form] = Form.useForm<BusinessFormValues>()
 
   const fetchList = useCallback(async () => {
@@ -90,6 +94,17 @@ const BusinessTab: React.FC = () => {
       const data = await listBusinessesPaged(keyword, page, pageSize)
       setItems(data.items)
       setTotal(data.total)
+
+      if (data.items.length > 0) {
+        setSelectedBusinessId((prev) => {
+          if (prev && data.items.some((b) => b.process_id === prev)) {
+            return prev
+          }
+          return data.items[0].process_id
+        })
+      } else {
+        setSelectedBusinessId(null)
+      }
     } catch (e) {
       showError('加载流程列表失败')
     } finally {
@@ -101,27 +116,41 @@ const BusinessTab: React.FC = () => {
     fetchList()
   }, [fetchList])
 
-  const openCreate = () => {
-    setEditing(null)
+  const selectedBusiness = useMemo(
+    () => items.find((b) => b.process_id === selectedBusinessId) || null,
+    [items, selectedBusinessId],
+  )
+
+  const isCreateMode = mode === 'create'
+  const isEditMode = mode === 'edit'
+  const isViewMode = mode === 'view'
+
+  useEffect(() => {
+    if (!selectedBusiness || isCreateMode) return
+
+    form.setFieldsValue({
+      name: selectedBusiness.name,
+      channel: selectedBusiness.channel ?? undefined,
+      description: selectedBusiness.description ?? undefined,
+      entrypoints: selectedBusiness.entrypoints ?? undefined,
+    })
+  }, [selectedBusiness, isCreateMode, form])
+
+  const handleStartCreate = () => {
+    setMode('create')
+    setSelectedBusinessId(null)
     form.resetFields()
-    setModalVisible(true)
   }
 
-  const openEdit = (item: BusinessNode) => {
-    setEditing(item)
-    form.setFieldsValue({
-      name: item.name,
-      channel: item.channel ?? undefined,
-      description: item.description ?? undefined,
-      entrypoints: item.entrypoints ?? undefined,
-    })
-    setModalVisible(true)
+  const handleEditClick = () => {
+    if (!selectedBusiness) return
+    setMode('edit')
   }
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
-      if (!editing) {
+      if (isCreateMode) {
         await createBusiness({
           name: values.name,
           channel: values.channel ?? null,
@@ -129,8 +158,8 @@ const BusinessTab: React.FC = () => {
           entrypoints: values.entrypoints ?? null,
         })
         showSuccess('创建成功')
-      } else {
-        await updateBusiness(editing.process_id, {
+      } else if (selectedBusiness) {
+        await updateBusiness(selectedBusiness.process_id, {
           name: values.name,
           channel: values.channel ?? null,
           description: values.description ?? null,
@@ -138,8 +167,7 @@ const BusinessTab: React.FC = () => {
         })
         showSuccess('保存成功')
       }
-      setModalVisible(false)
-      setEditing(null)
+      setMode('view')
       fetchList()
     } catch (e: any) {
       if (e?.errorFields) return
@@ -147,10 +175,32 @@ const BusinessTab: React.FC = () => {
     }
   }
 
+  const handleCancelEdit = () => {
+    if (isCreateMode) {
+      setMode('view')
+      if (items.length > 0) {
+        setSelectedBusinessId(items[0].process_id)
+      }
+    } else if (isEditMode) {
+      setMode('view')
+      if (selectedBusiness) {
+        form.setFieldsValue({
+          name: selectedBusiness.name,
+          channel: selectedBusiness.channel ?? undefined,
+          description: selectedBusiness.description ?? undefined,
+          entrypoints: selectedBusiness.entrypoints ?? undefined,
+        })
+      }
+    }
+  }
+
   const handleDelete = async (item: BusinessNode) => {
     try {
       await deleteBusiness(item.process_id)
       showSuccess('删除成功')
+      if (selectedBusinessId === item.process_id) {
+        setSelectedBusinessId(null)
+      }
       fetchList()
     } catch (e) {
       showError('删除失败')
@@ -158,18 +208,19 @@ const BusinessTab: React.FC = () => {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
+    <div style={{ display: 'flex', height: '100%', gap: 16 }}>
+      {/* 左侧：业务流程列表 */}
       <div
         style={{
+          flex: 1.8,
+          minWidth: 0,
           display: 'flex',
           flexDirection: 'column',
-          flex: 1,
-          minHeight: 0,
-          paddingRight: modalVisible ? 24 : 0,
-          transition: 'padding-right 0.2s ease',
+          gap: 8,
+          overflow: 'hidden',
         }}
       >
-        <div className="toolbar-container">
+        <div className="toolbar-container" style={{ marginBottom: 4 }}>
           <Input.Search
             allowClear
             placeholder="按名称或流程ID搜索..."
@@ -182,9 +233,23 @@ const BusinessTab: React.FC = () => {
           />
           <Space>
             <Button onClick={fetchList}>刷新</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleStartCreate}>
               新建流程
             </Button>
+          </Space>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Space>
+            <Typography.Title level={5} style={{ margin: 0 }}>
+              业务流程列表
+            </Typography.Title>
+            <Badge
+              count={total}
+              style={{ backgroundColor: '#1d4ed8' }}
+              overflowCount={999}
+              showZero
+            />
           </Space>
         </div>
 
@@ -192,44 +257,115 @@ const BusinessTab: React.FC = () => {
           style={{
             flex: 1,
             minHeight: 0,
+            borderRadius: 8,
+            border: '1px solid #e5e7eb',
             overflowY: 'auto',
             overflowX: 'hidden',
-            paddingBottom: 24,
+            padding: 8,
+            background: '#ffffff',
           }}
         >
-          <Row gutter={[24, 24]}>
-            {items.map((item) => (
-              <Col key={item.process_id} xs={24} sm={12} md={8} lg={6} xl={6}>
-                <Card
-                  className="resource-card"
-                  title={
-                    <Space>
-                      <Avatar
-                        icon={<BranchesOutlined />}
-                        style={{ backgroundColor: '#e6f7ff', color: '#1890ff' }}
-                        size="small"
-                      />
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gap: 8,
+            }}
+          >
+            {items.map((item) => {
+              const isSelected = item.process_id === selectedBusinessId
+
+              return (
+                <div
+                  key={item.process_id}
+                  onClick={() => {
+                    setSelectedBusinessId(item.process_id)
+                    setMode('view')
+                  }}
+                  style={{
+                    borderRadius: 8,
+                    border: isSelected ? '2px solid #2563eb' : '1px solid #e5e7eb',
+                    padding: 8,
+                    cursor: 'pointer',
+                    background: isSelected ? '#eff6ff' : '#ffffff',
+                    boxShadow: isSelected
+                      ? '0 0 0 1px rgba(37, 99, 235, 0.25)'
+                      : '0 1px 2px rgba(15,23,42,0.03)',
+                    transition:
+                      'border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: 4,
+                    }}
+                  >
+                    <Space size={6}>
+                      <span style={{ color: '#2563eb' }}>
+                        <BranchesOutlined />
+                      </span>
                       <Tooltip title={item.name}>
-                        <span>{item.name}</span>
+                        <Typography.Text
+                          strong
+                          style={{
+                            fontSize: 13,
+                            wordBreak: 'break-all',
+                            whiteSpace: 'normal',
+                          }}
+                        >
+                          {item.name}
+                        </Typography.Text>
                       </Tooltip>
                     </Space>
-                  }
-                  loading={loading}
-                  extra={item.channel ? <Tag color="blue">{item.channel}</Tag> : null}
-                  hoverable
-                  onClick={() => openEdit(item)}
-                  actions={[
-                    <span
-                      key="edit"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        openEdit(item)
-                      }}
-                    >
-                      编辑
-                    </span>,
+                    <Space size={4}>
+                      {item.channel && (
+                        <Tag color="blue" style={{ fontSize: 11 }}>
+                          {item.channel}
+                        </Tag>
+                      )}
+                    </Space>
+                  </div>
+
+                  <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
+                    <div>流程ID: {item.process_id}</div>
+                    {item.entrypoints && (
+                      <div
+                        style={{
+                          marginTop: 2,
+                          display: '-webkit-box',
+                          WebkitLineClamp: 2,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        入口: {item.entrypoints}
+                      </div>
+                    )}
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: '#6b7280',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                    title={item.description || ''}
+                  >
+                    {item.description || '暂无描述'}
+                  </div>
+
+                  <div style={{ marginTop: 'auto', textAlign: 'right', paddingTop: 4 }}>
                     <Popconfirm
-                      key="delete"
                       title="确认删除该流程？"
                       onConfirm={(e) => {
                         e?.stopPropagation()
@@ -239,39 +375,19 @@ const BusinessTab: React.FC = () => {
                       okText="删除"
                       cancelText="取消"
                     >
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation()
-                        }}
-                        style={{ color: '#ff4d4f' }}
+                      <Typography.Text
+                        type="secondary"
+                        style={{ fontSize: 11, color: '#f97316' }}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         删除
-                      </span>
-                    </Popconfirm>,
-                  ]}
-                >
-                  <div className="card-meta-row">
-                    <AppstoreOutlined className="card-meta-icon" />
-                    <span className="card-meta-label">ID:</span>
-                    <span className="card-meta-value">{item.process_id}</span>
+                      </Typography.Text>
+                    </Popconfirm>
                   </div>
-                  <div className="card-meta-row">
-                    <GlobalOutlined className="card-meta-icon" />
-                    <span className="card-meta-label">渠道:</span>
-                    <span className="card-meta-value">{item.channel || '-'}</span>
-                  </div>
-                  <div className="card-meta-row">
-                    <ApiOutlined className="card-meta-icon" />
-                    <span className="card-meta-label">入口:</span>
-                    <span className="card-meta-value">{item.entrypoints || '-'}</span>
-                  </div>
-                  <div className="card-description" title={item.description || ''}>
-                    {item.description || '暂无描述'}
-                  </div>
-                </Card>
-              </Col>
-            ))}
-          </Row>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         <div
@@ -295,52 +411,124 @@ const BusinessTab: React.FC = () => {
         </div>
       </div>
 
+      {/* 右侧：流程详情 */}
       <div
         style={{
-          width: modalVisible ? 420 : 0,
-          transition: 'width 0.25s ease',
-          borderLeft: modalVisible ? '1px solid #f0f0f0' : 'none',
-          background: modalVisible ? '#fff' : 'transparent',
-          overflow: 'hidden',
+          width: 360,
+          borderLeft: '1px solid #f3f4f6',
+          paddingLeft: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          minHeight: 0,
+          maxHeight: '100%',
+          overflowY: 'auto',
+          overflowX: 'hidden',
         }}
       >
-        {modalVisible && (
-          <div style={{ padding: 16, height: '100%', overflowY: 'auto', overflowX: 'hidden' }}>
-            <Typography.Title level={5} style={{ marginBottom: 16 }}>
-              {editing ? '编辑流程' : '新建流程'}
-            </Typography.Title>
-            <Form form={form} layout="vertical">
-              <Form.Item
-                label="名称"
-                name="name"
-                rules={[{ required: true, message: '请输入名称' }]}
+        <Typography.Title level={5} style={{ margin: 0 }}>
+          流程详情
+        </Typography.Title>
+
+        {!selectedBusiness && !isCreateMode && (
+          <Card size="small" bordered={false} style={{ background: '#f9fafb' }}>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              在左侧列表中点击任意流程，这里将展示该流程的基础信息，
+              包括名称、渠道、触发场景与描述。
+            </Typography.Text>
+          </Card>
+        )}
+
+        {(selectedBusiness || isCreateMode) && (
+          <Card size="small" bordered={false}>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <Space size={6}>
+                  <span style={{ color: '#2563eb' }}>
+                    <BranchesOutlined />
+                  </span>
+                  <Typography.Text
+                    strong
+                    style={{
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {isCreateMode
+                      ? '新建流程'
+                      : selectedBusiness?.name || '未选择流程'}
+                  </Typography.Text>
+                </Space>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Space size={8}>
+                    {isViewMode && selectedBusiness && <Tag>详情</Tag>}
+                    {isViewMode && selectedBusiness && (
+                      <Tag
+                        color="blue"
+                        style={{ cursor: 'pointer' }}
+                        onClick={handleEditClick}
+                      >
+                        编辑
+                      </Tag>
+                    )}
+                    {(isEditMode || isCreateMode) && (
+                      <Space size={8}>
+                        <Tag
+                          color="default"
+                          style={{ cursor: 'pointer' }}
+                          onClick={handleCancelEdit}
+                        >
+                          取消
+                        </Tag>
+                        <Tag
+                          color="blue"
+                          style={{ cursor: 'pointer' }}
+                          onClick={handleSubmit}
+                        >
+                          保存
+                        </Tag>
+                      </Space>
+                    )}
+                  </Space>
+                </div>
+              </div>
+
+              <Divider style={{ margin: '8px 0' }} />
+
+              <Form
+                form={form}
+                layout="vertical"
+                disabled={isViewMode && !isCreateMode}
               >
-                <Input />
-              </Form.Item>
-              <Form.Item label="渠道" name="channel">
-                <Input />
-              </Form.Item>
-              <Form.Item label="业务触发场景" name="entrypoints">
-                <Input.TextArea rows={2} placeholder="描述用户如何触发该业务流程，如：用户在C端App点击开通月卡按钮" />
-              </Form.Item>
-              <Form.Item label="描述" name="description">
-                <Input.TextArea rows={3} />
-              </Form.Item>
-              <Space style={{ marginTop: 8 }}>
-                <Button type="primary" onClick={handleSubmit}>
-                  保存
-                </Button>
-                <Button
-                  onClick={() => {
-                    setModalVisible(false)
-                    setEditing(null)
-                  }}
+                <Form.Item
+                  label="名称"
+                  name="name"
+                  rules={[{ required: true, message: '请输入名称' }]}
                 >
-                  取消
-                </Button>
-              </Space>
-            </Form>
-          </div>
+                  <Input />
+                </Form.Item>
+                <Form.Item label="渠道" name="channel">
+                  <Input />
+                </Form.Item>
+                <Form.Item label="业务触发场景" name="entrypoints">
+                  <Input.TextArea
+                    rows={2}
+                    placeholder="描述用户如何触发该业务流程，如：用户在C端App点击开通月卡按钮"
+                  />
+                </Form.Item>
+                <Form.Item label="描述" name="description">
+                  <Input.TextArea rows={3} />
+                </Form.Item>
+              </Form>
+
+              {isCreateMode && (
+                <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                  新建模式下，这里只编辑流程本身的基础字段，
+                  具体步骤与实现的编排建议在业务画布中维护。
+                </Typography.Text>
+              )}
+            </Space>
+          </Card>
         )}
       </div>
     </div>
@@ -360,8 +548,8 @@ const StepTab: React.FC = () => {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [editing, setEditing] = useState<StepNode | null>(null)
+  const [selectedStepId, setSelectedStepId] = useState<string | null>(null)
+  const [mode, setMode] = useState<'view' | 'edit' | 'create'>('view')
   const [form] = Form.useForm<StepFormValues>()
 
   const fetchList = useCallback(async () => {
@@ -370,6 +558,17 @@ const StepTab: React.FC = () => {
       const data = await listStepsPaged(keyword, page, pageSize)
       setItems(data.items)
       setTotal(data.total)
+
+      if (data.items.length > 0) {
+        setSelectedStepId((prev) => {
+          if (prev && data.items.some((s) => s.step_id === prev)) {
+            return prev
+          }
+          return data.items[0].step_id
+        })
+      } else {
+        setSelectedStepId(null)
+      }
     } catch (e) {
       showError('加载步骤列表失败')
     } finally {
@@ -381,42 +580,55 @@ const StepTab: React.FC = () => {
     fetchList()
   }, [fetchList])
 
-  const openCreate = () => {
-    setEditing(null)
+  const selectedStep = useMemo(
+    () => items.find((s) => s.step_id === selectedStepId) || null,
+    [items, selectedStepId],
+  )
+
+  const isCreateMode = mode === 'create'
+  const isEditMode = mode === 'edit'
+  const isViewMode = mode === 'view'
+
+  useEffect(() => {
+    if (!selectedStep || isCreateMode) return
+
+    form.setFieldsValue({
+      name: selectedStep.name,
+      description: selectedStep.description ?? undefined,
+      step_type: selectedStep.step_type ?? undefined,
+    })
+  }, [selectedStep, isCreateMode, form])
+
+  const handleStartCreate = () => {
+    setMode('create')
+    setSelectedStepId(null)
     form.resetFields()
-    setModalVisible(true)
   }
 
-  const openEdit = (item: StepNode) => {
-    setEditing(item)
-    form.setFieldsValue({
-      name: item.name,
-      description: item.description ?? undefined,
-      step_type: item.step_type ?? undefined,
-    })
-    setModalVisible(true)
+  const handleEditClick = () => {
+    if (!selectedStep) return
+    setMode('edit')
   }
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
-      if (!editing) {
+      if (isCreateMode) {
         await createStep({
           name: values.name,
           description: values.description ?? null,
           step_type: values.step_type ?? null,
         })
         showSuccess('创建成功')
-      } else {
-        await updateStep(editing.step_id, {
+      } else if (selectedStep) {
+        await updateStep(selectedStep.step_id, {
           name: values.name,
           description: values.description ?? null,
           step_type: values.step_type ?? null,
         })
         showSuccess('保存成功')
       }
-      setModalVisible(false)
-      setEditing(null)
+      setMode('view')
       fetchList()
     } catch (e: any) {
       if (e?.errorFields) return
@@ -424,10 +636,31 @@ const StepTab: React.FC = () => {
     }
   }
 
+  const handleCancelEdit = () => {
+    if (isCreateMode) {
+      setMode('view')
+      if (items.length > 0) {
+        setSelectedStepId(items[0].step_id)
+      }
+    } else if (isEditMode) {
+      setMode('view')
+      if (selectedStep) {
+        form.setFieldsValue({
+          name: selectedStep.name,
+          description: selectedStep.description ?? undefined,
+          step_type: selectedStep.step_type ?? undefined,
+        })
+      }
+    }
+  }
+
   const handleDelete = async (item: StepNode) => {
     try {
       await deleteStep(item.step_id)
       showSuccess('删除成功')
+      if (selectedStepId === item.step_id) {
+        setSelectedStepId(null)
+      }
       fetchList()
     } catch (e) {
       showError('删除失败')
@@ -435,18 +668,19 @@ const StepTab: React.FC = () => {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
+    <div style={{ display: 'flex', height: '100%', gap: 16 }}>
+      {/* 左侧：步骤列表 */}
       <div
         style={{
+          flex: 1.8,
+          minWidth: 0,
           display: 'flex',
           flexDirection: 'column',
-          flex: 1,
-          minHeight: 0,
-          paddingRight: modalVisible ? 24 : 0,
-          transition: 'padding-right 0.2s ease',
+          gap: 8,
+          overflow: 'hidden',
         }}
       >
-        <div className="toolbar-container">
+        <div className="toolbar-container" style={{ marginBottom: 4 }}>
           <Input.Search
             allowClear
             placeholder="按名称或步骤ID搜索..."
@@ -459,9 +693,23 @@ const StepTab: React.FC = () => {
           />
           <Space>
             <Button onClick={fetchList}>刷新</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleStartCreate}>
               新建步骤
             </Button>
+          </Space>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Space>
+            <Typography.Title level={5} style={{ margin: 0 }}>
+              业务步骤列表
+            </Typography.Title>
+            <Badge
+              count={total}
+              style={{ backgroundColor: '#1677ff' }}
+              overflowCount={999}
+              showZero
+            />
           </Space>
         </div>
 
@@ -469,44 +717,101 @@ const StepTab: React.FC = () => {
           style={{
             flex: 1,
             minHeight: 0,
+            borderRadius: 8,
+            border: '1px solid #e5e7eb',
             overflowY: 'auto',
             overflowX: 'hidden',
-            paddingBottom: 24,
+            padding: 8,
+            background: '#ffffff',
           }}
         >
-          <Row gutter={[24, 24]}>
-            {items.map((item) => (
-              <Col key={item.step_id} xs={24} sm={12} md={8} lg={6} xl={6}>
-                <Card
-                  className="resource-card"
-                  title={
-                    <Space>
-                      <Avatar
-                        icon={<NodeIndexOutlined />}
-                        style={{ backgroundColor: '#f6ffed', color: '#52c41a' }}
-                        size="small"
-                      />
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gap: 8,
+            }}
+          >
+            {items.map((item) => {
+              const isSelected = item.step_id === selectedStepId
+
+              return (
+                <div
+                  key={item.step_id}
+                  onClick={() => {
+                    setSelectedStepId(item.step_id)
+                    setMode('view')
+                  }}
+                  style={{
+                    borderRadius: 8,
+                    border: isSelected ? '2px solid #1677ff' : '1px solid #e5e7eb',
+                    padding: 8,
+                    cursor: 'pointer',
+                    background: isSelected ? '#eff6ff' : '#ffffff',
+                    boxShadow: isSelected
+                      ? '0 0 0 1px rgba(37, 99, 235, 0.25)'
+                      : '0 1px 2px rgba(15,23,42,0.03)',
+                    transition:
+                      'border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: 4,
+                    }}
+                  >
+                    <Space size={6}>
+                      <span style={{ color: '#1677ff' }}>
+                        <NodeIndexOutlined />
+                      </span>
                       <Tooltip title={item.name}>
-                        <span>{item.name}</span>
+                        <Typography.Text
+                          strong
+                          style={{
+                            fontSize: 13,
+                            wordBreak: 'break-all',
+                            whiteSpace: 'normal',
+                          }}
+                        >
+                          {item.name}
+                        </Typography.Text>
                       </Tooltip>
                     </Space>
-                  }
-                  loading={loading}
-                  extra={item.step_type ? <Tag color="green">{item.step_type}</Tag> : null}
-                  hoverable
-                  onClick={() => openEdit(item)}
-                  actions={[
-                    <span
-                      key="edit"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        openEdit(item)
-                      }}
-                    >
-                      编辑
-                    </span>,
+                    <Space size={4}>
+                      {item.step_type && (
+                        <Tag color="green" style={{ fontSize: 11 }}>
+                          {item.step_type}
+                        </Tag>
+                      )}
+                    </Space>
+                  </div>
+
+                  <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
+                    <div>步骤ID: {item.step_id}</div>
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: '#6b7280',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                    title={item.description || ''}
+                  >
+                    {item.description || '暂无描述'}
+                  </div>
+
+                  <div style={{ marginTop: 'auto', textAlign: 'right', paddingTop: 4 }}>
                     <Popconfirm
-                      key="delete"
                       title="确认删除该步骤？"
                       onConfirm={(e) => {
                         e?.stopPropagation()
@@ -516,29 +821,19 @@ const StepTab: React.FC = () => {
                       okText="删除"
                       cancelText="取消"
                     >
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation()
-                        }}
-                        style={{ color: '#ff4d4f' }}
+                      <Typography.Text
+                        type="secondary"
+                        style={{ fontSize: 11, color: '#f97316' }}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         删除
-                      </span>
-                    </Popconfirm>,
-                  ]}
-                >
-                  <div className="card-meta-row">
-                    <AppstoreOutlined className="card-meta-icon" />
-                    <span className="card-meta-label">ID:</span>
-                    <span className="card-meta-value">{item.step_id}</span>
+                      </Typography.Text>
+                    </Popconfirm>
                   </div>
-                  <div className="card-description" title={item.description || ''}>
-                    {item.description || '暂无描述'}
-                  </div>
-                </Card>
-              </Col>
-            ))}
-          </Row>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         <div
@@ -561,56 +856,119 @@ const StepTab: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* 右侧：步骤详情 */}
       <div
         style={{
-          width: modalVisible ? 420 : 0,
-          transition: 'width 0.25s ease',
-          borderLeft: modalVisible ? '1px solid #f0f0f0' : 'none',
-          background: modalVisible ? '#fff' : 'transparent',
-          overflow: 'hidden',
+          width: 360,
+          borderLeft: '1px solid #f3f4f6',
+          paddingLeft: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          minHeight: 0,
+          maxHeight: '100%',
+          overflowY: 'auto',
+          overflowX: 'hidden',
         }}
       >
-        {modalVisible && (
-          <div
-            style={{
-              padding: 16,
-              height: '100%',
-              overflowY: 'auto',
-              overflowX: 'hidden',
-            }}
-          >
-            <Typography.Title level={5} style={{ marginBottom: 16 }}>
-              {editing ? '编辑步骤' : '新建步骤'}
-            </Typography.Title>
-            <Form form={form} layout="vertical">
-              <Form.Item
-                label="名称"
-                name="name"
-                rules={[{ required: true, message: '请输入名称' }]}
+        <Typography.Title level={5} style={{ margin: 0 }}>
+          步骤详情
+        </Typography.Title>
+
+        {!selectedStep && !isCreateMode && (
+          <Card size="small" bordered={false} style={{ background: '#f9fafb' }}>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              在左侧列表中点击任意步骤，这里将展示该步骤的基础信息，
+              包括名称、类型与描述。
+            </Typography.Text>
+          </Card>
+        )}
+
+        {(selectedStep || isCreateMode) && (
+          <Card size="small" bordered={false}>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <Space size={6}>
+                  <span style={{ color: '#16a34a' }}>
+                    <NodeIndexOutlined />
+                  </span>
+                  <Typography.Text
+                    strong
+                    style={{
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {isCreateMode
+                      ? '新建步骤'
+                      : selectedStep?.name || '未选择步骤'}
+                  </Typography.Text>
+                </Space>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Space size={8}>
+                    {isViewMode && selectedStep && <Tag>详情</Tag>}
+                    {isViewMode && selectedStep && (
+                      <Tag
+                        color="blue"
+                        style={{ cursor: 'pointer' }}
+                        onClick={handleEditClick}
+                      >
+                        编辑
+                      </Tag>
+                    )}
+                    {(isEditMode || isCreateMode) && (
+                      <Space size={8}>
+                        <Tag
+                          color="default"
+                          style={{ cursor: 'pointer' }}
+                          onClick={handleCancelEdit}
+                        >
+                          取消
+                        </Tag>
+                        <Tag
+                          color="blue"
+                          style={{ cursor: 'pointer' }}
+                          onClick={handleSubmit}
+                        >
+                          保存
+                        </Tag>
+                      </Space>
+                    )}
+                  </Space>
+                </div>
+              </div>
+
+              <Divider style={{ margin: '8px 0' }} />
+
+              <Form
+                form={form}
+                layout="vertical"
+                disabled={isViewMode && !isCreateMode}
               >
-                <Input />
-              </Form.Item>
-              <Form.Item label="类型" name="step_type">
-                <Input />
-              </Form.Item>
-              <Form.Item label="描述" name="description">
-                <Input.TextArea rows={3} />
-              </Form.Item>
-              <Space style={{ marginTop: 8 }}>
-                <Button type="primary" onClick={handleSubmit}>
-                  保存
-                </Button>
-                <Button
-                  onClick={() => {
-                    setModalVisible(false)
-                    setEditing(null)
-                  }}
+                <Form.Item
+                  label="名称"
+                  name="name"
+                  rules={[{ required: true, message: '请输入名称' }]}
                 >
-                  取消
-                </Button>
-              </Space>
-            </Form>
-          </div>
+                  <Input />
+                </Form.Item>
+                <Form.Item label="类型" name="step_type">
+                  <Input />
+                </Form.Item>
+                <Form.Item label="描述" name="description">
+                  <Input.TextArea rows={3} />
+                </Form.Item>
+              </Form>
+
+              {isCreateMode && (
+                <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                  新建模式下，这里只编辑步骤本身的基础字段，
+                  与实现、数据资源的关系建议在业务画布或关系工作台中维护。
+                </Typography.Text>
+              )}
+            </Space>
+          </Card>
         )}
       </div>
     </div>
@@ -625,6 +983,20 @@ interface ImplementationFormValues {
   code_ref?: string
 }
 
+interface ImplStepRef {
+  step_id: string
+  step_name: string
+  process_id?: string | null
+  process_name?: string | null
+}
+
+interface ImplResourceRef {
+  resource_id: string
+  resource_name: string
+  access_type?: string | null
+  access_pattern?: string | null
+}
+
 const ImplementationTab: React.FC = () => {
   const [items, setItems] = useState<ImplementationNode[]>([])
   const [loading, setLoading] = useState(false)
@@ -632,8 +1004,11 @@ const ImplementationTab: React.FC = () => {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
-  const [modalVisible, setModalVisible] = useState(false)
-  const [editing, setEditing] = useState<ImplementationNode | null>(null)
+  const [activeSystem, setActiveSystem] = useState<string>('all')
+  const [selectedImplId, setSelectedImplId] = useState<string | null>(null)
+  const [mode, setMode] = useState<'view' | 'edit' | 'create'>('view')
+  const [relationsLoading, setRelationsLoading] = useState(false)
+  const [accessChains, setAccessChains] = useState<AccessChainItem[]>([])
   const [form] = Form.useForm<ImplementationFormValues>()
 
   const fetchList = useCallback(async () => {
@@ -642,6 +1017,18 @@ const ImplementationTab: React.FC = () => {
       const data = await listImplementationsPaged(keyword, page, pageSize)
       setItems(data.items)
       setTotal(data.total)
+
+      if (data.items.length > 0) {
+        setSelectedImplId((prev) => {
+          if (prev && data.items.some((impl) => impl.impl_id === prev)) {
+            return prev
+          }
+          return data.items[0].impl_id
+        })
+      } else {
+        setSelectedImplId(null)
+        setAccessChains([])
+      }
     } catch (e) {
       showError('加载实现列表失败')
     } finally {
@@ -653,28 +1040,111 @@ const ImplementationTab: React.FC = () => {
     fetchList()
   }, [fetchList])
 
-  const openCreate = () => {
-    setEditing(null)
+  const loadRelations = useCallback(async (implId: string) => {
+    setRelationsLoading(true)
+    try {
+      const chains = await listAccessChainsByNode('impl', implId)
+      setAccessChains(chains)
+    } catch (e) {
+      showError('加载实现关联关系失败')
+      setAccessChains([])
+    } finally {
+      setRelationsLoading(false)
+    }
+  }, [])
+
+  const systems = useMemo(() => {
+    const set = new Set<string>()
+    items.forEach((impl: ImplementationNode) => {
+      if (impl.system) {
+        set.add(impl.system)
+      }
+    })
+    return Array.from(set).sort()
+  }, [items])
+
+  const filteredItems = useMemo(() => {
+    if (activeSystem === 'all') return items
+    return items.filter((impl) => impl.system === activeSystem)
+  }, [items, activeSystem])
+
+  const selectedImpl = useMemo(
+    () => items.find((impl) => impl.impl_id === selectedImplId) || null,
+    [items, selectedImplId],
+  )
+
+  const stepRefs: ImplStepRef[] = useMemo(() => {
+    const map = new Map<string, ImplStepRef>()
+    accessChains.forEach((c: AccessChainItem) => {
+      if (c.step_id && !map.has(c.step_id)) {
+        map.set(c.step_id, {
+          step_id: c.step_id,
+          step_name: c.step_name || c.step_id,
+          process_id: c.process_id,
+          process_name: c.process_name,
+        })
+      }
+    })
+    return Array.from(map.values())
+  }, [accessChains])
+
+  const resourceRefs: ImplResourceRef[] = useMemo(() => {
+    const map = new Map<string, ImplResourceRef>()
+    accessChains.forEach((c: AccessChainItem) => {
+      const existing = map.get(c.resource_id)
+      if (!existing) {
+        map.set(c.resource_id, {
+          resource_id: c.resource_id,
+          resource_name: c.resource_name,
+          access_type: c.access_type || null,
+          access_pattern: c.access_pattern || null,
+        })
+      } else {
+        if (!existing.access_type && c.access_type) {
+          existing.access_type = c.access_type
+        }
+        if (!existing.access_pattern && c.access_pattern) {
+          existing.access_pattern = c.access_pattern
+        }
+      }
+    })
+    return Array.from(map.values())
+  }, [accessChains])
+
+  const isCreateMode = mode === 'create'
+  const isEditMode = mode === 'edit'
+  const isViewMode = mode === 'view'
+
+  useEffect(() => {
+    if (!selectedImpl || isCreateMode) {
+      return
+    }
+
+    form.setFieldsValue({
+      name: selectedImpl.name,
+      type: selectedImpl.type ?? undefined,
+      system: selectedImpl.system ?? undefined,
+      description: selectedImpl.description ?? undefined,
+      code_ref: selectedImpl.code_ref ?? undefined,
+    })
+    loadRelations(selectedImpl.impl_id)
+  }, [selectedImpl, isCreateMode, form, loadRelations])
+
+  const handleStartCreate = () => {
+    setMode('create')
+    setSelectedImplId(null)
     form.resetFields()
-    setModalVisible(true)
   }
 
-  const openEdit = (item: ImplementationNode) => {
-    setEditing(item)
-    form.setFieldsValue({
-      name: item.name,
-      type: item.type ?? undefined,
-      system: item.system ?? undefined,
-      description: item.description ?? undefined,
-      code_ref: item.code_ref ?? undefined,
-    })
-    setModalVisible(true)
+  const handleEditClick = () => {
+    if (!selectedImpl) return
+    setMode('edit')
   }
 
   const handleSubmit = async () => {
     try {
       const values = await form.validateFields()
-      if (!editing) {
+      if (isCreateMode) {
         await createImplementation({
           name: values.name,
           type: values.type ?? null,
@@ -683,8 +1153,8 @@ const ImplementationTab: React.FC = () => {
           code_ref: values.code_ref ?? null,
         })
         showSuccess('创建成功')
-      } else {
-        await updateImplementation(editing.impl_id, {
+      } else if (selectedImpl) {
+        await updateImplementation(selectedImpl.impl_id, {
           name: values.name,
           type: values.type ?? null,
           system: values.system ?? null,
@@ -693,8 +1163,7 @@ const ImplementationTab: React.FC = () => {
         })
         showSuccess('保存成功')
       }
-      setModalVisible(false)
-      setEditing(null)
+      setMode('view')
       fetchList()
     } catch (e: any) {
       if (e?.errorFields) return
@@ -702,10 +1171,34 @@ const ImplementationTab: React.FC = () => {
     }
   }
 
+  const handleCancelEdit = () => {
+    if (isCreateMode) {
+      setMode('view')
+      if (items.length > 0) {
+        setSelectedImplId(items[0].impl_id)
+      }
+    } else if (isEditMode) {
+      setMode('view')
+      if (selectedImpl) {
+        form.setFieldsValue({
+          name: selectedImpl.name,
+          type: selectedImpl.type ?? undefined,
+          system: selectedImpl.system ?? undefined,
+          description: selectedImpl.description ?? undefined,
+          code_ref: selectedImpl.code_ref ?? undefined,
+        })
+      }
+    }
+  }
+
   const handleDelete = async (item: ImplementationNode) => {
     try {
       await deleteImplementation(item.impl_id)
       showSuccess('删除成功')
+      if (selectedImplId === item.impl_id) {
+        setSelectedImplId(null)
+        setAccessChains([])
+      }
       fetchList()
     } catch (e) {
       showError('删除失败')
@@ -713,18 +1206,19 @@ const ImplementationTab: React.FC = () => {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
+    <div style={{ display: 'flex', height: '100%', gap: 16 }}>
+      {/* 中间：实现节点画廊 + 筛选 */}
       <div
         style={{
+          flex: 1.8,
+          minWidth: 0,
           display: 'flex',
           flexDirection: 'column',
-          flex: 1,
-          minHeight: 0,
-          paddingRight: modalVisible ? 24 : 0,
-          transition: 'padding-right 0.2s ease',
+          gap: 8,
+          overflow: 'hidden',
         }}
       >
-        <div className="toolbar-container">
+        <div className="toolbar-container" style={{ marginBottom: 4 }}>
           <Input.Search
             allowClear
             placeholder="按名称或实现ID搜索..."
@@ -737,9 +1231,41 @@ const ImplementationTab: React.FC = () => {
           />
           <Space>
             <Button onClick={fetchList}>刷新</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleStartCreate}>
               新建实现
             </Button>
+          </Space>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Space>
+            <Typography.Title level={5} style={{ margin: 0 }}>
+              实现单元列表
+            </Typography.Title>
+            <Badge
+              count={total}
+              style={{ backgroundColor: '#52c41a' }}
+              overflowCount={999}
+              showZero
+            />
+          </Space>
+          <Space>
+            <Space size={4}>
+              <span style={{ fontSize: 12 }}>按系统过滤:</span>
+              <Select
+                size="small"
+                value={activeSystem}
+                style={{ width: 180 }}
+                onChange={(val) => setActiveSystem(val)}
+              >
+                <Select.Option value="all">全部系统</Select.Option>
+                {systems.map((s) => (
+                  <Select.Option key={s} value={s}>
+                    {s}
+                  </Select.Option>
+                ))}
+              </Select>
+            </Space>
           </Space>
         </div>
 
@@ -747,86 +1273,135 @@ const ImplementationTab: React.FC = () => {
           style={{
             flex: 1,
             minHeight: 0,
+            borderRadius: 8,
+            border: '1px solid #e5e7eb',
             overflowY: 'auto',
             overflowX: 'hidden',
-            paddingBottom: 24,
+            padding: 8,
+            background: '#ffffff',
           }}
         >
-          <Row gutter={[24, 24]}>
-            {items.map((item) => (
-              <Col key={item.impl_id} xs={24} sm={12} md={8} lg={6} xl={6}>
-                <Card
-                  className="resource-card"
-                  title={
-                    <Space>
-                      <Avatar
-                        icon={<CodeOutlined />}
-                        style={{ backgroundColor: '#fff2e8', color: '#fa541c' }}
-                        size="small"
-                      />
-                      <Tooltip title={item.name}>
-                        <span>{item.name}</span>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gap: 8,
+            }}
+          >
+            {filteredItems.map((impl: ImplementationNode) => {
+              const isSelected = impl.impl_id === selectedImplId
+
+              return (
+                <div
+                  key={impl.impl_id}
+                  onClick={() => {
+                    setSelectedImplId(impl.impl_id)
+                    setMode('view')
+                  }}
+                  style={{
+                    borderRadius: 8,
+                    border: isSelected ? '2px solid #52c41a' : '1px solid #e5e7eb',
+                    padding: 8,
+                    cursor: 'pointer',
+                    background: isSelected ? '#f6ffed' : '#ffffff',
+                    boxShadow: isSelected
+                      ? '0 0 0 1px rgba(82, 196, 26, 0.25)'
+                      : '0 1px 2px rgba(15,23,42,0.03)',
+                    transition:
+                      'border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: 4,
+                    }}
+                  >
+                    <Space size={6}>
+                      <span style={{ color: '#52c41a' }}>
+                        <CodeOutlined />
+                      </span>
+                      <Tooltip title={impl.name}>
+                        <Typography.Text
+                          strong
+                          style={{
+                            fontSize: 13,
+                            wordBreak: 'break-all',
+                            whiteSpace: 'normal',
+                          }}
+                        >
+                          {impl.name}
+                        </Typography.Text>
                       </Tooltip>
                     </Space>
-                  }
-                  loading={loading}
-                  extra={item.system ? <Tag color="geekblue">{item.system}</Tag> : null}
-                  hoverable
-                  onClick={() => openEdit(item)}
-                  actions={[
-                    <span
-                      key="edit"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        openEdit(item)
+                    <Space size={4}>
+                      {impl.system && (
+                        <Tag color="geekblue" style={{ fontSize: 11 }}>
+                          {impl.system}
+                        </Tag>
+                      )}
+                      {impl.type && (
+                        <Tag color="default" style={{ fontSize: 11 }}>
+                          {impl.type}
+                        </Tag>
+                      )}
+                    </Space>
+                  </div>
+
+                  <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
+                    <div>实现ID: {impl.impl_id}</div>
+                    {impl.code_ref && (
+                      <div style={{ wordBreak: 'break-all', whiteSpace: 'normal' }}>
+                        代码引用: {impl.code_ref}
+                      </div>
+                    )}
+                  </div>
+
+                  {impl.description && (
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: '#6b7280',
+                        marginBottom: 4,
+                        display: '-webkit-box',
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: 'vertical',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
                       }}
                     >
-                      编辑
-                    </span>,
+                      {impl.description}
+                    </div>
+                  )}
+
+                  <div style={{ marginTop: 'auto', textAlign: 'right', paddingTop: 4 }}>
                     <Popconfirm
-                      key="delete"
                       title="确认删除该实现？"
                       onConfirm={(e) => {
                         e?.stopPropagation()
-                        handleDelete(item)
+                        handleDelete(impl)
                       }}
                       onCancel={(e) => e?.stopPropagation()}
                       okText="删除"
                       cancelText="取消"
                     >
-                      <span
-                        onClick={(e) => {
-                          e.stopPropagation()
-                        }}
-                        style={{ color: '#ff4d4f' }}
+                      <Typography.Text
+                        type="secondary"
+                        style={{ fontSize: 11, color: '#f97316' }}
+                        onClick={(e) => e.stopPropagation()}
                       >
                         删除
-                      </span>
-                    </Popconfirm>,
-                  ]}
-                >
-                  <div className="card-meta-row">
-                    <AppstoreOutlined className="card-meta-icon" />
-                    <span className="card-meta-label">ID:</span>
-                    <span className="card-meta-value">{item.impl_id}</span>
+                      </Typography.Text>
+                    </Popconfirm>
                   </div>
-                  <div className="card-meta-row">
-                    <AppstoreOutlined className="card-meta-icon" />
-                    <span className="card-meta-label">类型:</span>
-                    <span className="card-meta-value">{item.type || '-'}</span>
-                  </div>
-                  <div className="card-meta-row">
-                    <CodeOutlined className="card-meta-icon" />
-                    <span className="card-meta-label">引用:</span>
-                    <span className="card-meta-value">{item.code_ref || '-'}</span>
-                  </div>
-                  <div className="card-description" title={item.description || ''}>
-                    {item.description || '暂无描述'}
-                  </div>
-                </Card>
-              </Col>
-            ))}
-          </Row>
+                </div>
+              )
+            })}
+          </div>
         </div>
 
         <div
@@ -849,62 +1424,282 @@ const ImplementationTab: React.FC = () => {
           />
         </div>
       </div>
+
+      {/* 右侧：实现详情 + 基础信息表单 + 关系只读视图 */}
       <div
         style={{
-          width: modalVisible ? 420 : 0,
-          transition: 'width 0.25s ease',
-          borderLeft: modalVisible ? '1px solid #f0f0f0' : 'none',
-          background: modalVisible ? '#fff' : 'transparent',
-          overflow: 'hidden',
+          width: 360,
+          borderLeft: '1px solid #f3f4f6',
+          paddingLeft: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          minHeight: 0,
+          maxHeight: '100%',
+          overflowY: 'auto',
+          overflowX: 'hidden',
         }}
       >
-        {modalVisible && (
-          <div
-            style={{
-              padding: 16,
-              height: '100%',
-              overflowY: 'auto',
-              overflowX: 'hidden',
-            }}
-          >
-            <Typography.Title level={5} style={{ marginBottom: 16 }}>
-              {editing ? '编辑实现' : '新建实现'}
-            </Typography.Title>
-            <Form form={form} layout="vertical">
-              <Form.Item
-                label="名称"
-                name="name"
-                rules={[{ required: true, message: '请输入名称' }]}
+        <Typography.Title level={5} style={{ margin: 0 }}>
+          实现详情与关系
+        </Typography.Title>
+
+        {!selectedImpl && !isCreateMode && (
+          <Card size="small" bordered={false} style={{ background: '#f9fafb' }}>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              在左侧列表中点击任意实现，
+              这里将展示该实现的基础信息，以及它关联的步骤、流程和访问的数据资源。
+            </Typography.Text>
+          </Card>
+        )}
+
+        {(selectedImpl || isCreateMode) && (
+          <Card size="small" bordered={false}>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <Space size={6}>
+                  <span style={{ color: '#ea580c' }}>
+                    <CodeOutlined />
+                  </span>
+                  <Typography.Text
+                    strong
+                    style={{
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {isCreateMode
+                      ? '新建实现'
+                      : selectedImpl?.name || '未选择实现'}
+                  </Typography.Text>
+                </Space>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Space size={8}>
+                    {isViewMode && selectedImpl && <Tag>详情</Tag>}
+                    {isViewMode && selectedImpl && (
+                      <Tag
+                        color="blue"
+                        style={{ cursor: 'pointer' }}
+                        onClick={handleEditClick}
+                      >
+                        编辑
+                      </Tag>
+                    )}
+                    {(isEditMode || isCreateMode) && (
+                      <Space size={8}>
+                        <Tag
+                          color="default"
+                          style={{ cursor: 'pointer' }}
+                          onClick={handleCancelEdit}
+                        >
+                          取消
+                        </Tag>
+                        <Tag
+                          color="blue"
+                          style={{ cursor: 'pointer' }}
+                          onClick={handleSubmit}
+                        >
+                          保存
+                        </Tag>
+                      </Space>
+                    )}
+                  </Space>
+                </div>
+              </div>
+
+              <Divider style={{ margin: '8px 0' }} />
+
+              <Form
+                form={form}
+                layout="vertical"
+                disabled={isViewMode && !isCreateMode}
               >
-                <Input />
-              </Form.Item>
-              <Form.Item label="类型" name="type">
-                <Input />
-              </Form.Item>
-              <Form.Item label="系统" name="system">
-                <Input />
-              </Form.Item>
-              <Form.Item label="代码引用" name="code_ref">
-                <Input />
-              </Form.Item>
-              <Form.Item label="描述" name="description">
-                <Input.TextArea rows={3} />
-              </Form.Item>
-              <Space style={{ marginTop: 8 }}>
-                <Button type="primary" onClick={handleSubmit}>
-                  保存
-                </Button>
-                <Button
-                  onClick={() => {
-                    setModalVisible(false)
-                    setEditing(null)
-                  }}
+                <Form.Item
+                  label="名称"
+                  name="name"
+                  rules={[{ required: true, message: '请输入名称' }]}
                 >
-                  取消
-                </Button>
-              </Space>
-            </Form>
-          </div>
+                  <Input />
+                </Form.Item>
+                <Form.Item label="类型" name="type">
+                  <Input placeholder="例如 http_api / batch_job" />
+                </Form.Item>
+                <Form.Item label="系统" name="system">
+                  <Input placeholder="例如 member-service" />
+                </Form.Item>
+                <Form.Item label="代码引用" name="code_ref">
+                  <Input placeholder="例如 仓库路径或接口路径" />
+                </Form.Item>
+                <Form.Item label="描述" name="description">
+                  <Input.TextArea rows={3} />
+                </Form.Item>
+              </Form>
+
+              {!isCreateMode && selectedImpl && (
+                <>
+                  <Divider style={{ margin: '8px 0' }} />
+
+                  <div>
+                    <Space style={{ marginBottom: 4 }}>
+                      <Typography.Text strong style={{ fontSize: 12 }}>
+                        关联步骤 & 流程
+                      </Typography.Text>
+                      {relationsLoading && (
+                        <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                          加载中...
+                        </Typography.Text>
+                      )}
+                    </Space>
+                    <div style={{ marginTop: 4, maxHeight: 130, overflowY: 'auto' }}>
+                      {stepRefs.map((s: ImplStepRef) => (
+                        <div
+                          key={s.step_id + (s.process_id || '')}
+                          style={{
+                            fontSize: 11,
+                            padding: 6,
+                            borderRadius: 6,
+                            border: '1px solid #e5e7eb',
+                            marginBottom: 4,
+                            background: '#f9fafb',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Space size={4}>
+                              <span style={{ color: '#16a34a' }}>
+                                <NodeIndexOutlined />
+                              </span>
+                              <Typography.Text
+                                style={{
+                                  maxWidth: 190,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  display: 'inline-block',
+                                }}
+                              >
+                                {s.step_name}
+                              </Typography.Text>
+                            </Space>
+                          </div>
+                          <div>
+                            <Typography.Text type="secondary">步骤ID:</Typography.Text>{' '}
+                            {s.step_id}
+                          </div>
+                          {s.process_name && (
+                            <div>
+                              <Space size={4}>
+                                <span style={{ color: '#2563eb' }}>
+                                  <BranchesOutlined />
+                                </span>
+                                <Typography.Text
+                                  style={{
+                                    maxWidth: 190,
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    display: 'inline-block',
+                                  }}
+                                >
+                                  {s.process_name}（{s.process_id}）
+                                </Typography.Text>
+                              </Space>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                      {stepRefs.length === 0 && !relationsLoading && (
+                        <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                          当前未查询到该实现绑定的步骤关系。
+                        </Typography.Text>
+                      )}
+                    </div>
+                  </div>
+
+                  <Divider style={{ margin: '8px 0' }} />
+
+                  <div>
+                    <Space style={{ marginBottom: 4 }}>
+                      <Typography.Text strong style={{ fontSize: 12 }}>
+                        访问的数据资源
+                      </Typography.Text>
+                    </Space>
+                    <div style={{ marginTop: 4, maxHeight: 140, overflowY: 'auto' }}>
+                      {resourceRefs.map((r: ImplResourceRef) => (
+                        <div
+                          key={r.resource_id}
+                          style={{
+                            fontSize: 11,
+                            padding: 6,
+                            borderRadius: 6,
+                            border: '1px solid #e5e7eb',
+                            marginBottom: 4,
+                            background: '#f9fafb',
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                            <Space size={4}>
+                              <span style={{ color: '#7c3aed' }}>
+                                <DatabaseOutlined />
+                              </span>
+                              <Typography.Text
+                                style={{
+                                  maxWidth: 190,
+                                  whiteSpace: 'nowrap',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  display: 'inline-block',
+                                }}
+                              >
+                                {r.resource_name}
+                              </Typography.Text>
+                            </Space>
+                            <Space size={4}>
+                              {r.access_type && (
+                                <Tag color={
+                                  r.access_type === 'read'
+                                    ? 'green'
+                                    : r.access_type === 'write'
+                                    ? 'red'
+                                    : 'blue'
+                                }>
+                                  {r.access_type === 'read'
+                                    ? '读'
+                                    : r.access_type === 'write'
+                                    ? '写'
+                                    : '读/写'}
+                                </Tag>
+                              )}
+                              {r.access_pattern && (
+                                <Tag color="default" style={{ fontSize: 10 }}>
+                                  {r.access_pattern}
+                                </Tag>
+                              )}
+                            </Space>
+                          </div>
+                          <div>
+                            <Typography.Text type="secondary">资源ID:</Typography.Text>{' '}
+                            {r.resource_id}
+                          </div>
+                        </div>
+                      ))}
+                      {resourceRefs.length === 0 && !relationsLoading && (
+                        <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                          当前未查询到该实现访问的数据资源。
+                        </Typography.Text>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {isCreateMode && (
+                <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                  新建模式下，这里只编辑实现本身的基础字段，
+                  关联步骤与数据资源的关系建议在画布或专门的关系管理视图中维护。
+                </Typography.Text>
+              )}
+            </Space>
+          </Card>
         )}
       </div>
     </div>
@@ -926,17 +1721,16 @@ const DataResourceTab: React.FC = () => {
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [total, setTotal] = useState(0)
-  const [loadingList, setLoadingList] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   const [keyword, setKeyword] = useState('')
   const [systemFilter, setSystemFilter] = useState<string | undefined>()
 
-  const [selectedResource, setSelectedResource] = useState<DataResource | null>(null)
-  const [creatingNew, setCreatingNew] = useState(false)
-  const [drawerVisible, setDrawerVisible] = useState(false)
+  const [selectedResourceId, setSelectedResourceId] = useState<string | null>(null)
+  const [mode, setMode] = useState<'view' | 'edit' | 'create'>('view')
 
   const fetchList = useCallback(async () => {
-    setLoadingList(true)
+    setLoading(true)
     try {
       const data = await listDataResources({
         page,
@@ -946,10 +1740,21 @@ const DataResourceTab: React.FC = () => {
       })
       setResources(data.items)
       setTotal(data.total)
+
+      if (data.items.length > 0) {
+        setSelectedResourceId((prev) => {
+          if (prev && data.items.some((r) => r.resource_id === prev)) {
+            return prev
+          }
+          return data.items[0].resource_id
+        })
+      } else {
+        setSelectedResourceId(null)
+      }
     } catch (e) {
       showError('加载数据资源列表失败')
     } finally {
-      setLoadingList(false)
+      setLoading(false)
     }
   }, [page, pageSize, keyword, systemFilter])
 
@@ -957,25 +1762,43 @@ const DataResourceTab: React.FC = () => {
     fetchList()
   }, [fetchList])
 
-  const handleSelectResource = useCallback((record: DataResource) => {
-    setSelectedResource(record)
-    setCreatingNew(false)
-    form.setFieldsValue(record)
-    setDrawerVisible(true)
-  }, [form])
+  const selectedResource = useMemo(
+    () => resources.find((r) => r.resource_id === selectedResourceId) || null,
+    [resources, selectedResourceId],
+  )
 
-  const handleNewResource = () => {
-    setCreatingNew(true)
-    setSelectedResource(null)
+  const isCreateMode = mode === 'create'
+  const isEditMode = mode === 'edit'
+  const isViewMode = mode === 'view'
+
+  useEffect(() => {
+    if (!selectedResource || isCreateMode) return
+
+    form.setFieldsValue({
+      name: selectedResource.name,
+      type: selectedResource.type ?? undefined,
+      system: selectedResource.system ?? undefined,
+      location: selectedResource.location ?? undefined,
+      description: selectedResource.description ?? undefined,
+    })
+  }, [selectedResource, isCreateMode, form])
+
+  const handleStartCreate = () => {
+    setMode('create')
+    setSelectedResourceId(null)
     form.resetFields()
-    setDrawerVisible(true)
+  }
+
+  const handleEditClick = () => {
+    if (!selectedResource) return
+    setMode('edit')
   }
 
   const handleSaveBasic = async () => {
     try {
       const values = await form.validateFields()
 
-      if (creatingNew || !selectedResource) {
+      if (isCreateMode || !selectedResource) {
         const created = await createDataResource({
           name: values.name,
           type: values.type,
@@ -984,9 +1807,7 @@ const DataResourceTab: React.FC = () => {
           description: values.description,
         })
         showSuccess('创建成功')
-        setCreatingNew(false)
-        setSelectedResource(created)
-        await fetchList()
+        setSelectedResourceId(created.resource_id)
       } else {
         const updated = await updateDataResource(selectedResource.resource_id, {
           name: values.name,
@@ -996,9 +1817,10 @@ const DataResourceTab: React.FC = () => {
           description: values.description,
         })
         showSuccess('保存成功')
-        setSelectedResource(updated)
-        await fetchList()
+        setSelectedResourceId(updated.resource_id)
       }
+      setMode('view')
+      await fetchList()
     } catch (e: any) {
       if (e?.errorFields) {
         return
@@ -1007,118 +1829,223 @@ const DataResourceTab: React.FC = () => {
     }
   }
 
-  const handleDelete = async () => {
-    if (!selectedResource) return
+  const handleCancelEdit = () => {
+    if (isCreateMode) {
+      setMode('view')
+      if (resources.length > 0) {
+        setSelectedResourceId(resources[0].resource_id)
+      }
+    } else if (isEditMode) {
+      setMode('view')
+      if (selectedResource) {
+        form.setFieldsValue({
+          name: selectedResource.name,
+          type: selectedResource.type ?? undefined,
+          system: selectedResource.system ?? undefined,
+          location: selectedResource.location ?? undefined,
+          description: selectedResource.description ?? undefined,
+        })
+      }
+    }
+  }
+
+  const handleDelete = async (resource: DataResource) => {
     try {
-      await deleteDataResource(selectedResource.resource_id)
+      await deleteDataResource(resource.resource_id)
       showSuccess('删除成功')
-      setSelectedResource(null)
-      setDrawerVisible(false)
+      if (selectedResourceId === resource.resource_id) {
+        setSelectedResourceId(null)
+      }
       await fetchList()
     } catch (e) {
       showError('删除失败')
     }
   }
 
-
   return (
-    <div style={{ display: 'flex', height: '100%' }}>
+    <div style={{ display: 'flex', height: '100%', gap: 16 }}>
+      {/* 左侧：数据资源列表 */}
       <div
         style={{
+          flex: 1.8,
+          minWidth: 0,
           display: 'flex',
           flexDirection: 'column',
-          flex: 1,
-          minHeight: 0,
-          paddingRight: drawerVisible ? 24 : 0,
-          transition: 'padding-right 0.2s ease',
+          gap: 8,
+          overflow: 'hidden',
         }}
       >
-        <div className="toolbar-container">
+        <div className="toolbar-container" style={{ marginBottom: 4 }}>
           <Space>
             <Input.Search
               allowClear
               placeholder="按名称或资源ID搜索..."
-            prefix={<SearchOutlined style={{ color: '#9ca3af' }} />}
-            onSearch={(val) => {
-              setKeyword(val)
-              setPage(1)
-            }}
-            style={{ width: 320 }}
-          />
-          <Input
-            allowClear
-            placeholder="所属系统过滤"
-            prefix={<LaptopOutlined style={{ color: '#9ca3af' }} />}
-            value={systemFilter}
-            onChange={(e) => {
-              setSystemFilter(e.target.value || undefined)
-              setPage(1)
-            }}
-            style={{ width: 220 }}
-          />
-        </Space>
-        <Space>
-          <Button onClick={fetchList}>刷新</Button>
-          <Button type="primary" icon={<PlusOutlined />} onClick={handleNewResource}>
-            新建数据资源
-          </Button>
-        </Space>
-      </div>
+              prefix={<SearchOutlined style={{ color: '#9ca3af' }} />}
+              onSearch={(val) => {
+                setKeyword(val)
+                setPage(1)
+              }}
+              style={{ width: 320 }}
+            />
+            <Input
+              allowClear
+              placeholder="所属系统过滤"
+              prefix={<LaptopOutlined style={{ color: '#9ca3af' }} />}
+              value={systemFilter}
+              onChange={(e) => {
+                setSystemFilter(e.target.value || undefined)
+                setPage(1)
+              }}
+              style={{ width: 220 }}
+            />
+          </Space>
+          <Space>
+            <Button onClick={fetchList}>刷新</Button>
+            <Button type="primary" icon={<PlusOutlined />} onClick={handleStartCreate}>
+              新建数据资源
+            </Button>
+          </Space>
+        </div>
 
-      <div
-        style={{
-          flex: 1,
-          minHeight: 0,
-          overflowY: 'auto',
-          overflowX: 'hidden',
-          paddingBottom: 24,
-        }}
-      >
-        <Row gutter={[24, 24]}>
-          {resources.map((r) => (
-            <Col key={r.resource_id} xs={24} sm={12} md={12} lg={8} xl={6}>
-              <Card
-                className="resource-card"
-                size="small"
-                hoverable
-                loading={loadingList}
-                onClick={() => handleSelectResource(r)}
-                title={
-                  <Space>
-                    <Avatar
-                      icon={<DatabaseOutlined />}
-                      style={{ backgroundColor: '#f9f0ff', color: '#722ed1' }}
-                      size="small"
-                    />
-                    <Tooltip title={r.name}>
-                      <span>{r.name}</span>
-                    </Tooltip>
-                  </Space>
-                }
-                extra={
-                  <Space size={4}>
-                    {r.type && <Tag>{r.type}</Tag>}
-                  </Space>
-                }
-              >
-                <div className="card-meta-row">
-                  <GlobalOutlined className="card-meta-icon" />
-                  <span className="card-meta-label">位置:</span>
-                  <span className="card-meta-value">{r.location || '-'}</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <Space>
+            <Typography.Title level={5} style={{ margin: 0 }}>
+              数据资源列表
+            </Typography.Title>
+            <Badge
+              count={total}
+              style={{ backgroundColor: '#7c3aed' }}
+              overflowCount={999}
+              showZero
+            />
+          </Space>
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            minHeight: 0,
+            borderRadius: 8,
+            border: '1px solid #e5e7eb',
+            overflowY: 'auto',
+            overflowX: 'hidden',
+            padding: 8,
+            background: '#ffffff',
+          }}
+        >
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gap: 8,
+            }}
+          >
+            {resources.map((r) => {
+              const isSelected = r.resource_id === selectedResourceId
+
+              return (
+                <div
+                  key={r.resource_id}
+                  onClick={() => {
+                    setSelectedResourceId(r.resource_id)
+                    setMode('view')
+                  }}
+                  style={{
+                    borderRadius: 8,
+                    border: isSelected ? '2px solid #faad14' : '1px solid #e5e7eb',
+                    padding: 8,
+                    cursor: 'pointer',
+                    background: isSelected ? '#fff7e6' : '#ffffff',
+                    boxShadow: isSelected
+                      ? '0 0 0 1px rgba(250, 173, 20, 0.25)'
+                      : '0 1px 2px rgba(15,23,42,0.03)',
+                    transition:
+                      'border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      marginBottom: 4,
+                    }}
+                  >
+                    <Space size={6}>
+                      <span style={{ color: '#faad14' }}>
+                        <DatabaseOutlined />
+                      </span>
+                      <Tooltip title={r.name}>
+                        <Typography.Text
+                          strong
+                          style={{
+                            fontSize: 13,
+                            wordBreak: 'break-all',
+                            whiteSpace: 'normal',
+                          }}
+                        >
+                          {r.name}
+                        </Typography.Text>
+                      </Tooltip>
+                    </Space>
+                    <Space size={4}>
+                      {r.type && (
+                        <Tag style={{ fontSize: 11 }}>
+                          {r.type}
+                        </Tag>
+                      )}
+                    </Space>
+                  </div>
+
+                  <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
+                    <div>资源ID: {r.resource_id}</div>
+                    <div>
+                      位置: {r.location || '-'}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: '#6b7280',
+                      display: '-webkit-box',
+                      WebkitLineClamp: 2,
+                      WebkitBoxOrient: 'vertical',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                    }}
+                    title={r.description || ''}
+                  >
+                    {r.description || '暂无描述'}
+                  </div>
+
+                  <div style={{ marginTop: 'auto', textAlign: 'right', paddingTop: 4 }}>
+                    <Popconfirm
+                      title="确认删除该数据资源？"
+                      onConfirm={(e) => {
+                        e?.stopPropagation()
+                        handleDelete(r)
+                      }}
+                      onCancel={(e) => e?.stopPropagation()}
+                      okText="删除"
+                      cancelText="取消"
+                    >
+                      <Typography.Text
+                        type="secondary"
+                        style={{ fontSize: 11, color: '#f97316' }}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        删除
+                      </Typography.Text>
+                    </Popconfirm>
+                  </div>
                 </div>
-                <div className="card-meta-row">
-                  <FileTextOutlined className="card-meta-icon" />
-                  <span className="card-meta-label">ID:</span>
-                  <span className="card-meta-value">{r.resource_id}</span>
-                </div>
-                <div className="card-description" title={r.description || ''}>
-                  {r.description || '暂无描述'}
-                </div>
-              </Card>
-            </Col>
-          ))}
-        </Row>
-      </div>
+              )
+            })}
+          </div>
+        </div>
 
         <div
           style={{
@@ -1141,66 +2068,124 @@ const DataResourceTab: React.FC = () => {
         </div>
       </div>
 
+      {/* 右侧：数据资源详情 */}
       <div
         style={{
-          width: drawerVisible ? 420 : 0,
-          transition: 'width 0.25s ease',
-          borderLeft: drawerVisible ? '1px solid #f0f0f0' : 'none',
-          background: drawerVisible ? '#fff' : 'transparent',
-          overflow: 'hidden',
+          width: 360,
+          borderLeft: '1px solid #f3f4f6',
+          paddingLeft: 16,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 12,
+          minHeight: 0,
+          maxHeight: '100%',
+          overflowY: 'auto',
+          overflowX: 'hidden',
         }}
       >
-        {drawerVisible && (
-          <div
-            style={{
-              padding: 16,
-              height: '100%',
-              overflowY: 'auto',
-              overflowX: 'hidden',
-            }}
-          >
-          <Typography.Title level={5} style={{ marginBottom: 16 }}>
-            {creatingNew ? '新建数据资源' : '编辑数据资源'}
-          </Typography.Title>
+        <Typography.Title level={5} style={{ margin: 0 }}>
+          数据资源详情
+        </Typography.Title>
 
-          <Form
-            form={form}
-            layout="vertical"
-            initialValues={{ name: '' }}
-          >
-            <Form.Item
-              label="名称"
-              name="name"
-              rules={[{ required: true, message: '请输入名称' }]}
-            >
-              <Input />
-            </Form.Item>
-            <Form.Item label="类型" name="type">
-              <Input placeholder="如 db_table/api 等" />
-            </Form.Item>
-            <Form.Item label="所属系统" name="system">
-              <Input placeholder="如 member-service" />
-            </Form.Item>
-            <Form.Item label="物理位置" name="location">
-              <Input placeholder="如 member_db.user_card" />
-            </Form.Item>
-            <Form.Item label="描述" name="description">
-              <Input.TextArea rows={4} />
-            </Form.Item>
-            <Space style={{ marginTop: 8 }}>
-              <Button type="primary" onClick={handleSaveBasic}>
-                保存
-              </Button>
-              <Button
-                onClick={() => {
-                  setDrawerVisible(false)
-                }}
+        {!selectedResource && !isCreateMode && (
+          <Card size="small" bordered={false} style={{ background: '#f9fafb' }}>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              在左侧列表中点击任意数据资源，这里将展示该资源的基础信息，
+              包括名称、类型、所属系统、物理位置与描述。
+            </Typography.Text>
+          </Card>
+        )}
+
+        {(selectedResource || isCreateMode) && (
+          <Card size="small" bordered={false}>
+            <Space direction="vertical" size={8} style={{ width: '100%' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <Space size={6}>
+                  <span style={{ color: '#7c3aed' }}>
+                    <DatabaseOutlined />
+                  </span>
+                  <Typography.Text
+                    strong
+                    style={{
+                      whiteSpace: 'normal',
+                      wordBreak: 'break-word',
+                    }}
+                  >
+                    {isCreateMode
+                      ? '新建数据资源'
+                      : selectedResource?.name || '未选择数据资源'}
+                  </Typography.Text>
+                </Space>
+                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                  <Space size={8}>
+                    {isViewMode && selectedResource && <Tag>详情</Tag>}
+                    {isViewMode && selectedResource && (
+                      <Tag
+                        color="blue"
+                        style={{ cursor: 'pointer' }}
+                        onClick={handleEditClick}
+                      >
+                        编辑
+                      </Tag>
+                    )}
+                    {(isEditMode || isCreateMode) && (
+                      <Space size={8}>
+                        <Tag
+                          color="default"
+                          style={{ cursor: 'pointer' }}
+                          onClick={handleCancelEdit}
+                        >
+                          取消
+                        </Tag>
+                        <Tag
+                          color="blue"
+                          style={{ cursor: 'pointer' }}
+                          onClick={handleSaveBasic}
+                        >
+                          保存
+                        </Tag>
+                      </Space>
+                    )}
+                  </Space>
+                </div>
+              </div>
+
+              <Divider style={{ margin: '8px 0' }} />
+
+              <Form
+                form={form}
+                layout="vertical"
+                disabled={isViewMode && !isCreateMode}
               >
-                取消
-              </Button>
+                <Form.Item
+                  label="名称"
+                  name="name"
+                  rules={[{ required: true, message: '请输入名称' }]}
+                >
+                  <Input />
+                </Form.Item>
+                <Form.Item label="类型" name="type">
+                  <Input placeholder="如 db_table/api 等" />
+                </Form.Item>
+                <Form.Item label="所属系统" name="system">
+                  <Input placeholder="如 member-service" />
+                </Form.Item>
+                <Form.Item label="物理位置" name="location">
+                  <Input placeholder="如 member_db.user_card" />
+                </Form.Item>
+                <Form.Item label="描述" name="description">
+                  <Input.TextArea rows={4} />
+                </Form.Item>
+              </Form>
+
+              {isCreateMode && (
+                <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+                  新建模式下，这里只编辑数据资源本身的基础字段，
+                  与实现、步骤的访问关系建议在关系工作台中维护。
+                </Typography.Text>
+              )}
             </Space>
-          </Form>
-          </div>
+          </Card>
         )}
       </div>
     </div>

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, Typography, List, Spin, Empty, Space, Tag, Button, Modal, Input, Tabs, Tooltip, message as antdMessage } from 'antd'
-import { SyncOutlined, PlusCircleOutlined, SaveOutlined, CloseOutlined } from '@ant-design/icons'
+import { SyncOutlined, PlusCircleOutlined, SaveOutlined, CloseOutlined, NodeIndexOutlined, CodeOutlined, DatabaseOutlined } from '@ant-design/icons'
 import {
   ReactFlow,
   Background,
@@ -922,7 +922,29 @@ const BusinessLibraryPage: React.FC = () => {
         },
       }))
 
-      const allEdges: Edge[] = [...stepEdges, ...stepImplEdges, ...implDrEdges]
+      const implImplEdges: Edge[] = (canvasData.impl_links || []).map((link, idx) => ({
+        id: `edge:impl-impl:${link.id || idx}`,
+        source: `impl:${link.from_impl_id}`,
+        target: `impl:${link.to_impl_id}`,
+        sourceHandle: link.from_handle || undefined,
+        targetHandle: link.to_handle || undefined,
+        style: {
+          stroke: '#52c41a',
+        },
+        data: {
+          kind: 'impl-impl',
+          edge_type: link.edge_type,
+          condition: link.condition,
+          label: link.label,
+        },
+      }))
+
+      const allEdges: Edge[] = [
+        ...stepEdges,
+        ...stepImplEdges,
+        ...implDrEdges,
+        ...implImplEdges,
+      ]
       const { nodes: layoutedNodes, edges: layoutedEdges } = layoutGraph(allNodes, allEdges)
 
       setNodes(layoutedNodes)
@@ -1088,7 +1110,11 @@ const BusinessLibraryPage: React.FC = () => {
         name: canvas.process.name,
         channel: canvas.process.channel || undefined,
         description: canvas.process.description || undefined,
-        entrypoints: canvas.process.entrypoints,
+        entrypoints: canvas.process.entrypoints
+          ? Array.isArray(canvas.process.entrypoints)
+            ? canvas.process.entrypoints
+            : [canvas.process.entrypoints]
+          : undefined,
       }
     }
     return null
@@ -1353,7 +1379,7 @@ const BusinessLibraryPage: React.FC = () => {
 
       // 创建新节点
       let newNode: Node
-      let edgeKind: 'process' | 'step-impl' | 'impl-dr' = 'process'
+      let edgeKind: 'process' | 'step-impl' | 'impl-dr' | 'impl-impl' = 'process'
       let targetHandle = 'l-in' // 默认目标handle
 
       // 根据方向确定目标handle
@@ -1421,7 +1447,8 @@ const BusinessLibraryPage: React.FC = () => {
             maxWidth: 300,
           },
         }
-        edgeKind = 'step-impl'
+        // 源节点为实现时，允许实现之间直接连线
+        edgeKind = quickAddModal.sourceNodeType === 'implementation' ? 'impl-impl' : 'step-impl'
       } else if (selectedNode.nodeType === 'data') {
         // 添加数据资源节点
         newNode = {
@@ -1462,7 +1489,14 @@ const BusinessLibraryPage: React.FC = () => {
         markerEnd: { type: MarkerType.ArrowClosed },
         data: { kind: edgeKind },
         style: {
-          stroke: edgeKind === 'process' ? '#1677ff' : edgeKind === 'step-impl' ? '#52c41a' : '#faad14',
+          stroke:
+            edgeKind === 'process'
+              ? '#1677ff'
+              : edgeKind === 'step-impl'
+              ? '#52c41a'
+              : edgeKind === 'impl-dr'
+              ? '#faad14'
+              : '#52c41a',
         },
       }
 
@@ -1485,6 +1519,7 @@ const BusinessLibraryPage: React.FC = () => {
       process: [] as any[],
       stepImpl: [] as any[],
       implDr: [] as any[],
+      implImpl: [] as any[],
     }
 
     edges.forEach((edge) => {
@@ -1548,6 +1583,19 @@ const BusinessLibraryPage: React.FC = () => {
           resource_handle: resourceHandle,
           access_type: (edge.data as any)?.access_type,
           access_pattern: (edge.data as any)?.access_pattern,
+        })
+      } else if (kind === 'impl-impl') {
+        const fromImplId = edge.source.slice('impl:'.length)
+        const toImplId = edge.target.slice('impl:'.length)
+
+        edgesByKind.implImpl.push({
+          from_impl_id: fromImplId,
+          to_impl_id: toImplId,
+          from_handle: (edge as any).sourceHandle || null,
+          to_handle: (edge as any).targetHandle || null,
+          edge_type: (edge.data as any)?.edge_type,
+          condition: (edge.data as any)?.condition,
+          label: edge.label || (edge.data as any)?.label,
         })
       }
     })
@@ -1615,6 +1663,7 @@ const BusinessLibraryPage: React.FC = () => {
       step_impl_links: edgesByKind.stepImpl,
       data_resources: currentDataResources,
       impl_data_links: edgesByKind.implDr,
+      impl_links: edgesByKind.implImpl,
     }
 
     setSaving(true)
@@ -1739,6 +1788,18 @@ const BusinessLibraryPage: React.FC = () => {
           style: { stroke: '#faad14' },
           data: { kind: 'impl-dr' },
         }
+      } else if (sourceIsImpl && targetIsImpl) {
+        newEdge = {
+          id: `edge:impl-impl:${Date.now()}`,
+          source: rawSource,
+          target: rawTarget,
+          sourceHandle: connection.sourceHandle || undefined,
+          targetHandle: connection.targetHandle || undefined,
+          type: 'simplebezier',
+          markerEnd: { type: MarkerType.ArrowClosed },
+          style: { stroke: '#52c41a' },
+          data: { kind: 'impl-impl' },
+        }
       }
 
       if (newEdge) {
@@ -1777,6 +1838,8 @@ const BusinessLibraryPage: React.FC = () => {
         kind === 'impl-dr' &&
         ((sourceIsImpl && targetIsDr) || (sourceIsDr && targetIsImpl))
       ) {
+        valid = true
+      } else if (kind === 'impl-impl' && sourceIsImpl && targetIsImpl) {
         valid = true
       }
 
@@ -2676,18 +2739,34 @@ const BusinessLibraryPage: React.FC = () => {
                       step: {
                         steps: { allowed: true, reason: '' },
                         implementations: { allowed: true, reason: '' },
-                        data_resources: { allowed: false, reason: '步骤不能直接连接到数据资源，需要通过实现节点' }
+                        data_resources: {
+                          allowed: false,
+                          reason: '步骤不能直接连接到数据资源，需要通过实现节点',
+                        },
                       },
                       implementation: {
-                        steps: { allowed: false, reason: '实现不能连接到步骤，应该由步骤连接到实现' },
-                        implementations: { allowed: false, reason: '实现之间不能直接连接' },
-                        data_resources: { allowed: true, reason: '' }
+                        steps: {
+                          allowed: false,
+                          reason: '实现不能连接到步骤，应该由步骤连接到实现',
+                        },
+                        // 允许实现之间直接连接
+                        implementations: { allowed: true, reason: '' },
+                        data_resources: { allowed: true, reason: '' },
                       },
                       data: {
-                        steps: { allowed: false, reason: '数据资源是终点节点，不能作为连线起点' },
-                        implementations: { allowed: false, reason: '数据资源是终点节点，不能作为连线起点' },
-                        data_resources: { allowed: false, reason: '数据资源之间不能连接' }
-                      }
+                        steps: {
+                          allowed: false,
+                          reason: '数据资源是终点节点，不能作为连线起点',
+                        },
+                        implementations: {
+                          allowed: false,
+                          reason: '数据资源是终点节点，不能作为连线起点',
+                        },
+                        data_resources: {
+                          allowed: false,
+                          reason: '数据资源之间不能连接',
+                        },
+                      },
                     }
                     return rules[sourceType]
                   }
@@ -2711,18 +2790,22 @@ const BusinessLibraryPage: React.FC = () => {
                   }
                   
                   // 渲染节点列表的函数
-                  const renderNodeList = (nodes: any[], nodeType: 'step' | 'implementation' | 'data', disabled: boolean) => {
+                  const renderNodeList = (
+                    items: any[],
+                    nodeType: 'step' | 'implementation' | 'data',
+                    disabled: boolean,
+                  ) => {
                     if (disabled) {
                       return (
-                        <Empty 
-                          description="此类型节点不允许连接" 
-                          style={{ marginTop: 40, color: '#bfbfbf' }} 
+                        <Empty
+                          description="此类型节点不允许连接"
+                          style={{ marginTop: 40, color: '#bfbfbf' }}
                         />
                       )
                     }
-                    
+
                     // 过滤搜索
-                    const filteredNodes = nodes.filter((node: any) => {
+                    const filteredNodes = items.filter((node: any) => {
                       const searchLower = quickAddSearch.toLowerCase()
                       return (
                         node.name?.toLowerCase().includes(searchLower) ||
@@ -2731,49 +2814,204 @@ const BusinessLibraryPage: React.FC = () => {
                         node.description?.toLowerCase().includes(searchLower)
                       )
                     })
-                    
-                    // 添加nodeType字段
+
+                    // 添加 nodeType 字段
                     const nodesWithType = filteredNodes.map((node: any) => ({
                       ...node,
-                      nodeType
+                      nodeType,
                     }))
-                    
+
                     if (nodesWithType.length === 0) {
                       return <Empty description="没有找到匹配的节点" style={{ marginTop: 40 }} />
                     }
-                    
+
+                    // 当前画布上已存在的节点 ID 集合（按类型），基于 canvas 数据判断
+                    const existingIds = new Set<string>()
+                    if (canvas) {
+                      if (nodeType === 'step') {
+                        canvas.steps.forEach((s) => existingIds.add(s.step_id))
+                      } else if (nodeType === 'implementation') {
+                        canvas.implementations.forEach((i) => existingIds.add(i.impl_id))
+                      } else if (nodeType === 'data') {
+                        canvas.data_resources.forEach((d) => existingIds.add(d.resource_id))
+                      }
+                    }
+
+                    // 不同节点类型的视觉风格
+                    const getVisualConfig = (node: any) => {
+                      if (nodeType === 'step') {
+                        return {
+                          icon: <NodeIndexOutlined />,
+                          iconColor: '#1677ff',
+                          tagColor: 'green' as const,
+                          idLabel: '步骤ID',
+                          idValue: node.step_id,
+                          typeText: node.step_type,
+                        }
+                      }
+                      if (nodeType === 'implementation') {
+                        return {
+                          icon: <CodeOutlined />,
+                          iconColor: '#52c41a',
+                          tagColor: 'default' as const,
+                          idLabel: '实现ID',
+                          idValue: node.impl_id,
+                          typeText: node.type,
+                        }
+                      }
+                      return {
+                        icon: <DatabaseOutlined />,
+                        iconColor: '#faad14',
+                        tagColor: 'default' as const,
+                        idLabel: '资源ID',
+                        idValue: node.resource_id,
+                        typeText: node.type,
+                      }
+                    }
+
                     return (
-                      <List
-                        dataSource={nodesWithType}
-                        style={{ maxHeight: listMaxHeight, overflow: 'auto' }}
-                        renderItem={(node: any) => (
-                          <List.Item
-                            style={{ cursor: 'pointer', padding: '12px 16px' }}
-                            onClick={() => handleQuickAddNode(node)}
-                            onMouseEnter={(e) => {
-                              e.currentTarget.style.background = '#f5f5f5'
-                            }}
-                            onMouseLeave={(e) => {
-                              e.currentTarget.style.background = 'transparent'
-                            }}
-                          >
-                            <List.Item.Meta
-                              title={node.name}
-                              description={
-                                <Space direction="vertical" size={2}>
-                                  {node.type && <Text type="secondary">类型: {node.type}</Text>}
-                                  {node.system && <Text type="secondary">系统: {node.system}</Text>}
-                                  {node.description && (
-                                    <Text type="secondary" style={{ fontSize: 12 }}>
-                                      {node.description}
-                                    </Text>
+                      <div
+                        style={{
+                          maxHeight: listMaxHeight,
+                          overflowY: 'auto',
+                          overflowX: 'hidden',
+                          paddingRight: 4,
+                        }}
+                      >
+                        <div
+                          style={{
+                            display: 'grid',
+                            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                            gap: 8,
+                          }}
+                        >
+                          {nodesWithType.map((node: any) => {
+                            const key =
+                              node.step_id || node.impl_id || node.resource_id || node.name || Math.random()
+                            const { icon, iconColor, tagColor, idLabel, idValue, typeText } =
+                              getVisualConfig(node)
+
+                            const isExisting =
+                              nodeType === 'step'
+                                ? !!node.step_id && existingIds.has(node.step_id)
+                                : nodeType === 'implementation'
+                                ? !!node.impl_id && existingIds.has(node.impl_id)
+                                : !!node.resource_id && existingIds.has(node.resource_id)
+
+                            const card = (
+                              <div
+                                onClick={() => {
+                                  if (isExisting) return
+                                  handleQuickAddNode(node)
+                                }}
+                                style={{
+                                  position: 'relative',
+                                  borderRadius: 8,
+                                  border: '1px solid #e5e7eb',
+                                  padding: 8,
+                                  background: isExisting ? '#f5f5f5' : '#ffffff',
+                                  cursor: isExisting ? 'not-allowed' : 'pointer',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: 4,
+                                  boxShadow: '0 1px 2px rgba(15,23,42,0.04)',
+                                  transition:
+                                    'border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease',
+                                  opacity: isExisting ? 0.6 : 1,
+                                }}
+                                onMouseEnter={(e) => {
+                                  if (isExisting) return
+                                  e.currentTarget.style.background = '#f9fafb'
+                                  e.currentTarget.style.borderColor = '#d1d5db'
+                                  e.currentTarget.style.boxShadow =
+                                    '0 2px 4px rgba(15,23,42,0.08)'
+                                }}
+                                onMouseLeave={(e) => {
+                                  if (isExisting) return
+                                  e.currentTarget.style.background = '#ffffff'
+                                  e.currentTarget.style.borderColor = '#e5e7eb'
+                                  e.currentTarget.style.boxShadow =
+                                    '0 1px 2px rgba(15,23,42,0.04)'
+                                }}
+                              >
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems: 'center',
+                                    marginBottom: 2,
+                                  }}
+                                >
+                                  <Space size={6}>
+                                    <span style={{ color: iconColor }}>{icon}</span>
+                                    <Tooltip title={node.name}>
+                                      <Text
+                                        strong
+                                        style={{
+                                          fontSize: 13,
+                                          whiteSpace: 'normal',
+                                          wordBreak: 'break-word',
+                                        }}
+                                      >
+                                        {node.name}
+                                      </Text>
+                                    </Tooltip>
+                                  </Space>
+                                  {typeText && (
+                                    <Tag color={tagColor} style={{ fontSize: 10 }}>
+                                      {typeText}
+                                    </Tag>
                                   )}
-                                </Space>
-                              }
-                            />
-                          </List.Item>
-                        )}
-                      />
+                                </div>
+
+                                {(idValue || node.system) && (
+                                  <div
+                                    style={{
+                                      fontSize: 11,
+                                      color: '#6b7280',
+                                      marginBottom: node.description ? 2 : 0,
+                                    }}
+                                  >
+                                    {idValue && (
+                                      <div>
+                                        {idLabel}: {idValue}
+                                      </div>
+                                    )}
+                                    {node.system && <div>系统: {node.system}</div>}
+                                  </div>
+                                )}
+
+                                {node.description && (
+                                  <div
+                                    style={{
+                                      fontSize: 11,
+                                      color: '#6b7280',
+                                      display: '-webkit-box',
+                                      WebkitLineClamp: 2,
+                                      WebkitBoxOrient: 'vertical',
+                                      overflow: 'hidden',
+                                      textOverflow: 'ellipsis',
+                                    }}
+                                    title={node.description}
+                                  >
+                                    {node.description}
+                                  </div>
+                                )}
+                              </div>
+                            )
+
+                            if (isExisting) {
+                              return (
+                                <Tooltip key={key} title="该节点已存在于画布中">
+                                  {card}
+                                </Tooltip>
+                              )
+                            }
+
+                            return <React.Fragment key={key}>{card}</React.Fragment>
+                          })}
+                        </div>
+                      </div>
                     )
                   }
                   

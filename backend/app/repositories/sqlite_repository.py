@@ -1,6 +1,7 @@
 """SQLite 数据访问层 - 负责所有 SQLite 数据库操作"""
 
 from typing import Any, Dict, List, Optional, Set, Sequence
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from backend.app.models.resource_graph import (
@@ -11,6 +12,7 @@ from backend.app.models.resource_graph import (
     ProcessStepEdge,
     Step,
     StepImplementation,
+    ImplementationLink,
 )
 
 
@@ -231,6 +233,66 @@ class SQLiteRepository:
             impl_id=impl_id,
             step_handle=step_handle,
             impl_handle=impl_handle,
+        )
+        self.db.add(link)
+        return link
+
+    # ==================== ImplementationLink 相关 ====================
+
+    def get_implementation_links_by_process(
+        self,
+        process_id: str,
+        impl_ids: Set[str],
+    ) -> List[ImplementationLink]:
+        """获取指定流程的实现-实现关联"""
+        if not impl_ids:
+            return []
+        return (
+            self.db.query(ImplementationLink)
+            .filter(
+                ImplementationLink.process_id == process_id,
+                or_(
+                    ImplementationLink.from_impl_id.in_(impl_ids),
+                    ImplementationLink.to_impl_id.in_(impl_ids),
+                ),
+            )
+            .order_by(ImplementationLink.id)
+            .all()
+        )
+
+    def delete_implementation_links(self, process_id: str, impl_ids: Set[str]) -> None:
+        """删除指定流程的实现-实现关联"""
+        if not impl_ids:
+            return
+        self.db.query(ImplementationLink).filter(
+            ImplementationLink.process_id == process_id,
+            or_(
+                ImplementationLink.from_impl_id.in_(impl_ids),
+                ImplementationLink.to_impl_id.in_(impl_ids),
+            ),
+        ).delete(synchronize_session=False)
+
+    def create_implementation_link(
+        self,
+        process_id: str,
+        from_impl_id: str,
+        to_impl_id: str,
+        from_handle: Optional[str] = None,
+        to_handle: Optional[str] = None,
+        edge_type: Optional[str] = None,
+        condition: Optional[str] = None,
+        label: Optional[str] = None,
+    ) -> ImplementationLink:
+        """创建实现-实现关联"""
+        link = ImplementationLink(
+            process_id=process_id,
+            from_impl_id=from_impl_id,
+            to_impl_id=to_impl_id,
+            from_handle=from_handle,
+            to_handle=to_handle,
+            edge_type=edge_type,
+            condition=condition,
+            label=label,
         )
         self.db.add(link)
         return link

@@ -64,11 +64,14 @@ def get_process_canvas(db: Session, process_id: str) -> Dict[str, Any]:
     
     # 7. 获取实现-数据资源关联（限定process_id）
     impl_data_rows = repo.get_implementation_data_resources_by_process(process_id, impl_ids)
+
+    # 8. 获取实现-实现关联（限定process_id）
+    impl_link_rows = repo.get_implementation_links_by_process(process_id, impl_ids)
     
-    # 8. 获取数据资源信息
+    # 9. 获取数据资源信息
     data_resources = repo.get_data_resources_by_ids(resource_ids)
 
-    # 9. 组装返回结果
+    # 10. 组装返回结果
     result: Dict[str, Any] = {
         "process": _business_to_dict(process),
         "steps": [
@@ -137,6 +140,19 @@ def get_process_canvas(db: Session, process_id: str) -> Dict[str, Any]:
             }
             for link in impl_data_rows
         ],
+        "impl_links": [
+            {
+                "id": link.id,
+                "from_impl_id": link.from_impl_id,
+                "to_impl_id": link.to_impl_id,
+                "from_handle": getattr(link, "from_handle", None),
+                "to_handle": getattr(link, "to_handle", None),
+                "edge_type": link.edge_type,
+                "condition": link.condition,
+                "label": link.label,
+            }
+            for link in impl_link_rows
+        ],
     }
 
     logger.info(
@@ -154,6 +170,7 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
     data_resources_data: List[Dict[str, Any]] = payload.get("data_resources") or []
     step_impl_links_data: List[Dict[str, Any]] = payload.get("step_impl_links") or []
     impl_data_links_data: List[Dict[str, Any]] = payload.get("impl_data_links") or []
+    impl_links_data: List[Dict[str, Any]] = payload.get("impl_links") or []
 
     entrypoints = process_data.get("entrypoints") or []
     entrypoints_str = ",".join(entrypoints)
@@ -268,7 +285,25 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
                 impl_handle=link_item.get("impl_handle"),
             )
 
-        # 7. 重建实现-数据资源关联
+        # 7. 重建实现-实现关联
+        repo.delete_implementation_links(process_id, incoming_impl_ids)
+        for link_item in impl_links_data:
+            from_impl_id = link_item.get("from_impl_id")
+            to_impl_id = link_item.get("to_impl_id")
+            if not from_impl_id or not to_impl_id:
+                continue
+            repo.create_implementation_link(
+                process_id=process_id,
+                from_impl_id=from_impl_id,
+                to_impl_id=to_impl_id,
+                from_handle=link_item.get("from_handle"),
+                to_handle=link_item.get("to_handle"),
+                edge_type=link_item.get("edge_type"),
+                condition=link_item.get("condition"),
+                label=link_item.get("label"),
+            )
+
+        # 8. 重建实现-数据资源关联
         repo.delete_implementation_data_resources(process_id, incoming_impl_ids)
         for link_item in impl_data_links_data:
             impl_id = link_item.get("impl_id")

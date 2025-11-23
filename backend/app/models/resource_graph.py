@@ -171,3 +171,61 @@ class ImplementationDataResource(Base):
 
     implementation = relationship("Implementation", back_populates="data_resources")  # 关联的实现实体
     data_resource = relationship("DataResource", back_populates="implementations")  # 关联的数据资源实体
+
+
+class ImplementationLink(Base):
+    """实现节点之间的连线关系，用于表示实现之间的调用/依赖链路。
+
+    设计上参考 ProcessStepEdge，但起点和终点都指向 Implementation。
+    """
+
+    __tablename__ = "implementation_links"
+
+    id = Column(Integer, primary_key=True, index=True, comment="实现-实现边记录主键")
+    process_id = Column(
+        String,
+        ForeignKey("businesses.process_id"),
+        nullable=False,
+        index=True,
+        comment="所属业务流程 ID",
+    )
+    from_impl_id = Column(
+        String,
+        ForeignKey("implementations.impl_id"),
+        nullable=False,
+        index=True,
+        comment="起始实现 ID",
+    )
+    to_impl_id = Column(
+        String,
+        ForeignKey("implementations.impl_id"),
+        nullable=False,
+        index=True,
+        comment="目标实现 ID",
+    )
+    from_handle = Column(
+        String,
+        nullable=True,
+        comment="起始实现节点的连接点 ID（如 t-out, r-out 等）",
+    )
+    to_handle = Column(
+        String,
+        nullable=True,
+        comment="目标实现节点的连接点 ID（如 t-in, l-in 等）",
+    )
+    edge_type = Column(String, nullable=True, comment="边类型（如调用、回调等）")
+    condition = Column(Text, nullable=True, comment="触发该边的条件表达式")
+    label = Column(String, nullable=True, comment="边上的展示文案/标签")
+
+    __table_args__ = (
+        UniqueConstraint(
+            "process_id",
+            "from_impl_id",
+            "to_impl_id",
+            "edge_type",
+            "condition",
+            name="uq_implementation_links_process_from_to_type_cond",
+        ),
+    )
+
+    # 这里暂不定义反向 relationship，按需从实现或业务侧手动查询

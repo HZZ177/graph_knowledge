@@ -62,6 +62,17 @@ export interface CanvasImplDataLink {
   access_pattern?: string | null
 }
 
+export interface CanvasImplLink {
+  id?: number
+  from_impl_id: string
+  to_impl_id: string
+  from_handle?: string | null
+  to_handle?: string | null
+  edge_type?: string | null
+  condition?: string | null
+  label?: string | null
+}
+
 export interface ProcessCanvas {
   process: CanvasProcess
   steps: CanvasStep[]
@@ -70,6 +81,7 @@ export interface ProcessCanvas {
   step_impl_links: CanvasStepImplLink[]
   data_resources: CanvasDataResource[]
   impl_data_links: CanvasImplDataLink[]
+  impl_links: CanvasImplLink[]
 }
 
 export async function getProcessCanvas(processId: string): Promise<ProcessCanvas> {
