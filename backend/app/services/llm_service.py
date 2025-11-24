@@ -1,26 +1,67 @@
 from typing import Any, Dict, Optional
 
-from .graph_query_service import get_process_context
+from sqlalchemy.orm import Session
+from crewai import Agent, Task, Crew, Process
+
+from backend.app.llm.base import get_crewai_llm
+from backend.app.services.graph_query_service import get_process_context
 
 
-def answer_question(question: str, process_id: Optional[str] = None) -> Dict[str, Any]:
-    pid = process_id or "c_open_card"
-    try:
-        context = get_process_context(pid)
-    except ValueError:
-        answer = f"当前暂不支持流程 {pid} 的详细说明。你问了: {question}"
-        return {"answer": answer, "process_id": pid}
+def answer_question_with_process_context(
+    db: Session,
+    question: str,
+    process_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """基于流程上下文 + crewai 进行问答。
 
-    process = context.get("process", {})
-    steps = context.get("steps", [])
-    step_names = [str(item.get("step", {}).get("name", "")) for item in steps]
-    step_names = [name for name in step_names if name]
+    返回结构: {"answer": str, "process_id": str | None}
+    """
 
-    if step_names:
-        summary = "；".join(step_names)
-        prefix = f"这是关于流程「{process.get('name', pid)}」的示例说明。该流程大致包含以下步骤：{summary}。"
-    else:
-        prefix = f"这是关于流程「{process.get('name', pid)}」的示例说明。"
+    llm = get_crewai_llm(db)
 
-    answer = f"{prefix} 你问了: {question}"
-    return {"answer": answer, "process_id": pid}
+    context: Dict[str, Any] | None = None
+    if process_id is not None:
+        try:
+            context = get_process_context(db, process_id)
+        except ValueError:
+            # 如果流程不存在，直接给出友好提示
+            answer = f"当前暂不支持流程 {process_id} 的详细说明。你问了: {question}"
+            return {"answer": answer, "process_id": process_id}
+
+    # 将流程上下文压缩成适合 prompt 的字符串
+    context_str = "无" if not context else str(context)
+
+    system_prompt = "你是业务流程知识助手，回答问题时参考给定的流程上下文，用清晰的中文回答。"
+
+    analyst = Agent(
+        role="Process Analyst",
+        goal="根据给定流程上下文，回答用户关于该流程或相关系统/数据资源的问题",
+        backstory=system_prompt,
+        llm=llm,
+    )
+
+    task_description = (
+        f"用户问题：{question}\n"
+        f"流程上下文：{context_str}\n"
+        "请基于以上信息给出结构化、清晰的中文回答，如果上下文不足以回答，请明确说明。"
+    )
+
+    qa_task = Task(
+        description=task_description,
+        agent=analyst,
+        expected_output="一段清晰的中文回答，描述流程的关键步骤、涉及系统和数据资源，并回答用户问题。",
+    )
+
+    crew = Crew(
+        agents=[analyst],
+        tasks=[qa_task],
+        process=Process.sequential,
+        llm=llm,
+    )
+
+    result = crew.kickoff()
+
+    return {
+        "answer": str(result),
+        "process_id": process_id,
+    }

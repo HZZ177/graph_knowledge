@@ -4,6 +4,7 @@ import MainLayout from './layouts/MainLayout'
 import HomePage from './pages/HomePage'
 import ResourceLibraryPage from './pages/ResourceLibraryPage'
 import BusinessLibraryPage from './pages/BusinessLibraryPage'
+import LLMModelManagePage from './pages/LLMModelManagePage'
 
 const router = createBrowserRouter([
   {
@@ -21,6 +22,10 @@ const router = createBrowserRouter([
       {
         path: '/business',
         element: <BusinessLibraryPage />,
+      },
+      {
+        path: '/llm-models',
+        element: <LLMModelManagePage />,
       },
     ],
   },

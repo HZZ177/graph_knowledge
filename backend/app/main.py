@@ -9,11 +9,13 @@ from backend.app.api.v1 import (
     resource_nodes,
     canvas,
     health,
+    llm_models,
 )
 
 from backend.app.db.sqlite import Base, engine, SessionLocal
 from backend.app.db.init_db import init_db
 from backend.app.core.middleware import trace_id_middleware
+from backend.app.models import ai_models  # noqa: F401  确保 ai_models 表被创建
 
 app = FastAPI(title="Graph Knowledge Backend")
 
@@ -29,11 +31,12 @@ app.add_middleware(
 app.middleware("http")(trace_id_middleware)
 
 app.include_router(processes.router, prefix="/api/v1")
-app.include_router(chat.router, prefix="/api/v1")
+app.include_router(llm.router, prefix="/api/v1")
 app.include_router(graph.router, prefix="/api/v1")
 app.include_router(resource_nodes.router, prefix="/api/v1")
 app.include_router(canvas.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api/v1")
+app.include_router(llm_models.router, prefix="/api/v1")
 
 
 @app.on_event("startup")

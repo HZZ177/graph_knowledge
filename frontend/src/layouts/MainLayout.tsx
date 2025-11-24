@@ -6,6 +6,7 @@ import {
   DatabaseOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  RobotOutlined,
 } from '@ant-design/icons'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 
@@ -31,6 +32,11 @@ const MainLayout: React.FC = () => {
       key: '/business',
       icon: <AppstoreOutlined />,
       label: <Link to="/business">业务库</Link>,
+    },
+    {
+      key: '/llm-models',
+      icon: <RobotOutlined />,
+      label: <Link to="/llm-models">AI 模型</Link>,
     },
   ]
 
