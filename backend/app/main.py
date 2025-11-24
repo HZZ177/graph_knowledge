@@ -4,7 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.v1 import (
     processes,
-    chat,
+    llm,
     graph,
     resource_nodes,
     canvas,
