@@ -90,21 +90,28 @@ export async function createDataResource(payload: DataResourceCreatePayload) {
 }
 
 export async function getDataResource(resourceId: string) {
-  const { data } = await http.get<DataResource>(`/resource-nodes/get_data_resource/${resourceId}`)
+  const { data } = await http.get<DataResource>('/resource-nodes/get_data_resource', {
+    params: { resource_id: resourceId },
+  })
   return data
 }
 
 export async function updateDataResource(resourceId: string, payload: Partial<DataResource>) {
-  const { data } = await http.post<DataResource>(`/resource-nodes/update_data_resource/${resourceId}` , payload)
+  const { data } = await http.post<DataResource>('/resource-nodes/update_data_resource', {
+    resource_id: resourceId,
+    ...payload,
+  })
   return data
 }
 
 export async function deleteDataResource(resourceId: string) {
-  await http.post(`/resource-nodes/delete_data_resource/${resourceId}`)
+  await http.post('/resource-nodes/delete_data_resource', { resource_id: resourceId })
 }
 
 export async function getResourceAccessors(resourceId: string) {
-  const { data } = await http.get<ResourceWithAccessors>(`/resource-nodes/get_resource_accessors/${resourceId}`)
+  const { data } = await http.get<ResourceWithAccessors>(`/resource-nodes/get_resource_accessors`, {
+    params: { resource_id: resourceId },
+  })
   return data
 }
 
@@ -123,14 +130,17 @@ export async function updateImplementationDataLink(
   payload: Partial<Pick<ImplementationDataLink, 'access_type' | 'access_pattern'>>,
 ): Promise<ImplementationDataLink> {
   const { data } = await http.post<ImplementationDataLink>(
-    `/resource-nodes/update_implementation_data_link/${linkId}`,
-    payload,
+    `/resource-nodes/update_implementation_data_link`,
+    {
+      link_id: linkId,
+      ...payload,
+    },
   )
   return data
 }
 
 export async function deleteImplementationDataLink(linkId: number): Promise<void> {
-  await http.post(`/resource-nodes/delete_implementation_data_link/${linkId}`)
+  await http.post('/resource-nodes/delete_implementation_data_link', { link_id: linkId })
 }
 
 type AccessNodeKind = 'resource' | 'impl' | 'step' | 'process'

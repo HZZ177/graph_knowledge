@@ -13,6 +13,7 @@ from backend.app.api.v1 import (
 
 from backend.app.db.sqlite import Base, engine, SessionLocal
 from backend.app.db.init_db import init_db
+from backend.app.core.middleware import trace_id_middleware
 
 app = FastAPI(title="Graph Knowledge Backend")
 
@@ -24,6 +25,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.middleware("http")(trace_id_middleware)
 
 app.include_router(processes.router, prefix="/api/v1")
 app.include_router(chat.router, prefix="/api/v1")

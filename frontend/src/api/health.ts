@@ -49,7 +49,9 @@ export const checkNeo4jHealth = async (): Promise<Neo4jHealthResponse> => {
  * 获取指定流程的同步状态
  */
 export const getSyncStatus = async (processId: string): Promise<SyncStatusResponse> => {
-  const response = await http.get(`/health/get_sync_status/${processId}`)
+  const response = await http.get('/health/get_sync_status', {
+    params: { process_id: processId },
+  })
   return response.data
 }
 

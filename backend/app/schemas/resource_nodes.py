@@ -113,3 +113,31 @@ class StepImplementationLinkOut(StepImplementationLinkBase):
 
     class Config:
         from_attributes = True
+
+
+class BusinessIdRequest(BaseModel):
+    process_id: str
+
+
+class BusinessUpdatePayload(BusinessUpdate):
+    process_id: str
+
+
+class StepIdRequest(BaseModel):
+    step_id: str
+
+
+class StepUpdatePayload(StepUpdate):
+    step_id: str
+
+
+class ImplementationIdRequest(BaseModel):
+    impl_id: str
+
+
+class ImplementationUpdatePayload(ImplementationUpdate):
+    impl_id: str
+
+
+class StepImplementationLinkIdRequest(BaseModel):
+    link_id: int

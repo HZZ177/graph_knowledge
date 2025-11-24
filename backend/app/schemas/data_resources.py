@@ -32,7 +32,6 @@ class DataResourceOut(DataResourceBase):
     class Config:
         from_attributes = True
 
-
 class PaginatedDataResources(BaseModel):
     page: int
     page_size: int
@@ -50,6 +49,14 @@ class StepSimple(BaseModel):
     name: str
     process_id: Optional[str] = None
     process_name: Optional[str] = None
+
+
+class DataResourceIdRequest(BaseModel):
+    resource_id: str
+
+
+class DataResourceUpdatePayload(DataResourceUpdate):
+    resource_id: str
 
 
 class ResourceAccessor(BaseModel):
@@ -78,6 +85,14 @@ class ImplementationDataLinkCreate(ImplementationDataLinkBase):
 class ImplementationDataLinkUpdate(BaseModel):
     access_type: Optional[str] = None
     access_pattern: Optional[str] = None
+
+
+class ImplementationDataLinkIdRequest(BaseModel):
+    link_id: int
+
+
+class ImplementationDataLinkUpdatePayload(ImplementationDataLinkUpdate):
+    link_id: int
 
 
 class ImplementationDataLinkOut(ImplementationDataLinkBase):

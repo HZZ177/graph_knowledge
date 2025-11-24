@@ -1,6 +1,6 @@
 from typing import List
 
-from fastapi import APIRouter, HTTPException, status, Depends
+from fastapi import APIRouter, Depends, Query, Body
 from sqlalchemy.orm import Session
 
 from backend.app.db.sqlite import get_db
@@ -12,11 +12,18 @@ from backend.app.schemas.processes import (
     ProcessEdgeCreate,
     ProcessEdgeUpdate,
     ProcessEdgeOut,
+    ProcessIdRequest,
+    ProcessUpdatePayload,
+    SaveProcessStepsRequest,
+    DeleteProcessStepRequest,
+    CreateProcessEdgeRequest,
+    UpdateProcessEdgeRequest,
+    DeleteProcessEdgeRequest,
 )
+from backend.app.core.utils import success_response, error_response
 from ...services import process_service
 from ...services.graph_sync_service import sync_process
 from backend.app.core.logger import logger
-
 
 router = APIRouter(prefix="/processes", tags=["processes"])
 
@@ -27,11 +34,14 @@ async def list_processes(db: Session = Depends(get_db)) -> list[dict]:
 
     items = process_service.list_processes(db)
     logger.info(f"列出业务流程列表，共返回 {len(items)} 条记录")
-    return items
+    return success_response(data=items)
 
 
-@router.post("/create_process", status_code=status.HTTP_201_CREATED)
-async def create_process(payload: ProcessCreate, db: Session = Depends(get_db)) -> dict:
+@router.post("/create_process")
+async def create_process(
+    payload: ProcessCreate = Body(...),
+    db: Session = Depends(get_db),
+) -> dict:
     """创建业务流程。
 
     根据请求体中的流程基础信息在 sqlite 中创建一条新的流程记录。
@@ -40,17 +50,17 @@ async def create_process(payload: ProcessCreate, db: Session = Depends(get_db)) 
     try:
         data = process_service.create_process(db, payload.dict())
         logger.info(f"创建流程成功 process_id={payload.process_id}")
-        return data
+        return success_response(data=data, message="创建流程成功")
     except ValueError as exc:
         logger.warning(f"创建流程失败 process_id={payload.process_id}, error={exc}")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(exc),
-        )
+        return error_response(message=str(exc))
 
 
-@router.get("/get_process/{process_id}")
-async def get_process(process_id: str, db: Session = Depends(get_db)) -> dict:
+@router.get("/get_process")
+async def get_process(
+    process_id: str = Query(...),
+    db: Session = Depends(get_db),
+) -> dict:
     """获取单个业务流程详情。
 
     如果指定的流程不存在，则返回 404。
@@ -59,107 +69,108 @@ async def get_process(process_id: str, db: Session = Depends(get_db)) -> dict:
     record = process_service.get_process(db, process_id)
     if record is None:
         logger.warning(f"流程不存在 process_id={process_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="流程不存在",
-        )
-    return record
+        return error_response(message="流程不存在")
+    return success_response(data=record)
 
 
-@router.post("/update_process/{process_id}")
+@router.post("/update_process")
 async def update_process(
-    process_id: str, payload: ProcessUpdate, db: Session = Depends(get_db)
+    payload: ProcessUpdatePayload = Body(...),
+    db: Session = Depends(get_db),
 ) -> dict:
     """更新业务流程的基础信息。
 
     仅更新请求体中提供的字段，如果流程不存在则返回 404。
     """
+    process_id = payload.process_id
     logger.info(f"更新流程 process_id={process_id}")
     try:
         data = process_service.update_process(
             db,
             process_id,
-            payload.dict(exclude_unset=True),
+            payload.dict(exclude={"process_id"}, exclude_unset=True),
         )
         logger.info(f"更新流程成功 process_id={process_id}")
-        return data
+        return success_response(data=data, message="更新流程成功")
     except ValueError:
         logger.warning(f"更新流程失败，流程不存在 process_id={process_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="流程不存在",
-        )
+        return error_response(message="流程不存在")
 
 
-@router.post("/delete_process/{process_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_process(process_id: str, db: Session = Depends(get_db)) -> None:
+@router.post("/delete_process")
+async def delete_process(
+    payload: ProcessIdRequest = Body(...),
+    db: Session = Depends(get_db),
+) -> None:
     """删除指定的业务流程。
 
     如果流程不存在则返回 404，成功时返回 204 无内容。
     """
+    process_id = payload.process_id
     logger.info(f"删除流程 process_id={process_id}")
     record = process_service.get_process(db, process_id)
     if record is None:
         logger.warning(f"删除流程失败，流程不存在 process_id={process_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="流程不存在",
-        )
+        return error_response(message="流程不存在")
     process_service.delete_process(db, process_id)
     logger.info(f"删除流程成功 process_id={process_id}")
+    return success_response(message="删除流程成功")
 
 
-@router.get("/get_process_steps/{process_id}")
-async def get_process_steps(process_id: str, db: Session = Depends(get_db)) -> list[dict]:
+@router.get("/get_process_steps")
+async def get_process_steps(
+    process_id: str = Query(...),
+    db: Session = Depends(get_db),
+) -> list[dict]:
     """获取指定流程下的全部步骤列表。"""
     logger.info(f"获取流程步骤 process_id={process_id}")
     record = process_service.get_process(db, process_id)
     if record is None:
         logger.warning(f"获取流程步骤失败，流程不存在 process_id={process_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="流程不存在",
-        )
-    return process_service.get_process_steps(db, process_id)
+        return error_response(message="流程不存在")
+    steps = process_service.get_process_steps(db, process_id)
+    return success_response(data=steps)
 
 
-@router.post("/save_process_steps/{process_id}")
+@router.post("/save_process_steps")
 async def save_process_steps(
-    process_id: str, items: List[ProcessStep], db: Session = Depends(get_db)
+    payload: SaveProcessStepsRequest = Body(...),
+    db: Session = Depends(get_db),
 ) -> list[dict]:
     """保存指定流程的步骤列表。
 
     用请求体中的步骤列表整体替换原有的步骤配置。
     """
+    process_id = payload.process_id
     record = process_service.get_process(db, process_id)
     if record is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Process not found",
-        )
-    plain_items = [item.dict() for item in items]
-    return process_service.save_process_steps(db, process_id, plain_items)
+        return error_response(message="Process not found")
+    plain_items = [item.dict() for item in payload.steps]
+    data = process_service.save_process_steps(db, process_id, plain_items)
+    return success_response(data=data, message="保存流程步骤成功")
 
 
-@router.post("/delete_process_step/{process_id}/{step_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/delete_process_step")
 async def delete_process_step(
-    process_id: str, step_id: int, db: Session = Depends(get_db)
+    payload: DeleteProcessStepRequest = Body(...),
+    db: Session = Depends(get_db),
 ) -> None:
     """删除指定流程中的单个步骤。"""
+    process_id = payload.process_id
+    step_id = payload.step_id
     logger.info(f"删除流程步骤 process_id={process_id}, step_id={step_id}")
     record = process_service.get_process(db, process_id)
     if record is None:
         logger.warning(f"删除流程步骤失败，流程不存在 process_id={process_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="流程不存在",
-        )
+        return error_response(message="流程不存在")
     process_service.delete_process_step(db, process_id, step_id)
+    return success_response(message="删除流程步骤成功")
 
 
-@router.get("/list_process_edges/{process_id}", response_model=List[ProcessEdgeOut])
+@router.get("/list_process_edges", response_model=List[ProcessEdgeOut])
 async def list_process_edges(
-    process_id: str, db: Session = Depends(get_db)
+    process_id: str = Query(...),
+    db: Session = Depends(get_db),
 ) -> List[ProcessEdgeOut]:
     """列出指定流程中所有步骤之间的边。"""
     # 直接基于 sqlite 中的 ProcessStepEdge 表返回边列表
@@ -169,25 +180,21 @@ async def list_process_edges(
         .order_by(ProcessStepEdge.id)
         .all()
     )
-    return [ProcessEdgeOut.from_orm(e) for e in edges]
+    edge_list = [ProcessEdgeOut.from_orm(e) for e in edges]
+    return success_response(data=edge_list)
 
 
-@router.post(
-    "/create_process_edge/{process_id}",
-    response_model=ProcessEdgeOut,
-    status_code=status.HTTP_201_CREATED,
-)
+@router.post("/create_process_edge",response_model=ProcessEdgeOut)
 async def create_process_edge(
-    process_id: str, payload: ProcessEdgeCreate, db: Session = Depends(get_db)
+    payload: CreateProcessEdgeRequest = Body(...),
+    db: Session = Depends(get_db),
 ) -> ProcessEdgeOut:
     """在指定流程中创建一条步骤之间的边。"""
     # 保持与 SAMPLE_DATA 的流程 ID 一致性
+    process_id = payload.process_id
     record = process_service.get_process(db, process_id)
     if record is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Process not found",
-        )
+        return error_response(message="Process not found")
 
     edge = ProcessStepEdge(
         process_id=process_id,
@@ -201,17 +208,17 @@ async def create_process_edge(
     db.commit()
     db.refresh(edge)
     logger.info(f"创建流程边成功 process_id={process_id}")
-    return ProcessEdgeOut.from_orm(edge)
+    return success_response(data=ProcessEdgeOut.from_orm(edge), message="创建流程边成功")
 
 
-@router.post("/update_process_edge/{process_id}/{edge_id}", response_model=ProcessEdgeOut)
+@router.post("/update_process_edge", response_model=ProcessEdgeOut)
 async def update_process_edge(
-    process_id: str,
-    edge_id: int,
-    payload: ProcessEdgeUpdate,
+    payload: UpdateProcessEdgeRequest = Body(...),
     db: Session = Depends(get_db),
 ) -> ProcessEdgeOut:
     """更新指定流程中某条边的属性。"""
+    process_id = payload.process_id
+    edge_id = payload.edge_id
     edge = (
         db.query(ProcessStepEdge)
         .filter(
@@ -222,24 +229,25 @@ async def update_process_edge(
     )
     if not edge:
         logger.warning(f"更新流程边失败，未找到边 process_id={process_id}, edge_id={edge_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="流程边不存在",
-        )
+        return error_response(message="流程边不存在")
 
-    for field, value in payload.dict(exclude_unset=True).items():
+    update_data = payload.dict(exclude_unset=True, exclude={"process_id", "edge_id"})
+    for field, value in update_data.items():
         setattr(edge, field, value)
 
     db.commit()
     db.refresh(edge)
-    return ProcessEdgeOut.from_orm(edge)
+    return success_response(data=ProcessEdgeOut.from_orm(edge), message="更新流程边成功")
 
 
-@router.post("/delete_process_edge/{process_id}/{edge_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.post("/delete_process_edge")
 async def delete_process_edge(
-    process_id: str, edge_id: int, db: Session = Depends(get_db)
+    payload: DeleteProcessEdgeRequest = Body(...),
+    db: Session = Depends(get_db),
 ) -> None:
     """删除指定流程中的一条边。"""
+    process_id = payload.process_id
+    edge_id = payload.edge_id
     edge = (
         db.query(ProcessStepEdge)
         .filter(
@@ -250,52 +258,46 @@ async def delete_process_edge(
     )
     if not edge:
         logger.warning(f"删除流程边失败，未找到边 process_id={process_id}, edge_id={edge_id}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="流程边不存在",
-        )
+        return error_response(message="流程边不存在")
 
     db.delete(edge)
     db.commit()
     logger.info(f"删除流程边成功 process_id={process_id}, edge_id={edge_id}")
+    return success_response(message="删除流程边成功")
 
 
-@router.post("/publish_process/{process_id}")
-async def publish_process(process_id: str, db: Session = Depends(get_db)) -> dict:
+@router.post("/publish_process")
+async def publish_process(
+    payload: ProcessIdRequest = Body(...),
+    db: Session = Depends(get_db),
+) -> dict:
     """发布流程到Neo4j图数据库
     
     Returns:
         包含同步结果的详细信息：success, message, synced_at, stats, error等
     """
+    process_id = payload.process_id
     record = process_service.get_process(db, process_id)
     if record is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Process not found",
-        )
+        return error_response(message="Process not found")
 
     try:
         result = sync_process(db, process_id)
         logger.info(f"发布流程成功 process_id={process_id}")
-        return result
+        return success_response(data=result, message="发布流程成功")
     except ValueError as e:
         logger.error(f"发布流程失败 process_id={process_id}, error={e}")
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=str(e),
-        )
+        return error_response(message=str(e))
     except Exception as e:
         logger.error(f"发布流程失败 process_id={process_id}, error={e}")
         # 返回错误信息而不是抛出异常，让前端能看到详细错误
         from backend.app.services.graph_sync_service import SyncError
         if isinstance(e, SyncError):
-            return {
-                "success": False,
-                "message": e.message,
-                "error_type": e.error_type,
-                "synced_at": None
-            }
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"同步失败: {str(e)}",
-        )
+            return error_response(
+                message=e.message,
+                data={
+                    "error_type": e.error_type,
+                    "synced_at": None,
+                },
+            )
+        return error_response(message=f"同步失败: {str(e)}")

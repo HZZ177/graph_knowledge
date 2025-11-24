@@ -51,3 +51,50 @@ class ProcessEdgeOut(ProcessEdgeBase):
 
     class Config:
         from_attributes = True
+
+
+class ProcessIdRequest(BaseModel):
+    """通用的流程 ID 请求体。"""
+
+    process_id: str
+
+
+class ProcessUpdatePayload(ProcessUpdate):
+    """更新流程时使用的请求体，包含流程 ID 及可更新字段。"""
+
+    process_id: str
+
+
+class SaveProcessStepsRequest(BaseModel):
+    """保存流程步骤列表的请求体。"""
+
+    process_id: str
+    steps: List[ProcessStep]
+
+
+class DeleteProcessStepRequest(BaseModel):
+    """删除单个流程步骤的请求体。"""
+
+    process_id: str
+    step_id: int
+
+
+class CreateProcessEdgeRequest(ProcessEdgeCreate):
+    """在流程中创建边的请求体。"""
+
+    process_id: str
+
+
+class UpdateProcessEdgeRequest(ProcessEdgeUpdate):
+    """更新流程边属性的请求体。"""
+
+    process_id: str
+    edge_id: int
+
+
+class DeleteProcessEdgeRequest(BaseModel):
+    """删除流程边的请求体。"""
+
+    process_id: str
+    edge_id: int
+

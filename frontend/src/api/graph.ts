@@ -30,6 +30,8 @@ export interface GraphProcessContext {
 }
 
 export async function getProcessContext(processId: string): Promise<GraphProcessContext> {
-  const res = await http.get<GraphProcessContext>(`/graph/get_process_context/${processId}`)
+  const res = await http.get<GraphProcessContext>('/graph/get_process_context', {
+    params: { process_id: processId },
+  })
   return res.data
 }
