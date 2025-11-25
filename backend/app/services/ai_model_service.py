@@ -39,6 +39,12 @@ class AIModelService:
         return obj
 
     @staticmethod
+    def get_model_by_id(db: Session, model_id: int) -> Optional[AIModel]:
+        """根据主键 ID 获取单个模型配置。"""
+
+        return db.query(AIModel).filter(AIModel.id == model_id).first()
+
+    @staticmethod
     def update_model(db: Session, model_id: int, data: AIModelUpdate) -> Optional[AIModel]:
         obj = db.query(AIModel).filter(AIModel.id == model_id).first()
         if not obj:

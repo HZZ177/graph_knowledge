@@ -10,10 +10,7 @@ def get_crewai_llm(db: Session) -> LLM:
     config = AIModelService.get_active_llm_config(db)
 
     # 仅在 provider 非空且 model_name 未自带前缀时拼接
-    if "/" in config.model_name or not getattr(config, "provider", None):
-        model_full_name = config.model_name
-    else:
-        model_full_name = f"{config.provider}/{config.model_name}"
+    model_full_name = f"{config.provider}/{config.model_name}"
 
     llm = LLM(
         model=model_full_name,

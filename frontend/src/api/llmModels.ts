@@ -57,3 +57,8 @@ export async function testLLMModel(payload: AIModelCreate): Promise<TestLLMResul
   const res = await http.post<TestLLMResult>('/llm-models/test', payload)
   return res.data
 }
+
+export async function testSavedLLMModel(modelId: number): Promise<TestLLMResult> {
+  const res = await http.post<TestLLMResult>('/llm-models/test-by-id', { model_id: modelId })
+  return res.data
+}

@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { Card, Typography, Button, Space, Table, Tag, Modal, Form, Input, InputNumber, Select, Popconfirm } from 'antd'
-import type { ColumnsType } from 'antd/es/table'
-import { PlusOutlined, ReloadOutlined, CheckCircleOutlined, ExperimentOutlined, DeleteOutlined, EditOutlined, ThunderboltOutlined } from '@ant-design/icons'
+import React, { useEffect, useState } from 'react'
+import { Card, Typography, Button, Space, Tag, Modal, Form, Input, InputNumber, Select, Popconfirm, Avatar, Spin } from 'antd'
+import { PlusOutlined, ReloadOutlined, FileTextOutlined, LinkOutlined, ExperimentOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 
 import {
   listLLMModels,
@@ -10,6 +9,7 @@ import {
   deleteLLMModel,
   activateLLMModel,
   testLLMModel,
+  testSavedLLMModel,
   type AIModelOut,
   type AIModelCreate,
   type AIModelUpdate,
@@ -200,15 +200,17 @@ const ModelModal: React.FC<ModelModalProps> = ({ open, mode, initial, onOk, onCa
           <InputNumber min={0} step={256} style={{ width: '100%' }} />
         </Form.Item>
 
-        <Form.Item>
-          <Button
-            icon={<ExperimentOutlined />}
-            onClick={handleTest}
-            loading={testing}
-          >
-            测试连接
-          </Button>
-        </Form.Item>
+        {mode === 'create' && (
+          <Form.Item>
+            <Button
+              icon={<ExperimentOutlined />}
+              onClick={handleTest}
+              loading={testing}
+            >
+              测试连接
+            </Button>
+          </Form.Item>
+        )}
       </Form>
     </Modal>
   )
@@ -221,6 +223,8 @@ const LLMModelManagePage: React.FC = () => {
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
   const [editingModel, setEditingModel] = useState<AIModelOut | null>(null)
+  const [testingSavedId, setTestingSavedId] = useState<number | null>(null)
+  const [activating, setActivating] = useState(false)
 
   const fetchModels = async () => {
     setLoading(true)
@@ -254,11 +258,14 @@ const LLMModelManagePage: React.FC = () => {
 
   const handleActivate = async (record: AIModelOut) => {
     try {
+      setActivating(true)
       await activateLLMModel(record.id)
       showSuccess('已设置为当前激活模型')
       fetchModels()
     } catch (e) {
       showError('激活模型失败')
+    } finally {
+      setActivating(false)
     }
   }
 
@@ -272,95 +279,27 @@ const LLMModelManagePage: React.FC = () => {
     }
   }
 
-  const columns: ColumnsType<AIModelOut> = useMemo(
-    () => [
-      {
-        title: '配置名称',
-        dataIndex: 'name',
-        key: 'name',
-      },
-      {
-        title: '提供商',
-        dataIndex: 'provider',
-        key: 'provider',
-      },
-      {
-        title: '模型名称',
-        dataIndex: 'model_name',
-        key: 'model_name',
-      },
-      {
-        title: '基础 URL',
-        dataIndex: 'base_url',
-        key: 'base_url',
-        render: (val: string | null) => val || '-',
-      },
-      {
-        title: '温度',
-        dataIndex: 'temperature',
-        key: 'temperature',
-      },
-      {
-        title: '状态',
-        dataIndex: 'is_active',
-        key: 'is_active',
-        render: (val: boolean) =>
-          val ? (
-            <Tag color="green" icon={<CheckCircleOutlined />}>当前激活</Tag>
-          ) : (
-            <Tag>可用</Tag>
-          ),
-      },
-      {
-        title: '最近更新',
-        dataIndex: 'updated_at',
-        key: 'updated_at',
-        render: (val: string) => new Date(val).toLocaleString(),
-      },
-      {
-        title: '操作',
-        key: 'action',
-        render: (_, record) => (
-          <Space size="small">
-            <Button
-              type="link"
-              size="small"
-              icon={<EditOutlined />}
-              onClick={() => handleOpenEdit(record)}
-            >
-              编辑
-            </Button>
-            <Popconfirm
-              title="确认删除该模型？"
-              onConfirm={() => handleDelete(record)}
-            >
-              <Button
-                type="link"
-                size="small"
-                danger
-                icon={<DeleteOutlined />}
-              >
-                删除
-              </Button>
-            </Popconfirm>
-            {!record.is_active && (
-              <Button
-                type="link"
-                size="small"
-                icon={<ThunderboltOutlined />}
-                onClick={() => handleActivate(record)}
-              >
-                激活
-              </Button>
-            )}
-          </Space>
-        ),
-      },
-    ],
-    [],
-  )
+  const handleTestSaved = async (record: AIModelOut) => {
+    try {
+      setTestingSavedId(record.id)
+      const res = await testSavedLLMModel(record.id)
+      if (res.ok) {
+        showSuccess('模型连通性测试成功')
+      } else {
+        showError('模型连通性测试失败')
+      }
+    } catch (e) {
+      showError('测试失败')
+    } finally {
+      setTestingSavedId(null)
+    }
+  }
 
-  const activeModel = models.find((m) => m.id === currentActiveId) || null
+  const handleChangeActive = async (value: number) => {
+    const record = models.find((m) => m.id === value)
+    if (!record) return
+    await handleActivate(record)
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
@@ -382,33 +321,110 @@ const LLMModelManagePage: React.FC = () => {
       </div>
 
       <Card>
-        <Space size={24} wrap>
-          <Space direction="vertical" size={4}>
-            <Text type="secondary">当前使用的模型</Text>
-            <Space>
-              {activeModel ? (
-                <Tag color="green" icon={<CheckCircleOutlined />}>{activeModel.name}</Tag>
-              ) : (
-                <Tag>暂无激活模型</Tag>
-              )}
-            </Space>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            gap: 16,
+          }}
+        >
+          <Space align="center">
+            <Text strong>当前使用的模型：</Text>
+            <Select
+              style={{ minWidth: 260 }}
+              placeholder="选择模型"
+              value={currentActiveId ?? undefined}
+              onChange={handleChangeActive}
+              loading={activating}
+            >
+              {models.map((m) => {
+                const modelLabel = m.provider ? `${m.provider}/${m.model_name}` : m.model_name
+                return (
+                  <Option key={m.id} value={m.id}>
+                    {m.name}（{modelLabel}）
+                  </Option>
+                )
+              })}
+            </Select>
           </Space>
-          <Space direction="vertical" size={4}>
-            <Text type="secondary">模型数量</Text>
-            <Text strong>{models.length}</Text>
-          </Space>
-        </Space>
+          <Text type="secondary">共 {models.length} 个模型配置</Text>
+        </div>
       </Card>
 
-      <Card style={{ flex: 1, minHeight: 0 }} bodyStyle={{ padding: 0 }}>
-        <Table<AIModelOut>
-          rowKey="id"
-          columns={columns}
-          dataSource={models}
-          loading={loading}
-          pagination={false}
-        />
-      </Card>
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        {loading ? (
+          <Card style={{ marginTop: 8 }}>
+            <div style={{ padding: 16, textAlign: 'center' }}>
+              <Spin />
+            </div>
+          </Card>
+        ) : models.length === 0 ? (
+          <Card style={{ marginTop: 8 }}>
+            <div style={{ padding: 16, textAlign: 'center', color: '#999' }}>暂无模型配置</div>
+          </Card>
+        ) : (
+          <Space direction="vertical" style={{ width: '100%', marginTop: 8 }} size={12}>
+            {models.map((m) => {
+              const providerLabel = (m.provider || '默认').toUpperCase()
+              return (
+                <Card
+                  key={m.id}
+                  bodyStyle={{ padding: '12px 16px' }}
+                  style={{ borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: 16,
+                    }}
+                  >
+                    <Space size={16}>
+                      <Avatar
+                        size={40}
+                        style={{ backgroundColor: '#1677ff' }}
+                        icon={<FileTextOutlined />}
+                      />
+                      <div>
+                        <Space size={8} align="center">
+                          <Text strong>{m.name}</Text>
+                          {m.is_active && <Tag color="blue">启用</Tag>}
+                        </Space>
+                        <Space size={8} style={{ marginTop: 4, flexWrap: 'wrap' }}>
+                          <Tag>{providerLabel}</Tag>
+                          <Tag>{m.model_name}</Tag>
+                          {m.base_url && <Tag>{m.base_url}</Tag>}
+                        </Space>
+                      </div>
+                    </Space>
+                    <Space size="middle">
+                      <Button
+                        type="text"
+                        icon={<LinkOutlined />}
+                        loading={testingSavedId === m.id}
+                        onClick={() => handleTestSaved(m)}
+                      />
+                      <Button
+                        type="text"
+                        icon={<EditOutlined />}
+                        onClick={() => handleOpenEdit(m)}
+                      />
+                      <Popconfirm
+                        title="确认删除该模型？"
+                        onConfirm={() => handleDelete(m)}
+                      >
+                        <Button type="text" danger icon={<DeleteOutlined />} />
+                      </Popconfirm>
+                    </Space>
+                  </div>
+                </Card>
+              )
+            })}
+          </Space>
+        )}
+      </div>
 
       <ModelModal
         open={modalOpen}

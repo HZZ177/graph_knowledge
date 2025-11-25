@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from crewai import Agent, Task, Crew, Process
 
 from backend.app.llm.base import get_crewai_llm
-from backend.app.services.graph_query_service import get_process_context
+from backend.app.services.graph_service import get_business_context
 
 
 def answer_question_with_process_context(
@@ -22,7 +22,7 @@ def answer_question_with_process_context(
     context: Dict[str, Any] | None = None
     if process_id is not None:
         try:
-            context = get_process_context(db, process_id)
+            context = get_business_context(process_id)
         except ValueError:
             # 如果流程不存在，直接给出友好提示
             answer = f"当前暂不支持流程 {process_id} 的详细说明。你问了: {question}"
@@ -55,8 +55,7 @@ def answer_question_with_process_context(
     crew = Crew(
         agents=[analyst],
         tasks=[qa_task],
-        process=Process.sequential,
-        llm=llm,
+        verbose=True
     )
 
     result = crew.kickoff()
