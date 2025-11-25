@@ -182,6 +182,40 @@ class SQLiteRepository:
         
         return impl
 
+    def get_implementations_by_names(self, names: List[str]) -> List[Implementation]:
+        """按名称批量查询实现"""
+        if not names:
+            return []
+        return (
+            self.db.query(Implementation)
+            .filter(Implementation.name.in_(names))
+            .all()
+        )
+
+    def get_data_resources_by_names(self, names: List[str]) -> List[DataResource]:
+        """按名称批量查询数据资源"""
+        if not names:
+            return []
+        return (
+            self.db.query(DataResource)
+            .filter(DataResource.name.in_(names))
+            .all()
+        )
+
+    def get_steps_by_names(self, names: List[str]) -> List[Step]:
+        """按名称批量查询步骤"""
+        if not names:
+            return []
+        return (
+            self.db.query(Step)
+            .filter(Step.name.in_(names))
+            .all()
+        )
+    
+    def get_business_by_name(self, name: str) -> Optional[Business]:
+        """按名称查询业务流程"""
+        return self.db.query(Business).filter(Business.name == name).first()
+
     # ==================== StepImplementation 相关 ====================
     
     def get_step_implementations(self, step_ids: Set[str]) -> Sequence[StepImplementation]:

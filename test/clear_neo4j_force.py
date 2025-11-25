@@ -21,7 +21,7 @@ from backend.app.db.neo4j_client import (
 def force_clear_neo4j():
     """强制清空Neo4j数据库（无需确认）"""
     
-    print("🗑️  强制清空Neo4j数据库...")
+    print("强制清空Neo4j数据库...")
     
     driver = None
     try:
@@ -32,11 +32,11 @@ def force_clear_neo4j():
         
         with driver.session(database=DEFAULT_NEO4J_DATABASE) as session:
             # 删除所有节点和关系
-            print("   删除所有节点和关系...")
+            print("删除所有节点和关系...")
             session.run("MATCH (n) DETACH DELETE n")
             
             # 删除所有约束
-            print("   删除所有约束...")
+            print("删除所有约束...")
             result = session.run("SHOW CONSTRAINTS")
             for constraint in result:
                 name = constraint.get("name")
@@ -47,7 +47,7 @@ def force_clear_neo4j():
                         pass
             
             # 删除所有索引
-            print("   删除所有索引...")
+            print("删除所有索引...")
             result = session.run("SHOW INDEXES")
             for index in result:
                 name = index.get("name")
@@ -58,10 +58,10 @@ def force_clear_neo4j():
                     except:
                         pass
             
-            print("✅ 清空完成！")
+            print("清空完成！")
         
     except Exception as e:
-        print(f"❌ 错误：{e}")
+        print(f"错误：{e}")
         
     finally:
         if driver:

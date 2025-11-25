@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, Typography, List, Spin, Empty, Space, Tag, Button, Modal, Input, Tabs, Tooltip, message as antdMessage } from 'antd'
-import { SyncOutlined, PlusCircleOutlined, SaveOutlined, CloseOutlined, NodeIndexOutlined, CodeOutlined, DatabaseOutlined } from '@ant-design/icons'
+import { SyncOutlined, PlusCircleOutlined, SaveOutlined, CloseOutlined, NodeIndexOutlined, CodeOutlined, DatabaseOutlined, RobotOutlined } from '@ant-design/icons'
 import {
   ReactFlow,
   Background,
@@ -47,6 +47,8 @@ import NodeLibrary from '../components/NodeLibrary'
 
 import { showSuccess, showError } from '../utils/message'
 import { showConfirm } from '../utils/confirm'
+import SkeletonGenerateModal from '../components/SkeletonGenerateModal'
+import type { CanvasData } from '../api/skeleton'
 
 const { Title, Paragraph, Text } = Typography
 
@@ -471,6 +473,9 @@ const BusinessLibraryPage: React.FC = () => {
   } | null>(null)
   const [quickAddSearch, setQuickAddSearch] = useState('')
   const [processSearch, setProcessSearch] = useState('')
+  
+  // AI骨架生成弹窗
+  const [skeletonModalOpen, setSkeletonModalOpen] = useState(false)
   
   // 全局节点库数据
   const [allSteps, setAllSteps] = useState<StepNode[]>([])
@@ -1888,8 +1893,19 @@ const BusinessLibraryPage: React.FC = () => {
                     flexDirection: 'column',
                   }}
                 >
-                  <Paragraph type="secondary" style={{ marginBottom: 12 }}>
-                    左侧选择业务，中心查看流程画布，点击步骤查看右侧详情。
+                  {/* AI 生成业务骨架按钮 */}
+                  <Button
+                    type="primary"
+                    icon={<RobotOutlined />}
+                    onClick={() => setSkeletonModalOpen(true)}
+                    style={{ marginBottom: 12 }}
+                    block
+                  >
+                    AI 生成业务骨架
+                  </Button>
+                  
+                  <Paragraph type="secondary" style={{ marginBottom: 12, fontSize: 12 }}>
+                    选择业务查看流程画布，点击节点查看详情
                   </Paragraph>
                   <Input.Search
                     allowClear
@@ -3067,6 +3083,21 @@ const BusinessLibraryPage: React.FC = () => {
           })()}
         </>
       )}
+      
+      {/* AI骨架生成弹窗 */}
+      <SkeletonGenerateModal
+        open={skeletonModalOpen}
+        onClose={() => setSkeletonModalOpen(false)}
+        onConfirm={(canvasData: CanvasData) => {
+          // 刷新流程列表
+          fetchProcesses()
+          // 选中新创建的流程
+          if (canvasData.process_id) {
+            setSelectedProcessId(canvasData.process_id)
+          }
+          showSuccess('流程骨架已创建，请在画布中查看和编辑')
+        }}
+      />
     </>
   )
 }
