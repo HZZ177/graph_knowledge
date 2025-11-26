@@ -180,15 +180,17 @@ async def confirm_skeleton(
     try:
         # 1. 保存到SQLite
         data = save_process_canvas(db, payload.process_id, payload.dict())
-        logger.info(f"骨架已保存到SQLite: {payload.process_id}")
+        # 获取实际保存的 process_id（可能因名称去重而变化）
+        actual_process_id = data.get("process", {}).get("process_id") or payload.process_id
+        logger.info(f"骨架已保存到SQLite: {actual_process_id}")
         
-        # 2. 同步到Neo4j
+        # 2. 同步到Neo4j（使用实际的 process_id）
         sync_result = None
         try:
-            sync_result = sync_process(db, payload.process_id)
-            logger.info(f"骨架已同步到Neo4j: {payload.process_id}")
+            sync_result = sync_process(db, actual_process_id)
+            logger.info(f"骨架已同步到Neo4j: {actual_process_id}")
         except Exception as e:
-            logger.warning(f"骨架同步Neo4j失败: {payload.process_id}, error={e}")
+            logger.warning(f"骨架同步Neo4j失败: {actual_process_id}, error={e}")
             sync_result = {
                 "success": False,
                 "message": str(e),
@@ -204,33 +206,3 @@ async def confirm_skeleton(
     except Exception as e:
         logger.error(f"确认骨架失败: {e}", exc_info=True)
         return error_response(message=f"确认骨架失败: {str(e)}")
-
-
-@router.post("/skeleton/preview")
-async def preview_skeleton(
-    payload: SkeletonGenerateRequest = Body(...),
-    db: Session = Depends(get_db),
-) -> dict:
-    """非流式骨架预览（备用接口）
-    
-    如果前端不支持WebSocket，可以使用此接口
-    注意：此接口不会返回中间进度，只返回最终结果
-    """
-    logger.info(f"非流式骨架预览: {payload.business_name}")
-    
-    collected_chunks = []
-    
-    async def collect_chunk(chunk: AgentStreamChunk):
-        collected_chunks.append(chunk)
-    
-    try:
-        canvas_data = await generate_skeleton_with_stream(db, payload, collect_chunk)
-        
-        return success_response(
-            data=canvas_data.dict(),
-            message="骨架生成成功",
-        )
-        
-    except Exception as e:
-        logger.error(f"骨架预览失败: {e}", exc_info=True)
-        return error_response(message=f"骨架生成失败: {str(e)}")

@@ -153,11 +153,3 @@ export async function confirmSkeleton(canvasData: CanvasData): Promise<CanvasDat
   const res = await http.post<CanvasData>('/llm/skeleton/confirm', canvasData)
   return res.data
 }
-
-/**
- * 非流式骨架预览（备用）
- */
-export async function previewSkeleton(request: SkeletonGenerateRequest): Promise<CanvasData> {
-  const res = await http.post<CanvasData>('/llm/skeleton/preview', request)
-  return res.data
-}

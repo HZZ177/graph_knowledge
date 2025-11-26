@@ -66,6 +66,46 @@ const layoutGraph = (nodes: Node[], edges: Edge[]) => {
   return { nodes: layoutedNodes, edges: layoutedEdges }
 }
 
+/**
+ * 根据源节点和目标节点的位置，计算最佳的连接 Handle
+ * - 水平排列（同层）：使用左右连接
+ * - 垂直排列（跨层）：使用上下连接
+ */
+const computeOptimalHandles = (
+  sourcePos: { x: number; y: number; width: number },
+  targetPos: { x: number; y: number; width: number }
+): { sourceHandle: string; targetHandle: string } => {
+  const dx = targetPos.x - sourcePos.x
+  const dy = targetPos.y - sourcePos.y
+  
+  // 计算节点中心点的水平和垂直距离
+  const sourceCenterX = sourcePos.x + sourcePos.width / 2
+  const targetCenterX = targetPos.x + targetPos.width / 2
+  const horizontalDist = Math.abs(targetCenterX - sourceCenterX)
+  const verticalDist = Math.abs(dy)
+  
+  // 判断主要方向：如果垂直距离明显大于水平距离，用上下连接
+  if (verticalDist > 50 && verticalDist > horizontalDist * 0.5) {
+    // 垂直方向为主
+    if (dy > 0) {
+      // 目标在下方：源节点底部 -> 目标节点顶部
+      return { sourceHandle: 'b-out', targetHandle: 't-in' }
+    } else {
+      // 目标在上方：源节点顶部 -> 目标节点底部
+      return { sourceHandle: 't-out', targetHandle: 'b-in' }
+    }
+  } else {
+    // 水平方向为主
+    if (dx > 0) {
+      // 目标在右边：源节点右侧 -> 目标节点左侧
+      return { sourceHandle: 'r-out', targetHandle: 'l-in' }
+    } else {
+      // 目标在左边：源节点左侧 -> 目标节点右侧
+      return { sourceHandle: 'l-out', targetHandle: 'r-in' }
+    }
+  }
+}
+
 const AllSidesNode = React.memo(({ data, selected, id }: any) => {
   const [hovered, setHovered] = useState(false)
   const hideTimerRef = React.useRef<any>(null)
@@ -678,11 +718,16 @@ const BusinessLibraryPage: React.FC = () => {
       })
 
       // 第二遍：计算累积位置（动态间隔）
+      // 间距 = 两个相邻节点宽度的平均值的一半 + 基础间距
+      const baseGap = 80 // 基础间距
       let currentX = 0
       const stepPositions: number[] = []
       stepWidths.forEach((width, index) => {
         stepPositions.push(currentX)
-        currentX += width + minGap
+        // 计算与下一个节点的间距：基于当前节点和下一个节点的宽度
+        const nextWidth = stepWidths[index + 1] || width
+        const dynamicGap = baseGap + Math.max(width, nextWidth) * 0.3
+        currentX += width + dynamicGap
       })
 
       sorted.forEach((s, index) => {
@@ -879,70 +924,115 @@ const BusinessLibraryPage: React.FC = () => {
         ...Array.from(drNodes.values()),
       ]
 
-      const stepEdges: Edge[] = canvasData.edges.map((edge, idx) => ({
-        id: `edge:process:${edge.id || idx}`,
-        source: `step:${edge.from_step_id}`,
-        target: `step:${edge.to_step_id}`,
-        sourceHandle: edge.from_handle || undefined,
-        targetHandle: edge.to_handle || undefined,
-        label: edge.label || undefined,
-        style: {
-          stroke: '#1677ff',
-        },
-        data: {
-          kind: 'process',
-          edge_type: edge.edge_type,
-          condition: edge.condition,
-          label: edge.label,
-        },
-      }))
+      // 构建节点位置索引，用于计算最佳连接点
+      const nodePositionMap = new Map<string, { x: number; y: number; width: number }>()
+      allNodes.forEach((node) => {
+        const width = typeof node.style?.width === 'number' ? node.style.width : 200
+        nodePositionMap.set(node.id, {
+          x: node.position.x,
+          y: node.position.y,
+          width,
+        })
+      })
 
-      const stepImplEdges: Edge[] = canvasData.step_impl_links.map((link, idx) => ({
-        id: `edge:step-impl:${link.id || idx}`,
-        source: `step:${link.step_id}`,
-        target: `impl:${link.impl_id}`,
-        sourceHandle: link.step_handle || undefined,
-        targetHandle: link.impl_handle || undefined,
-        style: {
-          stroke: '#52c41a',
-        },
-        data: {
-          kind: 'step-impl',
-        },
-      }))
+      // 辅助函数：获取边的 handle（优先使用存储值，否则自动计算）
+      const getEdgeHandles = (sourceId: string, targetId: string, storedSource?: string | null, storedTarget?: string | null) => {
+        if (storedSource && storedTarget) {
+          return { sourceHandle: storedSource, targetHandle: storedTarget }
+        }
+        const sourcePos = nodePositionMap.get(sourceId)
+        const targetPos = nodePositionMap.get(targetId)
+        if (sourcePos && targetPos) {
+          return computeOptimalHandles(sourcePos, targetPos)
+        }
+        // 兜底默认值
+        return { sourceHandle: 'r-out', targetHandle: 'l-in' }
+      }
 
-      const implDrEdges: Edge[] = canvasData.impl_data_links.map((link, idx) => ({
-        id: `edge:impl-dr:${link.id || idx}`,
-        source: `impl:${link.impl_id}`,
-        target: `dr:${link.resource_id}`,
-        sourceHandle: link.impl_handle || undefined,
-        targetHandle: link.resource_handle || undefined,
-        style: {
-          stroke: '#faad14',
-        },
-        data: {
-          kind: 'impl-dr',
-          access_type: link.access_type,
-          access_pattern: link.access_pattern,
-        },
-      }))
+      const stepEdges: Edge[] = canvasData.edges.map((edge, idx) => {
+        const sourceId = `step:${edge.from_step_id}`
+        const targetId = `step:${edge.to_step_id}`
+        const handles = getEdgeHandles(sourceId, targetId, edge.from_handle, edge.to_handle)
+        return {
+          id: `edge:process:${edge.id || idx}`,
+          source: sourceId,
+          target: targetId,
+          sourceHandle: handles.sourceHandle,
+          targetHandle: handles.targetHandle,
+          label: edge.label || undefined,
+          style: {
+            stroke: '#1677ff',
+          },
+          data: {
+            kind: 'process',
+            edge_type: edge.edge_type,
+            condition: edge.condition,
+            label: edge.label,
+          },
+        }
+      })
 
-      const implImplEdges: Edge[] = (canvasData.impl_links || []).map((link, idx) => ({
-        id: `edge:impl-impl:${link.id || idx}`,
-        source: `impl:${link.from_impl_id}`,
-        target: `impl:${link.to_impl_id}`,
-        sourceHandle: link.from_handle || undefined,
-        targetHandle: link.to_handle || undefined,
-        style: {
-          stroke: '#52c41a',
-        },
-        data: {
-          kind: 'impl-impl',
-          edge_type: link.edge_type,
-          condition: link.condition,
-          label: link.label,
-        },
-      }))
+      const stepImplEdges: Edge[] = canvasData.step_impl_links.map((link, idx) => {
+        const sourceId = `step:${link.step_id}`
+        const targetId = `impl:${link.impl_id}`
+        const handles = getEdgeHandles(sourceId, targetId, link.step_handle, link.impl_handle)
+        return {
+          id: `edge:step-impl:${link.id || idx}`,
+          source: sourceId,
+          target: targetId,
+          sourceHandle: handles.sourceHandle,
+          targetHandle: handles.targetHandle,
+          style: {
+            stroke: '#52c41a',
+          },
+          data: {
+            kind: 'step-impl',
+          },
+        }
+      })
+
+      const implDrEdges: Edge[] = canvasData.impl_data_links.map((link, idx) => {
+        const sourceId = `impl:${link.impl_id}`
+        const targetId = `dr:${link.resource_id}`
+        const handles = getEdgeHandles(sourceId, targetId, link.impl_handle, link.resource_handle)
+        return {
+          id: `edge:impl-dr:${link.id || idx}`,
+          source: sourceId,
+          target: targetId,
+          sourceHandle: handles.sourceHandle,
+          targetHandle: handles.targetHandle,
+          style: {
+            stroke: '#faad14',
+          },
+          data: {
+            kind: 'impl-dr',
+            access_type: link.access_type,
+            access_pattern: link.access_pattern,
+          },
+        }
+      })
+
+      const implImplEdges: Edge[] = (canvasData.impl_links || []).map((link, idx) => {
+        const sourceId = `impl:${link.from_impl_id}`
+        const targetId = `impl:${link.to_impl_id}`
+        const handles = getEdgeHandles(sourceId, targetId, link.from_handle, link.to_handle)
+        return {
+          id: `edge:impl-impl:${link.id || idx}`,
+          source: sourceId,
+          target: targetId,
+          sourceHandle: handles.sourceHandle,
+          targetHandle: handles.targetHandle,
+          style: {
+            stroke: '#52c41a',
+          },
+          data: {
+            kind: 'impl-impl',
+            edge_type: link.edge_type,
+            condition: link.condition,
+            label: link.label,
+          },
+        }
+      })
 
       const allEdges: Edge[] = [
         ...stepEdges,

@@ -195,17 +195,64 @@ def sync_process(db: Session, process_id: str) -> Dict[str, Any]:
             )
             logger.info(f"[同步-删除边] 删除START_AT关系完成")
 
-            # 删除Business节点
+            # 删除Business节点（按process_id）
             session.run(
                 "MATCH (b:Business {process_id: $pid}) DELETE b",
                 pid=process_id,
             )
-            logger.info(f"[同步-删除节点] 删除Business节点完成")
+            logger.info(f"[同步-删除节点] 按ID删除Business节点完成")
+            
+            # 同时删除同名的Business节点（防止名称重复），并按其 process_id 清理对应边
+            if process.name:
+                # 先找出所有同名但 process_id 不同的流程ID
+                result = session.run(
+                    """
+                    MATCH (b:Business {name: $name})
+                    WHERE b.process_id <> $pid
+                    RETURN collect(b.process_id) AS extra_pids
+                    """,
+                    name=process.name,
+                    pid=process_id,
+                )
+                record = result.single()
+                extra_pids = record["extra_pids"] if record and record["extra_pids"] else []
+
+                if extra_pids:
+                    # 删除这些旧流程的所有边（与按ID删除时的范围保持一致）
+                    session.run(
+                        """
+                        MATCH ()-[r]->()
+                        WHERE r.process_id IN $pids
+                        DELETE r
+                        """,
+                        pids=extra_pids,
+                    )
+                    # 删除旧流程的 START_AT 关系
+                    session.run(
+                        """
+                        MATCH (b:Business)-[r:START_AT]->()
+                        WHERE b.process_id IN $pids
+                        DELETE r
+                        """,
+                        pids=extra_pids,
+                    )
+                    # 删除旧流程的 Business 节点
+                    session.run(
+                        """
+                        MATCH (b:Business)
+                        WHERE b.process_id IN $pids
+                        DELETE b
+                        """,
+                        pids=extra_pids,
+                    )
+                    logger.info(
+                        f"[同步-删除节点] 按名称删除同名Business节点完成, extra_pids={extra_pids}"
+                    )
 
             # ========== 创建节点阶段（批量优化）==========
             logger.info(f"[同步-创建节点] 开始批量创建节点...")
             
-            # 1. 创建Business节点（单个）
+            # 1. 创建Business节点（按ID MERGE，保持唯一标识）
             session.run(
                 """
                 MERGE (b:Business {process_id: $process_id})

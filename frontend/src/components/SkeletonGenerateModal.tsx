@@ -32,7 +32,7 @@ import {
   UpOutlined,
   DownOutlined,
 } from '@ant-design/icons'
-import { ReactFlow, Background, Controls, type Node, type Edge } from '@xyflow/react'
+import { ReactFlow, Background, Controls, Handle, Position, MarkerType, type Node, type Edge } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 
 import {
@@ -359,7 +359,7 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
       open={open}
       onCancel={onClose}
       title={renderTitle()}
-      width={900}
+      width={step === 'preview' ? 1100 : 900}
       footer={renderFooter()}
       maskClosable={false}
       destroyOnClose
@@ -659,31 +659,70 @@ interface PreviewStepProps {
 }
 
 /**
+ * 根据源节点和目标节点的位置，计算最佳的连接 Handle
+ */
+const computeOptimalHandles = (
+  sourcePos: { x: number; y: number; width: number },
+  targetPos: { x: number; y: number; width: number }
+): { sourceHandle: string; targetHandle: string } => {
+  const dx = targetPos.x - sourcePos.x
+  const dy = targetPos.y - sourcePos.y
+  
+  const sourceCenterX = sourcePos.x + sourcePos.width / 2
+  const targetCenterX = targetPos.x + targetPos.width / 2
+  const horizontalDist = Math.abs(targetCenterX - sourceCenterX)
+  const verticalDist = Math.abs(dy)
+  
+  if (verticalDist > 50 && verticalDist > horizontalDist * 0.5) {
+    if (dy > 0) {
+      return { sourceHandle: 'b-out', targetHandle: 't-in' }
+    } else {
+      return { sourceHandle: 't-out', targetHandle: 'b-in' }
+    }
+  } else {
+    if (dx > 0) {
+      return { sourceHandle: 'r-out', targetHandle: 'l-in' }
+    } else {
+      return { sourceHandle: 'l-out', targetHandle: 'r-in' }
+    }
+  }
+}
+
+/**
  * 三层布局算法：步骤(上) -> 实现(中) -> 数据资源(下)
  * 步骤之间水平排列，实现和数据资源根据关联关系定位
  */
 function layoutCanvasNodes(canvasData: CanvasData) {
-  const stepWidth = 160
   const stepHeight = 50
-  const implWidth = 180
   const implHeight = 70
-  const resWidth = 160
-  const resHeight = 60
-  const horizontalGap = 40
-  const verticalGap = 80
+  const baseGap = 60
+  const verticalGap = 100
   
-  const positions: Map<string, { x: number; y: number }> = new Map()
+  const positions: Map<string, { x: number; y: number; width: number }> = new Map()
   
-  // 1. 布局步骤节点（第一行，水平排列）
-  const stepY = 0
-  canvasData.steps.forEach((step, index) => {
-    positions.set(step.step_id, {
-      x: index * (stepWidth + horizontalGap),
-      y: stepY,
-    })
+  // 1. 计算每个步骤节点的宽度（基于名称长度）
+  const stepWidths: number[] = canvasData.steps.map((step) => {
+    const nameLen = step.name?.length || 10
+    return Math.min(280, Math.max(150, 150 + nameLen * 8))
   })
   
-  // 2. 为每个步骤找到关联的实现
+  // 2. 布局步骤节点（第一行，动态间距）
+  const stepY = 0
+  let currentX = 0
+  canvasData.steps.forEach((step, index) => {
+    const stepWidth = stepWidths[index]
+    positions.set(step.step_id, {
+      x: currentX,
+      y: stepY,
+      width: stepWidth,
+    })
+    // 动态间距：基于当前和下一个节点宽度
+    const nextWidth = stepWidths[index + 1] || stepWidth
+    const dynamicGap = baseGap + Math.max(stepWidth, nextWidth) * 0.2
+    currentX += stepWidth + dynamicGap
+  })
+  
+  // 3. 为每个步骤找到关联的实现
   const stepToImpls: Map<string, string[]> = new Map()
   canvasData.step_impl_links.forEach(link => {
     const impls = stepToImpls.get(link.step_id) || []
@@ -691,7 +730,14 @@ function layoutCanvasNodes(canvasData: CanvasData) {
     stepToImpls.set(link.step_id, impls)
   })
   
-  // 3. 布局实现节点（第二行，根据关联的步骤定位）
+  // 4. 计算实现节点宽度
+  const implWidthMap = new Map<string, number>()
+  canvasData.implementations.forEach((impl) => {
+    const nameLen = impl.name?.length || 10
+    implWidthMap.set(impl.impl_id, Math.min(280, Math.max(150, 150 + nameLen * 8)))
+  })
+  
+  // 5. 布局实现节点（第二行，居中对齐到步骤）
   const implY = stepHeight + verticalGap
   let implX = 0
   const placedImpls = new Set<string>()
@@ -700,27 +746,39 @@ function layoutCanvasNodes(canvasData: CanvasData) {
     const stepPos = positions.get(step.step_id)
     const implIds = stepToImpls.get(step.step_id) || []
     
-    implIds.forEach((implId, idx) => {
-      if (!placedImpls.has(implId)) {
-        positions.set(implId, {
-          x: stepPos ? stepPos.x + idx * 50 : implX,
-          y: implY,
-        })
-        placedImpls.add(implId)
-        implX += implWidth + horizontalGap / 2
-      }
-    })
+    if (stepPos && implIds.length > 0) {
+      // 计算该步骤下所有实现的总宽度
+      const totalImplWidth = implIds.reduce((sum, id) => sum + (implWidthMap.get(id) || 150), 0)
+      const implGap = 30
+      const totalWidth = totalImplWidth + (implIds.length - 1) * implGap
+      // 居中对齐到步骤节点
+      let startX = stepPos.x + stepPos.width / 2 - totalWidth / 2
+      
+      implIds.forEach((implId) => {
+        if (!placedImpls.has(implId)) {
+          const implWidth = implWidthMap.get(implId) || 150
+          positions.set(implId, {
+            x: startX,
+            y: implY,
+            width: implWidth,
+          })
+          placedImpls.add(implId)
+          startX += implWidth + implGap
+        }
+      })
+    }
   })
   
   // 放置未关联的实现
   canvasData.implementations.forEach(impl => {
     if (!placedImpls.has(impl.impl_id)) {
-      positions.set(impl.impl_id, { x: implX, y: implY })
-      implX += implWidth + horizontalGap / 2
+      const implWidth = implWidthMap.get(impl.impl_id) || 150
+      positions.set(impl.impl_id, { x: implX, y: implY, width: implWidth })
+      implX += implWidth + 40
     }
   })
   
-  // 4. 为每个实现找到关联的数据资源
+  // 6. 为每个实现找到关联的数据资源
   const implToResources: Map<string, string[]> = new Map()
   canvasData.impl_data_links.forEach(link => {
     const resources = implToResources.get(link.impl_id) || []
@@ -728,74 +786,242 @@ function layoutCanvasNodes(canvasData: CanvasData) {
     implToResources.set(link.impl_id, resources)
   })
   
-  // 5. 布局数据资源节点（第三行）
-  const resY = implY + implHeight + verticalGap
-  let resX = 0
-  const placedResources = new Set<string>()
+  // 7. 计算数据资源宽度
+  const resWidthMap = new Map<string, number>()
+  canvasData.data_resources.forEach((res) => {
+    const nameLen = res.name?.length || 10
+    resWidthMap.set(res.resource_id, Math.min(250, Math.max(140, 140 + nameLen * 7)))
+  })
   
-  canvasData.implementations.forEach((impl) => {
+  // 8. 布局数据资源节点（防止重叠的改进算法）
+  const resY = implY + implHeight + verticalGap
+  const placedResources = new Map<string, { x: number; width: number }>()
+  const resGap = 30
+  
+  // 追踪已占用的X区间，用于防止重叠
+  let occupiedRanges: Array<{ start: number; end: number }> = []
+  
+  // 检查并找到不重叠的位置
+  const findNonOverlappingX = (preferredX: number, width: number): number => {
+    let x = preferredX
+    let attempts = 0
+    const maxAttempts = 100
+    
+    while (attempts < maxAttempts) {
+      const hasOverlap = occupiedRanges.some(range => 
+        !(x + width + resGap < range.start || x > range.end + resGap)
+      )
+      if (!hasOverlap) break
+      // 尝试向右移动
+      x += 50
+      attempts++
+    }
+    return x
+  }
+  
+  // 按实现节点的X位置排序处理
+  const sortedImpls = [...canvasData.implementations].sort((a, b) => {
+    const posA = positions.get(a.impl_id)
+    const posB = positions.get(b.impl_id)
+    return (posA?.x || 0) - (posB?.x || 0)
+  })
+  
+  sortedImpls.forEach((impl) => {
     const implPos = positions.get(impl.impl_id)
     const resourceIds = implToResources.get(impl.impl_id) || []
     
-    resourceIds.forEach((resId, idx) => {
-      if (!placedResources.has(resId)) {
+    if (implPos && resourceIds.length > 0) {
+      // 过滤已放置的资源
+      const unplacedResources = resourceIds.filter(id => !placedResources.has(id))
+      if (unplacedResources.length === 0) return
+      
+      const totalResWidth = unplacedResources.reduce((sum, id) => sum + (resWidthMap.get(id) || 140), 0)
+      const totalWidth = totalResWidth + (unplacedResources.length - 1) * resGap
+      // 期望居中对齐到实现节点
+      let preferredStartX = implPos.x + (implPos.width || 150) / 2 - totalWidth / 2
+      
+      unplacedResources.forEach((resId) => {
+        const resWidth = resWidthMap.get(resId) || 140
+        const finalX = findNonOverlappingX(preferredStartX, resWidth)
+        
         positions.set(resId, {
-          x: implPos ? implPos.x + idx * 40 : resX,
+          x: finalX,
           y: resY,
+          width: resWidth,
         })
-        placedResources.add(resId)
-        resX += resWidth + horizontalGap / 2
-      }
-    })
+        placedResources.set(resId, { x: finalX, width: resWidth })
+        occupiedRanges.push({ start: finalX, end: finalX + resWidth })
+        preferredStartX = finalX + resWidth + resGap
+      })
+    }
   })
   
   // 放置未关联的数据资源
+  let resX = occupiedRanges.length > 0 
+    ? Math.max(...occupiedRanges.map(r => r.end)) + resGap 
+    : 0
   canvasData.data_resources.forEach(res => {
     if (!placedResources.has(res.resource_id)) {
-      positions.set(res.resource_id, { x: resX, y: resY })
-      resX += resWidth + horizontalGap / 2
+      const resWidth = resWidthMap.get(res.resource_id) || 140
+      positions.set(res.resource_id, { x: resX, y: resY, width: resWidth })
+      resX += resWidth + resGap
     }
   })
   
   return positions
 }
 
-// 与实际画布完全一致的节点样式
-const previewNodeStyles = {
-  step: { headerBg: '#e6f4ff', headerColor: '#0958d9', typeLabel: '步骤' },
-  impl: { headerBg: '#f6ffed', headerColor: '#237804', typeLabel: '实现' },
-  data: { headerBg: '#fff7e6', headerColor: '#ad6800', typeLabel: '数据资源' },
+/**
+ * 预览画布自定义节点组件（简化版，不含交互功能）
+ * 与实际画布 AllSidesNode 保持一致的样式和 Handle
+ */
+const PreviewNode = React.memo(({ data }: any) => {
+  const baseHandleStyle = {
+    width: 6,
+    height: 6,
+    background: '#bfbfbf',
+    border: '1px solid #d9d9d9',
+    borderRadius: '50%',
+  } as const
+
+  const nodeType = data?.nodeType as 'step' | 'implementation' | 'data' | undefined
+  let headerBg = '#f5f5f5'
+  let headerColor = '#595959'
+
+  if (nodeType === 'step') {
+    headerBg = '#e6f4ff'
+    headerColor = '#0958d9'
+  } else if (nodeType === 'implementation') {
+    headerBg = '#f6ffed'
+    headerColor = '#237804'
+  } else if (nodeType === 'data') {
+    headerBg = '#fff7e6'
+    headerColor = '#ad6800'
+  }
+
+  return (
+    <>
+      {/* 8个Handle：上下左右各2个（in/out） */}
+      <Handle type="target" position={Position.Top} id="t-in" style={{ ...baseHandleStyle, top: -4 }} />
+      <Handle type="source" position={Position.Top} id="t-out" style={{ ...baseHandleStyle, top: -4 }} />
+      <Handle type="target" position={Position.Bottom} id="b-in" style={{ ...baseHandleStyle, bottom: -4 }} />
+      <Handle type="source" position={Position.Bottom} id="b-out" style={{ ...baseHandleStyle, bottom: -4 }} />
+      <Handle type="target" position={Position.Left} id="l-in" style={{ ...baseHandleStyle, left: -4 }} />
+      <Handle type="source" position={Position.Left} id="l-out" style={{ ...baseHandleStyle, left: -4 }} />
+      <Handle type="target" position={Position.Right} id="r-in" style={{ ...baseHandleStyle, right: -4 }} />
+      <Handle type="source" position={Position.Right} id="r-out" style={{ ...baseHandleStyle, right: -4 }} />
+      
+      <div style={{
+        borderRadius: 12,
+        background: '#ffffff',
+        overflow: 'hidden',
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+      }}>
+        {data?.typeLabel && (
+          <div style={{
+            padding: '4px 8px',
+            background: headerBg,
+            color: headerColor,
+            borderBottom: '1px solid #f0f0f0',
+            fontWeight: 500,
+            fontSize: 11,
+            borderTopLeftRadius: 10,
+            borderTopRightRadius: 10,
+          }}>
+            {data.typeLabel}
+          </div>
+        )}
+        <div style={{
+          padding: 10,
+          fontSize: 12,
+          flex: 1,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 4,
+          justifyContent: 'center',
+        }}>
+          <div style={{ fontWeight: 500, fontSize: 13, color: '#262626', lineHeight: '18px' }}>
+            {data?.label}
+          </div>
+          
+          {/* 步骤：显示描述 */}
+          {nodeType === 'step' && data?.description && (
+            <div style={{ fontSize: 11, color: '#8c8c8c', lineHeight: '16px' }}>
+              <span style={{ color: '#bfbfbf', marginRight: 4 }}>描述:</span>
+              <span style={{
+                display: '-webkit-box',
+                WebkitLineClamp: 2,
+                WebkitBoxOrient: 'vertical',
+                overflow: 'hidden',
+              }}>
+                {data.description}
+              </span>
+            </div>
+          )}
+          
+          {/* 实现：显示类型和系统 */}
+          {nodeType === 'implementation' && (
+            <>
+              {data?.type && (
+                <div style={{ fontSize: 11, lineHeight: '16px' }}>
+                  <span style={{ color: '#bfbfbf', marginRight: 4 }}>类型:</span>
+                  <span style={{ color: '#52c41a' }}>{data.type}</span>
+                </div>
+              )}
+              {data?.system && (
+                <div style={{ fontSize: 11, color: '#8c8c8c', lineHeight: '16px' }}>
+                  <span style={{ color: '#bfbfbf', marginRight: 4 }}>系统:</span>
+                  {data.system}
+                </div>
+              )}
+            </>
+          )}
+          
+          {/* 数据资源：显示类型和描述 */}
+          {nodeType === 'data' && (
+            <>
+              {data?.resourceType && (
+                <div style={{ fontSize: 11, lineHeight: '16px' }}>
+                  <span style={{ color: '#bfbfbf', marginRight: 4 }}>类型:</span>
+                  <span style={{ color: '#faad14' }}>{data.resourceType}</span>
+                </div>
+              )}
+              {data?.description && (
+                <div style={{ fontSize: 11, color: '#8c8c8c', lineHeight: '16px' }}>
+                  <span style={{ color: '#bfbfbf', marginRight: 4 }}>描述:</span>
+                  <span style={{
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                  }}>
+                    {data.description}
+                  </span>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </>
+  )
+})
+
+// 预览画布节点类型注册
+const previewNodeTypes = {
+  preview: PreviewNode,
 }
 
-// 创建与实际画布一致的节点卡片
-const createNodeCard = (
-  typeLabel: string,
-  headerBg: string,
-  headerColor: string,
-  content: React.ReactNode
-) => (
-  <div style={{
-    borderRadius: 14,
-    background: '#ffffff',
-    overflow: 'hidden',
-    minWidth: 150,
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
-  }}>
-    <div style={{
-      padding: '4px 8px',
-      background: headerBg,
-      color: headerColor,
-      borderBottom: '1px solid #f0f0f0',
-      fontWeight: 500,
-      fontSize: 11,
-    }}>
-      {typeLabel}
-    </div>
-    <div style={{ padding: 10, fontSize: 12 }}>
-      {content}
-    </div>
-  </div>
-)
+// 详情列表使用的样式常量
+const previewNodeStyles = {
+  step: { headerBg: '#e6f4ff', headerColor: '#0958d9' },
+  impl: { headerBg: '#f6ffed', headerColor: '#237804' },
+  data: { headerBg: '#fff7e6', headerColor: '#ad6800' },
+}
 
 const PreviewStep: React.FC<PreviewStepProps> = ({
   canvasData,
@@ -811,131 +1037,125 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
     
     // 1. 步骤节点
     canvasData.steps.forEach((step) => {
-      const pos = positions.get(step.step_id) || { x: 0, y: 0 }
-      const style = previewNodeStyles.step
-      
+      const pos = positions.get(step.step_id) || { x: 0, y: 0, width: 150 }
       nodes.push({
         id: step.step_id,
-        type: 'default',
-        position: pos,
+        type: 'preview',
+        position: { x: pos.x, y: pos.y },
         data: { 
-          label: createNodeCard(style.typeLabel, style.headerBg, style.headerColor, (
-            <>
-              <div style={{ fontWeight: 500, fontSize: 13, color: '#262626', lineHeight: '18px' }}>
-                {step.name}
-              </div>
-              {step.description && (
-                <div style={{ fontSize: 11, color: '#8c8c8c', lineHeight: '16px', marginTop: 4 }}>
-                  <span style={{ color: '#bfbfbf', marginRight: 4 }}>描述:</span>
-                  {step.description}
-                </div>
-              )}
-            </>
-          ))
+          nodeType: 'step',
+          typeLabel: '步骤',
+          label: step.name,
+          description: step.description,
         },
-        style: { background: 'transparent', border: 'none', padding: 0 },
+        style: { 
+          width: pos.width || 150,
+          background: 'transparent', 
+          border: 'none', 
+          padding: 0,
+        },
       })
     })
     
     // 2. 实现节点
     canvasData.implementations.forEach((impl) => {
-      const pos = positions.get(impl.impl_id) || { x: 0, y: 150 }
-      const style = previewNodeStyles.impl
-      
+      const pos = positions.get(impl.impl_id) || { x: 0, y: 150, width: 150 }
       nodes.push({
         id: impl.impl_id,
-        type: 'default',
-        position: pos,
+        type: 'preview',
+        position: { x: pos.x, y: pos.y },
         data: { 
-          label: createNodeCard(style.typeLabel, style.headerBg, style.headerColor, (
-            <>
-              <div style={{ fontWeight: 500, fontSize: 13, color: '#262626', lineHeight: '18px' }}>
-                {impl.name}
-              </div>
-              {impl.type && (
-                <div style={{ fontSize: 11, lineHeight: '16px', marginTop: 4 }}>
-                  <span style={{ color: '#bfbfbf', marginRight: 4 }}>类型:</span>
-                  <span style={{ color: '#52c41a' }}>{impl.type}</span>
-                </div>
-              )}
-              {impl.system && (
-                <div style={{ fontSize: 11, color: '#8c8c8c', lineHeight: '16px' }}>
-                  <span style={{ color: '#bfbfbf', marginRight: 4 }}>系统:</span>
-                  {impl.system}
-                </div>
-              )}
-            </>
-          ))
+          nodeType: 'implementation',
+          typeLabel: '实现',
+          label: impl.name,
+          type: impl.type,
+          system: impl.system,
         },
-        style: { background: 'transparent', border: 'none', padding: 0 },
+        style: { 
+          width: pos.width || 150,
+          background: 'transparent', 
+          border: 'none', 
+          padding: 0,
+        },
       })
     })
     
     // 3. 数据资源节点
     canvasData.data_resources.forEach((res) => {
-      const pos = positions.get(res.resource_id) || { x: 0, y: 300 }
-      const style = previewNodeStyles.data
-      
+      const pos = positions.get(res.resource_id) || { x: 0, y: 300, width: 140 }
       nodes.push({
         id: res.resource_id,
-        type: 'default',
-        position: pos,
+        type: 'preview',
+        position: { x: pos.x, y: pos.y },
         data: { 
-          label: createNodeCard(style.typeLabel, style.headerBg, style.headerColor, (
-            <>
-              <div style={{ fontWeight: 500, fontSize: 13, color: '#262626', lineHeight: '18px' }}>
-                {res.name}
-              </div>
-              {res.type && (
-                <div style={{ fontSize: 11, lineHeight: '16px', marginTop: 4 }}>
-                  <span style={{ color: '#bfbfbf', marginRight: 4 }}>类型:</span>
-                  <span style={{ color: '#faad14' }}>{res.type}</span>
-                </div>
-              )}
-              {res.description && (
-                <div style={{ fontSize: 11, color: '#8c8c8c', lineHeight: '16px' }}>
-                  <span style={{ color: '#bfbfbf', marginRight: 4 }}>描述:</span>
-                  {res.description}
-                </div>
-              )}
-            </>
-          ))
+          nodeType: 'data',
+          typeLabel: '数据资源',
+          label: res.name,
+          resourceType: res.type,
+          description: res.description,
         },
-        style: { background: 'transparent', border: 'none', padding: 0 },
+        style: { 
+          width: pos.width || 140,
+          background: 'transparent', 
+          border: 'none', 
+          padding: 0,
+        },
       })
     })
     
+    // 辅助函数：获取智能连接点
+    const getHandles = (sourceId: string, targetId: string) => {
+      const sourcePos = positions.get(sourceId)
+      const targetPos = positions.get(targetId)
+      if (sourcePos && targetPos) {
+        return computeOptimalHandles(sourcePos, targetPos)
+      }
+      return { sourceHandle: 'r-out', targetHandle: 'l-in' }
+    }
+    
     // 4. 步骤之间的边
     canvasData.edges.forEach((edge, index) => {
+      const handles = getHandles(edge.from_step_id, edge.to_step_id)
       edges.push({
         id: `step-edge-${index}`,
         source: edge.from_step_id,
         target: edge.to_step_id,
+        sourceHandle: handles.sourceHandle,
+        targetHandle: handles.targetHandle,
         label: edge.label || edge.condition,
-        type: 'smoothstep',
-        style: { stroke: '#91d5ff', strokeWidth: 2 },
+        type: 'simplebezier',
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: { stroke: '#1677ff', strokeWidth: 2 },
       })
     })
     
-    // 5. 步骤-实现关联边（虚线）
+    // 5. 步骤-实现关联边
     canvasData.step_impl_links.forEach((link, index) => {
+      const handles = getHandles(link.step_id, link.impl_id)
       edges.push({
         id: `step-impl-${index}`,
         source: link.step_id,
         target: link.impl_id,
-        type: 'smoothstep',
-        style: { stroke: '#b7eb8f', strokeWidth: 1, strokeDasharray: '4 2' },
+        sourceHandle: handles.sourceHandle,
+        targetHandle: handles.targetHandle,
+        type: 'simplebezier',
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: { stroke: '#52c41a' },
       })
     })
     
-    // 6. 实现-数据资源关联边（虚线）
+    // 6. 实现-数据资源关联边
     canvasData.impl_data_links.forEach((link, index) => {
+      const handles = getHandles(link.impl_id, link.resource_id)
       edges.push({
         id: `impl-data-${index}`,
         source: link.impl_id,
         target: link.resource_id,
-        type: 'smoothstep',
-        style: { stroke: '#ffd591', strokeWidth: 1, strokeDasharray: '4 2' },
+        sourceHandle: handles.sourceHandle,
+        targetHandle: handles.targetHandle,
+        type: 'simplebezier',
+        markerEnd: { type: MarkerType.ArrowClosed },
+        style: { stroke: '#faad14' },
       })
     })
     
@@ -976,7 +1196,9 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
       {/* 流程图预览 */}
       <div
         style={{
-          height: 320,
+          height: 'calc(60vh - 100px)',
+          minHeight: 400,
+          maxHeight: 550,
           border: '1px solid #e8e8e8',
           borderRadius: 12,
           marginBottom: 16,
@@ -987,6 +1209,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
         <ReactFlow
           nodes={nodes}
           edges={edges}
+          nodeTypes={previewNodeTypes}
           fitView
           fitViewOptions={{ padding: 0.3 }}
           nodesDraggable={false}
@@ -1000,10 +1223,11 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
         </ReactFlow>
       </div>
       
-      {/* 详细列表 - 使用更紧凑的布局 */}
+      {/* 详细列表 - 默认折叠 */}
       <Collapse
         ghost
         size="small"
+        defaultActiveKey={[]}
         items={[
           {
             key: 'steps',
