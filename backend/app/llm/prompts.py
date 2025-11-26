@@ -58,6 +58,16 @@ DATA_ANALYSIS_PROMPT = """
 1. 只提取与核心业务流程直接相关的接口和资源，过滤所有噪声
 2. 如果原始数据混杂了多个不相关的业务，只提取与"{business_name}"相关的部分
 3. 如果某项信息无法从数据中提取，请基于业务描述进行合理推断
+
+为了便于系统解析，你在最终回答时必须严格遵守下面的输出格式：
+- 先输出一行以 "Thought:" 开头，用中文简要说明你的分析思路，例如：
+  Thought: 我将先过滤噪声请求，再梳理与业务直接相关的系统、接口和数据资源
+- 然后输出一行以 "Final Answer:" 开头，后面直接跟本题要求的 JSON 结果，例如：
+  Final Answer: 
+  ```json
+  xxxxxx
+  ```
+- 不要在 Final Answer 行之后再追加额外的自然语言解释，也不要再输出第二个 JSON。
 """
 
 
@@ -103,11 +113,25 @@ FLOW_DESIGN_PROMPT = """
 4. process类型用于普通顺序执行的步骤
 5. order从1开始递增
 6. 步骤名称应描述实际业务动作，如"展示车卡列表"、"用户选择套餐"、"调用支付接口"等
+7. 在输出时必须先给出一行以 "Thought:" 开头的中文思考说明，概述你是如何设计这些步骤的。
+8. 紧接着给出一行以 "Final Answer:" 开头的最终结果，该行后面直接跟上完整的 JSON 对象（即上面定义的 steps 结构），不要再追加其它自然语言解释。例如：
+Final Answer: 
+  ```json
+  xxxxxx
+  ```
 """
 
 
 TECH_ENRICH_PROMPT = """
 你是一位资深的技术架构师，擅长为业务流程补充技术实现细节。
+
+【非常重要!!!!!】
+1. 在输出时必须先给出一行以 "Thought:" 开头的中文思考说明，概述你是如何根据输入信息设计整体技术骨架的。
+2. 紧接着给出一行以 "Final Answer:" 开头的最终结果，后面直接跟上完整最终回答，严格禁止在没有Final Answer字样的情况下输出最终内容！！！！！！例如：
+Final Answer: 
+  ```json
+  xxxxxx
+  ```
 
 请根据以下信息，为每个步骤补充技术实现（Implementation）和数据资源（DataResource）访问关系：
 
@@ -144,9 +168,7 @@ TECH_ENRICH_PROMPT = """
         {{
             "from_step_name": "源步骤名",
             "to_step_name": "目标步骤名",
-            "edge_type": "normal/branch",
-            "condition": "分支条件（仅branch时填写）",
-            "label": "边标签"
+            "edge_type": "normal/branch"
         }}
     ],
     "implementations": [

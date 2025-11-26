@@ -1,12 +1,17 @@
 import http from './http'
 
+export type ProviderType = 'litellm' | 'custom_gateway'
+
 export interface AIModelBase {
   name: string
-  provider?: string | null
+  provider_type: ProviderType
+  provider?: string | null        // LiteLLM 模式下的提供商标识
   model_name: string
-  base_url?: string | null
+  base_url?: string | null        // LiteLLM 模式下的可选代理地址（一般不用）
+  gateway_endpoint?: string | null // 自定义网关模式下的完整端点 URL
   temperature?: number
   max_tokens?: number | null
+  timeout?: number
 }
 
 export interface AIModelCreate extends AIModelBase {
@@ -22,6 +27,19 @@ export interface AIModelOut extends AIModelBase {
   is_active: boolean
   updated_at: string
 }
+
+// 预设的 LiteLLM 支持的提供商列表
+export const LITELLM_PROVIDERS = [
+  { value: 'openrouter', label: 'OpenRouter' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'anthropic', label: 'Anthropic' },
+  { value: 'google', label: 'Google (Gemini)' },
+  { value: 'deepseek', label: 'DeepSeek' },
+  { value: 'mistral', label: 'Mistral' },
+  { value: 'groq', label: 'Groq' },
+  { value: 'cohere', label: 'Cohere' },
+  { value: 'ollama', label: 'Ollama (本地)' },
+] as const
 
 export interface TestLLMResult {
   ok: boolean

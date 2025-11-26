@@ -26,12 +26,15 @@ class AIModelService:
 
         obj = AIModel(
             name=data.name,
+            provider_type=data.provider_type,
             provider=data.provider or "",
             model_name=data.model_name,
             api_key=data.api_key,
             base_url=data.base_url,
+            gateway_endpoint=data.gateway_endpoint,
             temperature=data.temperature,
             max_tokens=data.max_tokens,
+            timeout=data.timeout,
         )
         db.add(obj)
         db.commit()
@@ -59,7 +62,11 @@ class AIModelService:
 
         for field, value in update_data.items():
             if field == "provider":
+                # provider 为空时设为空字符串
                 setattr(obj, field, value or "")
+            elif field in ("gateway_endpoint", "base_url"):
+                # 这些字段允许为 None
+                setattr(obj, field, value)
             else:
                 setattr(obj, field, value)
 
@@ -119,10 +126,13 @@ class AIModelService:
             raise RuntimeError("No active LLM model configured. Please configure one in ai_models.")
 
         return LLMConfig(
+            provider_type=obj.provider_type,
             provider=obj.provider,
             model_name=obj.model_name,
             base_url=obj.base_url,
+            gateway_endpoint=obj.gateway_endpoint,
             api_key=obj.api_key,
             temperature=obj.temperature,
             max_tokens=obj.max_tokens,
+            timeout=obj.timeout,
         )

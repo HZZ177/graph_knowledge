@@ -58,8 +58,6 @@ export interface CanvasData {
     from_step_id: string
     to_step_id: string
     edge_type?: string
-    condition?: string
-    label?: string
   }>
   implementations: Array<{
     impl_id: string

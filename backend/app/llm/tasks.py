@@ -6,12 +6,12 @@
 from crewai import Agent, Task
 
 
-class SkeletonTasks:
-    """骨架生成相关的预设 Task 工厂类
+class CrewAiTasks:
+    """预设 Task 工厂类
     
     Usage:
-        agent = SkeletonAgents.create_data_analyst_agent(llm)
-        task = SkeletonTasks.create_data_analysis_task(agent, prompt)
+        agent = CrewAiAgents.create_data_analyst_agent(llm)
+        task = CrewAiTasks.create_data_analysis_task(agent, prompt)
     """
     
     @staticmethod

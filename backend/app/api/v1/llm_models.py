@@ -11,6 +11,8 @@ from backend.app.schemas.ai_models import (
     AIModelTestRequest,
 )
 from backend.app.services.ai_model_service import AIModelService
+from backend.app.llm.custom_llm import CustomGatewayLLM
+from backend.app.llm.config import get_provider_base_url
 from backend.app.core.utils import success_response, error_response
 from backend.app.core.logger import logger
 
@@ -80,42 +82,68 @@ async def test_llm_model(
 ) -> dict:
     """测试给定模型配置是否可用，不写入数据库。"""
 
-    model_full_name = payload.model_name
     safe_payload = {
         "name": payload.name,
+        "provider_type": payload.provider_type,
         "provider": payload.provider,
         "model_name": payload.model_name,
-        "base_url": payload.base_url,
+        "gateway_endpoint": payload.gateway_endpoint,
         "temperature": payload.temperature,
         "max_tokens": payload.max_tokens,
+        "timeout": payload.timeout,
     }
     logger.info(f"开始测试 LLM 模型配置: {safe_payload}")
 
     try:
-        if not payload.provider:
-            model_full_name = payload.model_name
+        if payload.provider_type == "custom_gateway":
+            # 自定义网关模式
+            if not payload.gateway_endpoint:
+                return error_response(
+                    message="自定义网关模式需要提供 gateway_endpoint",
+                    data={"ok": False},
+                )
+            
+            llm = CustomGatewayLLM(
+                model=payload.model_name,
+                api_key=payload.api_key,
+                endpoint=payload.gateway_endpoint,
+                temperature=payload.temperature,
+                max_tokens=payload.max_tokens,
+                timeout=payload.timeout,
+            )
+            model_display = f"{payload.model_name}@{payload.gateway_endpoint}"
         else:
-            model_full_name = f"{payload.provider}/{payload.model_name}"
+            # LiteLLM 模式
+            if payload.provider:
+                model_full_name = f"{payload.provider}/{payload.model_name}"
+            else:
+                model_full_name = payload.model_name
 
-        llm = LLM(
-            model=model_full_name,
-            api_key=payload.api_key,
-            base_url=payload.base_url,
-            temperature=payload.temperature,
-            max_tokens=payload.max_tokens,
-        )
+            # 自动获取提供商的 base_url
+            base_url = payload.base_url
+            if not base_url and payload.provider:
+                base_url = get_provider_base_url(payload.provider)
+
+            llm = LLM(
+                model=model_full_name,
+                api_key=payload.api_key,
+                base_url=base_url,
+                temperature=payload.temperature,
+                max_tokens=payload.max_tokens,
+            )
+            model_display = model_full_name
 
         # 直接用 LLM 发起一次最简单的对话，验证连通性
         prompt = "请用极短的中文回答：ok。"
         result = llm.call(prompt)
 
-        logger.info(f"模型测试成功 model={model_full_name}")
+        logger.info(f"模型测试成功 model={model_display}")
         return success_response(
             data={"ok": True, "result": str(result)},
             message="测试成功",
         )
     except Exception as exc:
-        logger.error(f"模型测试失败 model={model_full_name}, error={exc}")
+        logger.error(f"模型测试失败 payload={safe_payload}, error={exc}")
         return error_response(
             message=f"模型测试失败: {exc}",
             data={"ok": False},
@@ -139,31 +167,50 @@ async def test_llm_model_by_id(
             data={"ok": False},
         )
 
-    if not obj.provider:
-        model_full_name = obj.model_name
-    else:
-        model_full_name = f"{obj.provider}/{obj.model_name}"
-
     try:
-        llm = LLM(
-            model=model_full_name,
-            api_key=obj.api_key,
-            base_url=obj.base_url,
-            temperature=obj.temperature,
-            max_tokens=obj.max_tokens,
-        )
+        if obj.provider_type == "custom_gateway":
+            # 自定义网关模式
+            llm = CustomGatewayLLM(
+                model=obj.model_name,
+                api_key=obj.api_key,
+                endpoint=obj.gateway_endpoint,
+                temperature=obj.temperature,
+                max_tokens=obj.max_tokens,
+                timeout=obj.timeout,
+            )
+            model_display = f"{obj.model_name}@{obj.gateway_endpoint}"
+        else:
+            # LiteLLM 模式
+            if obj.provider:
+                model_full_name = f"{obj.provider}/{obj.model_name}"
+            else:
+                model_full_name = obj.model_name
+
+            # 自动获取提供商的 base_url
+            base_url = obj.base_url
+            if not base_url and obj.provider:
+                base_url = get_provider_base_url(obj.provider)
+
+            llm = LLM(
+                model=model_full_name,
+                api_key=obj.api_key,
+                base_url=base_url,
+                temperature=obj.temperature,
+                max_tokens=obj.max_tokens,
+            )
+            model_display = model_full_name
 
         prompt = "请用极短的中文回答：ok。"
         result = llm.call(prompt)
 
-        logger.info(f"模型测试成功（已保存配置） id={model_id}, model={model_full_name}")
+        logger.info(f"模型测试成功（已保存配置） id={model_id}, model={model_display}")
         return success_response(
             data={"ok": True, "result": str(result)},
             message="测试成功",
         )
     except Exception as exc:
         logger.error(
-            f"模型测试失败（已保存配置） id={model_id}, model={model_full_name}, error={exc}"
+            f"模型测试失败（已保存配置） id={model_id}, error={exc}"
         )
         return error_response(
             message=f"模型测试失败: {exc}",

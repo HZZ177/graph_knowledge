@@ -2193,7 +2193,13 @@ const DataResourceTab: React.FC = () => {
 }
 
 const ResourceLibraryPage: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>('business')
+  // 从 URL 参数读取初始 Tab
+  const searchParams = new URLSearchParams(window.location.search)
+  const tabFromUrl = searchParams.get('tab')
+  const validTabs = ['business', 'step', 'implementation', 'resource']
+  const initialTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'business'
+  
+  const [activeTab, setActiveTab] = useState<string>(initialTab)
 
   return (
     <div className="resource-library-container">

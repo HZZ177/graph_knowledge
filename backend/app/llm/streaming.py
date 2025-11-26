@@ -3,6 +3,7 @@
 核心组件：
 - run_agent_stream: 执行单个 Agent 并自动发送流式响应到 WebSocket
 - iter_crew_text_stream: 底层异步迭代器（内部使用）
+- parse_agent_output: 解析 Thought/Final Answer 结构
 
 使用方式：
     # Service 层只需调用，不处理 chunk
@@ -12,15 +13,112 @@
 import asyncio
 import json
 import queue
+import re
 import threading
 import time
-from typing import Any, AsyncGenerator, Optional
+from typing import Any, AsyncGenerator, Optional, Tuple
 from dataclasses import dataclass, field
 
 from crewai import Crew
 from starlette.websockets import WebSocket
 
 from backend.app.core.logger import logger
+
+
+class StreamSectionTracker:
+    """流式输出区域追踪器
+    
+    在流式输出过程中，追踪当前处于哪个区域（thought / answer），
+    并在区域切换时发出通知。
+    """
+    
+    SECTION_THOUGHT = "thought"
+    SECTION_ANSWER = "answer"
+    SECTION_UNKNOWN = "unknown"
+    
+    def __init__(self):
+        self.buffer = ""  # 累积的完整输出
+        self.current_section = self.SECTION_UNKNOWN
+        self._thought_started = False
+        self._answer_started = False
+    
+    def process_chunk(self, chunk: str) -> dict:
+        """处理新的 chunk，返回该 chunk 所属的区域信息
+        
+        Args:
+            chunk: 新收到的文本片段
+            
+        Returns:
+            dict: {
+                "section": 当前区域 ("thought" | "answer" | "unknown"),
+                "content": 该区域应显示的内容（过滤掉标记文本）,
+                "section_changed": 是否刚切换到新区域,
+            }
+        """
+        self.buffer += chunk
+        
+        result = {
+            "section": self.current_section,
+            "content": chunk,
+            "section_changed": False,
+        }
+        
+        # 检测是否进入 Thought 区域
+        if not self._thought_started:
+            thought_marker = "Thought:"
+            if thought_marker.lower() in self.buffer.lower():
+                self._thought_started = True
+                self.current_section = self.SECTION_THOUGHT
+                result["section"] = self.SECTION_THOUGHT
+                result["section_changed"] = True
+                # 过滤掉 "Thought:" 标记本身
+                marker_pos = chunk.lower().find(thought_marker.lower())
+                if marker_pos >= 0:
+                    result["content"] = chunk[marker_pos + len(thought_marker):].lstrip()
+        
+        # 检测是否进入 Final Answer 区域
+        if not self._answer_started:
+            answer_marker = "Final Answer:"
+            if answer_marker.lower() in self.buffer.lower():
+                self._answer_started = True
+                self.current_section = self.SECTION_ANSWER
+                result["section"] = self.SECTION_ANSWER
+                result["section_changed"] = True
+                # 过滤掉 "Final Answer:" 标记本身
+                marker_pos = chunk.lower().find(answer_marker.lower())
+                if marker_pos >= 0:
+                    result["content"] = chunk[marker_pos + len(answer_marker):].lstrip()
+        
+        return result
+    
+    def get_final_sections(self) -> dict:
+        """获取最终的分区内容（用于 agent_end 消息）"""
+        thought = ""
+        final_answer = ""
+        
+        # 提取 Thought 部分
+        thought_match = re.search(
+            r"Thought:\s*(.*?)(?=Final Answer:|$)",
+            self.buffer,
+            re.DOTALL | re.IGNORECASE
+        )
+        if thought_match:
+            thought = thought_match.group(1).strip()
+        
+        # 提取 Final Answer 部分
+        answer_match = re.search(
+            r"Final Answer:\s*(.*)",
+            self.buffer,
+            re.DOTALL | re.IGNORECASE
+        )
+        if answer_match:
+            final_answer = answer_match.group(1).strip()
+        
+        return {
+            "thought": thought,
+            "final_answer": final_answer,
+            "raw": self.buffer,
+        }
 
 
 @dataclass
@@ -73,30 +171,41 @@ async def run_agent_stream(
     }))
     
     start_time = time.time()
-    output = ""
+    tracker = StreamSectionTracker()
     
     try:
-        # 流式执行，自动发送每个 chunk
+        # 流式执行，实时追踪区域并发送
         async for chunk in iter_crew_text_stream(crew):
-            output += chunk
+            section_info = tracker.process_chunk(chunk)
+            
+            # 发送带区域标识的 stream 消息
             await websocket.send_text(json.dumps({
                 "type": "stream",
                 "agent_name": agent_name,
                 "agent_index": agent_index,
-                "content": chunk,
+                "content": section_info["content"],  # 过滤掉标记的内容
+                "section": section_info["section"],  # 当前区域: thought / answer / unknown
+                "section_changed": section_info["section_changed"],  # 是否刚切换区域
             }))
         
-        # 发送 agent_end
+        # 获取最终分区内容
+        parsed = tracker.get_final_sections()
+        
+        # 发送 agent_end，包含结构化的思考过程和最终结果
         await websocket.send_text(json.dumps({
             "type": "agent_end",
             "agent_name": agent_name,
             "agent_index": agent_index,
-            "agent_output": output,
+            "agent_output": parsed["raw"],  # 保留原始输出以兼容
+            "thought": parsed["thought"],  # 思考过程
+            "final_answer": parsed["final_answer"],  # 最终结果
             "duration_ms": int((time.time() - start_time) * 1000),
         }))
         
-        logger.info(f"[{agent_name}] 执行完成，输出长度: {len(output)} 字符")
-        return output
+        # 调试用：打印该 Agent 的完整输出内容
+        logger.debug(f"[{agent_name}] 完整输出内容:\n{parsed['raw']}")
+        logger.info(f"[{agent_name}] 执行完成，输出长度: {len(parsed['raw'])} 字符, thought: {len(parsed['thought'])} 字符, answer: {len(parsed['final_answer'])} 字符")
+        return parsed["raw"]
         
     except Exception as e:
         logger.error(f"[{agent_name}] 执行失败: {e}", exc_info=True)
@@ -132,13 +241,49 @@ async def iter_crew_text_stream(
     def _run_streaming() -> None:
         try:
             streaming = crew.kickoff(**kickoff_kwargs)
-
-            for chunk in streaming:
-                # 官方文档：chunk 通常具有 .content 属性
-                text = getattr(chunk, "content", None)
-                if not text:
-                    continue
-                q.put(text)
+            
+            # CrewStreamingOutput 有 chunks, get_full_text, result 等属性
+            chunk_count = 0
+            
+            # 方式1: 迭代 chunks 属性
+            chunks = getattr(streaming, "chunks", None)
+            if chunks:
+                for chunk in chunks:
+                    chunk_count += 1
+                    text = getattr(chunk, "content", None) or getattr(chunk, "text", None) or str(chunk)
+                    if text:
+                        q.put(text)
+            
+            # 方式2: 直接迭代 streaming 对象
+            if chunk_count == 0:
+                try:
+                    for chunk in streaming:
+                        chunk_count += 1
+                        text = getattr(chunk, "content", None) or getattr(chunk, "text", None) or str(chunk)
+                        if text:
+                            q.put(text)
+                except TypeError:
+                    pass
+            
+            # 方式3: 使用 get_full_text() 方法
+            if chunk_count == 0:
+                get_full_text = getattr(streaming, "get_full_text", None)
+                if callable(get_full_text):
+                    full_text = get_full_text()
+                    if full_text:
+                        q.put(full_text)
+                        chunk_count = 1
+            
+            # 方式4: 使用 result 属性
+            if chunk_count == 0:
+                result = getattr(streaming, "result", None)
+                if result:
+                    result_raw = getattr(result, "raw", None) or str(result)
+                    if result_raw:
+                        q.put(result_raw)
+                        chunk_count = 1
+            
+            logger.info(f"[iter_crew_text_stream] 完成, 共 {chunk_count} 个输出")
 
         except Exception as exc:  # noqa: BLE001
             logger.error("[iter_crew_text_stream] 执行 crew.kickoff() 失败: {}", exc, exc_info=True)

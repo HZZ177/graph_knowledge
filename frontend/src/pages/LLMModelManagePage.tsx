@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Card, Typography, Button, Space, Tag, Modal, Form, Input, InputNumber, Select, Popconfirm, Avatar, Spin } from 'antd'
+import { Card, Typography, Button, Space, Tag, Modal, Form, Input, InputNumber, Select, Popconfirm, Avatar, Spin, Row, Col } from 'antd'
 import { PlusOutlined, ReloadOutlined, FileTextOutlined, LinkOutlined, ExperimentOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 
 import {
@@ -13,6 +13,8 @@ import {
   type AIModelOut,
   type AIModelCreate,
   type AIModelUpdate,
+  type ProviderType,
+  LITELLM_PROVIDERS,
 } from '../api/llmModels'
 import { showError, showSuccess, showInfo } from '../utils/message'
 
@@ -21,12 +23,14 @@ const { Option } = Select
 
 interface ModelFormValues {
   name: string
-  provider?: string
+  provider_type: ProviderType
+  provider?: string           // LiteLLM 模式下选择
   model_name: string
   api_key: string
-  base_url?: string
+  gateway_endpoint?: string   // 自定义网关模式下填写
   temperature?: number
   max_tokens?: number
+  timeout?: number
 }
 
 interface ModelModalProps {
@@ -41,27 +45,45 @@ const ModelModal: React.FC<ModelModalProps> = ({ open, mode, initial, onOk, onCa
   const [form] = Form.useForm<ModelFormValues>()
   const [confirmLoading, setConfirmLoading] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [providerType, setProviderType] = useState<ProviderType>('litellm')
 
   useEffect(() => {
     if (!open) return
 
     if (mode === 'edit' && initial) {
+      const pt = initial.provider_type || 'litellm'
+      setProviderType(pt)
       form.setFieldsValue({
         name: initial.name,
-        provider: (initial.provider ?? undefined) as string | undefined,
+        provider_type: pt,
+        provider: initial.provider ?? undefined,
         model_name: initial.model_name,
-        base_url: initial.base_url ?? undefined,
+        gateway_endpoint: initial.gateway_endpoint ?? undefined,
         temperature: initial.temperature,
         max_tokens: initial.max_tokens ?? undefined,
+        timeout: initial.timeout ?? 120,
         api_key: '', // 不回显已有密钥，留空表示不修改
       })
     } else {
       form.resetFields()
+      setProviderType('litellm')
       form.setFieldsValue({
+        provider_type: 'litellm',
         temperature: 0.7,
+        timeout: 120,
       })
     }
   }, [open, mode, initial, form])
+
+  const handleProviderTypeChange = (value: ProviderType) => {
+    setProviderType(value)
+    // 切换类型时清空对应的字段
+    if (value === 'litellm') {
+      form.setFieldsValue({ gateway_endpoint: undefined })
+    } else {
+      form.setFieldsValue({ provider: undefined })
+    }
+  }
 
   const handleOk = async () => {
     try {
@@ -71,23 +93,27 @@ const ModelModal: React.FC<ModelModalProps> = ({ open, mode, initial, onOk, onCa
       if (mode === 'create') {
         const payload: AIModelCreate = {
           name: values.name,
-          provider: values.provider || '',
+          provider_type: values.provider_type,
+          provider: values.provider_type === 'litellm' ? (values.provider || '') : '',
           model_name: values.model_name,
           api_key: values.api_key,
-          base_url: values.base_url || null,
+          gateway_endpoint: values.provider_type === 'custom_gateway' ? values.gateway_endpoint : null,
           temperature: values.temperature ?? 0.7,
           max_tokens: values.max_tokens ?? null,
+          timeout: values.timeout ?? 120,
         }
         await createLLMModel(payload)
         showSuccess('创建模型成功')
       } else if (mode === 'edit' && initial) {
         const payload: AIModelUpdate = {
           name: values.name,
-          provider: values.provider || '',
+          provider_type: values.provider_type,
+          provider: values.provider_type === 'litellm' ? (values.provider || '') : '',
           model_name: values.model_name,
-          base_url: values.base_url || null,
+          gateway_endpoint: values.provider_type === 'custom_gateway' ? values.gateway_endpoint : null,
           temperature: values.temperature ?? 0.7,
           max_tokens: values.max_tokens ?? null,
+          timeout: values.timeout ?? 120,
         }
         // api_key 仅在用户输入时更新
         if (values.api_key) {
@@ -117,12 +143,14 @@ const ModelModal: React.FC<ModelModalProps> = ({ open, mode, initial, onOk, onCa
       setTesting(true)
       const payload: AIModelCreate = {
         name: values.name,
-        provider: values.provider || '',
+        provider_type: values.provider_type,
+        provider: values.provider_type === 'litellm' ? (values.provider || '') : '',
         model_name: values.model_name,
         api_key: values.api_key,
-        base_url: values.base_url || null,
+        gateway_endpoint: values.provider_type === 'custom_gateway' ? values.gateway_endpoint : null,
         temperature: values.temperature ?? 0.7,
         max_tokens: values.max_tokens ?? null,
+        timeout: values.timeout ?? 120,
       }
       const res = await testLLMModel(payload)
       if (res.ok) {
@@ -151,57 +179,113 @@ const ModelModal: React.FC<ModelModalProps> = ({ open, mode, initial, onOk, onCa
       cancelText="取消"
       maskClosable={false}
       destroyOnClose
+      width={560}
     >
-      <Form<ModelFormValues> layout="vertical" form={form}>
-        <Form.Item
-          label="配置名称"
-          name="name"
-          rules={[{ required: true, message: '请输入配置名称' }]}
-        >
-          <Input placeholder="请输入配置名称" />
-        </Form.Item>
+      <Form<ModelFormValues> layout="vertical" form={form} size="middle">
+        <Row gutter={16}>
+          <Col span={12}>
+            <Form.Item
+              label="配置名称"
+              name="name"
+              rules={[{ required: true, message: '请输入' }]}
+            >
+              <Input placeholder="如：gemini-2.5-flash 生产环境" />
+            </Form.Item>
+          </Col>
+          <Col span={12}>
+            <Form.Item
+              label="接入方式"
+              name="provider_type"
+              rules={[{ required: true, message: '请选择' }]}
+            >
+              <Select onChange={handleProviderTypeChange}>
+                <Option value="litellm">通用提供商</Option>
+                <Option value="custom_gateway">自定义网关(暂无法流式响应)</Option>
+              </Select>
+            </Form.Item>
+          </Col>
+        </Row>
 
-        <Form.Item
-          label="模型提供商"
-          name="provider"
-        >
-          <Input placeholder="可选，例如：openai、ollama 等；留空则直接使用模型名称" />
-        </Form.Item>
+        <Row gutter={16}>
+          {providerType === 'litellm' ? (
+            <Col span={12}>
+              <Form.Item
+                label="提供商"
+                name="provider"
+                rules={[{ required: true, message: '请选择' }]}
+              >
+                <Select placeholder="选择提供商">
+                  {LITELLM_PROVIDERS.map((p) => (
+                    <Option key={p.value} value={p.value}>
+                      {p.label}
+                    </Option>
+                  ))}
+                </Select>
+              </Form.Item>
+            </Col>
+          ) : (
+            <Col span={24}>
+              <Form.Item
+                label="网关端点"
+                name="gateway_endpoint"
+                rules={[{ required: true, message: '请输入网关 URL' }]}
+              >
+                <Input placeholder="https://your-newapi.com/v1/chat/completions" />
+              </Form.Item>
+            </Col>
+          )}
+          {providerType === 'litellm' && (
+            <Col span={12}>
+              <Form.Item
+                label="模型名称"
+                name="model_name"
+                rules={[{ required: true, message: '请输入' }]}
+              >
+                <Input placeholder="如：gemini-2.5-flash" />
+              </Form.Item>
+            </Col>
+          )}
+        </Row>
 
-        <Form.Item
-          label="模型名称"
-          name="model_name"
-          rules={[{ required: true, message: '请输入模型名称' }]}
-        >
-          <Input placeholder="例如：gpt-4o 或 llama3.2" />
-        </Form.Item>
+        {providerType === 'custom_gateway' && (
+          <Form.Item
+            label="模型名称"
+            name="model_name"
+            rules={[{ required: true, message: '请输入模型名称' }]}
+          >
+            <Input placeholder="如：gemini-2.5-flash、claude-4.5-opus" />
+          </Form.Item>
+        )}
 
         <Form.Item
           label="API 密钥"
           name="api_key"
           rules={mode === 'create' ? [{ required: true, message: '请输入 API 密钥' }] : []}
-          extra={mode === 'edit' ? '留空表示不修改当前密钥' : undefined}
+          extra={mode === 'edit' ? '留空表示不修改' : undefined}
         >
-          <Input.Password placeholder="请输入 API 密钥" />
+          <Input.Password placeholder="sk-..." />
         </Form.Item>
 
-        <Form.Item
-          label="API 基础 URL"
-          name="base_url"
-        >
-          <Input placeholder="可选，例如：https://api.openai.com/v1" />
-        </Form.Item>
-
-        <Form.Item label="温度" name="temperature">
-          <InputNumber min={0} max={2} step={0.1} style={{ width: '100%' }} />
-        </Form.Item>
-
-        <Form.Item label="最大输出 Tokens" name="max_tokens">
-          <InputNumber min={0} step={256} style={{ width: '100%' }} />
-        </Form.Item>
+        <Row gutter={16}>
+          <Col span={8}>
+            <Form.Item label="温度" name="temperature">
+              <InputNumber min={0} max={2} step={0.1} style={{ width: '100%' }} placeholder="0.7" />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item label="最大 Tokens" name="max_tokens">
+              <InputNumber min={0} step={256} style={{ width: '100%' }} placeholder="可选" />
+            </Form.Item>
+          </Col>
+          <Col span={8}>
+            <Form.Item label="超时(秒)" name="timeout">
+              <InputNumber min={10} max={600} step={10} style={{ width: '100%' }} placeholder="120" />
+            </Form.Item>
+          </Col>
+        </Row>
 
         {mode === 'create' && (
-          <Form.Item>
+          <Form.Item style={{ marginBottom: 0 }}>
             <Button
               icon={<ExperimentOutlined />}
               onClick={handleTest}
@@ -366,7 +450,12 @@ const LLMModelManagePage: React.FC = () => {
         ) : (
           <Space direction="vertical" style={{ width: '100%', marginTop: 8 }} size={12}>
             {models.map((m) => {
-              const providerLabel = (m.provider || '默认').toUpperCase()
+              const isCustomGateway = m.provider_type === 'custom_gateway'
+              const typeLabel = isCustomGateway ? '自定义网关' : (m.provider || '默认').toUpperCase()
+              const endpointDisplay = isCustomGateway && m.gateway_endpoint
+                ? new URL(m.gateway_endpoint).host
+                : null
+              
               return (
                 <Card
                   key={m.id}
@@ -384,7 +473,7 @@ const LLMModelManagePage: React.FC = () => {
                     <Space size={16}>
                       <Avatar
                         size={40}
-                        style={{ backgroundColor: '#1677ff' }}
+                        style={{ backgroundColor: isCustomGateway ? '#722ed1' : '#1677ff' }}
                         icon={<FileTextOutlined />}
                       />
                       <div>
@@ -393,9 +482,9 @@ const LLMModelManagePage: React.FC = () => {
                           {m.is_active && <Tag color="blue">启用</Tag>}
                         </Space>
                         <Space size={8} style={{ marginTop: 4, flexWrap: 'wrap' }}>
-                          <Tag>{providerLabel}</Tag>
+                          <Tag color={isCustomGateway ? 'purple' : 'default'}>{typeLabel}</Tag>
                           <Tag>{m.model_name}</Tag>
-                          {m.base_url && <Tag>{m.base_url}</Tag>}
+                          {endpointDisplay && <Tag color="cyan">{endpointDisplay}</Tag>}
                         </Space>
                       </div>
                     </Space>

@@ -6,21 +6,21 @@
 from crewai import Agent, LLM
 
 
-class SkeletonAgents:
-    """骨架生成相关的预设 Agent 工厂类
+class CrewAiAgents:
+    """预设 Agent 工厂类
     
     Usage:
         llm = get_crewai_llm(db)
-        agent = SkeletonAgents.create_data_analyst_agent(llm)
+        agent = CrewAiAgents.create_data_analyst_agent(llm)
     """
-    
+
     # Agent 元信息（供前端展示、日志等使用）
     AGENT_META = [
         {"name": "数据分析师", "index": 0, "description": "分析原始技术数据，提取系统、接口、数据资源线索"},
         {"name": "流程设计师", "index": 1, "description": "根据业务描述和技术线索，设计业务流程步骤"},
         {"name": "技术架构师", "index": 2, "description": "补充实现细节、数据资源访问关系，生成完整骨架"},
     ]
-    
+
     @staticmethod
     def create_data_analysis_agent(llm: LLM) -> Agent:
         """创建数据分析师 Agent
@@ -36,7 +36,7 @@ class SkeletonAgents:
             llm=llm,
             verbose=False,
         )
-    
+
     @staticmethod
     def create_flow_design_agent(llm: LLM) -> Agent:
         """创建流程设计师 Agent
@@ -52,7 +52,7 @@ class SkeletonAgents:
             llm=llm,
             verbose=False,
         )
-    
+
     @staticmethod
     def create_tech_architect_agent(llm: LLM) -> Agent:
         """创建技术架构师 Agent

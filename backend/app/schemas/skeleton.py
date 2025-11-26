@@ -47,8 +47,6 @@ class EdgeSkeleton(BaseModel):
     from_step_name: str
     to_step_name: str
     edge_type: str = "normal"  # normal | branch
-    condition: Optional[str] = None
-    label: Optional[str] = None
 
 
 class ImplSkeleton(BaseModel):

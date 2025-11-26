@@ -15,11 +15,12 @@ import {
   Input,
   Button,
   Space,
-  Collapse,
   Alert,
   Typography,
-  Divider,
+  Select,
+  Switch,
 } from 'antd'
+import ReactMarkdown from 'react-markdown'
 import {
   RobotOutlined,
   CheckCircleOutlined,
@@ -56,8 +57,13 @@ interface AgentState {
   name: string
   description: string
   status: 'pending' | 'running' | 'completed' | 'failed'
-  content: string  // 流式累积内容
+  content: string  // 流式累积内容（兼容旧逻辑）
   output: string   // 最终输出
+  thought: string  // 思考过程（最终）
+  finalAnswer: string  // 最终结果（最终）
+  thoughtContent: string  // 思考过程流式内容
+  answerContent: string   // 最终结果流式内容
+  currentSection: 'unknown' | 'thought' | 'answer'  // 当前正在输出的区域
   durationMs?: number
   startTime?: number
 }
@@ -82,11 +88,12 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
   const [confirmLoading, setConfirmLoading] = useState(false)
   
   // Agent状态
-  const [agents, setAgents] = useState<AgentState[]>([
-    { name: '数据分析师', description: '分析原始技术数据', status: 'pending', content: '', output: '' },
-    { name: '流程设计师', description: '设计业务流程步骤', status: 'pending', content: '', output: '' },
-    { name: '技术架构师', description: '补充技术实现细节', status: 'pending', content: '', output: '' },
-  ])
+  const defaultAgents: AgentState[] = [
+    { name: '数据分析师', description: '分析原始技术数据', status: 'pending', content: '', output: '', thought: '', finalAnswer: '', thoughtContent: '', answerContent: '', currentSection: 'unknown' },
+    { name: '流程设计师', description: '设计业务流程步骤', status: 'pending', content: '', output: '', thought: '', finalAnswer: '', thoughtContent: '', answerContent: '', currentSection: 'unknown' },
+    { name: '技术架构师', description: '补充技术实现细节', status: 'pending', content: '', output: '', thought: '', finalAnswer: '', thoughtContent: '', answerContent: '', currentSection: 'unknown' },
+  ]
+  const [agents, setAgents] = useState<AgentState[]>(defaultAgents)
   
   const wsRef = useRef<WebSocket | null>(null)
   const scrollContainerRef = useRef<HTMLDivElement | null>(null)
@@ -95,43 +102,42 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
   const userScrollingRef = useRef(false)
   const lastScrollTopRef = useRef(0)
   
-  // 使用通用的多通道打字机 hook
-  const typewriter = useMultiTypewriter(3, {
-    onTick: () => {
-      // 打字机每次显示字符时触发滚动
-      if (autoScrollRef.current) {
-        const container = scrollContainerRef.current
-        if (container) {
-          requestAnimationFrame(() => {
-            container.scrollTop = container.scrollHeight
-          })
-        }
+  // 滚动回调（供打字机使用）
+  const handleTypewriterTick = useCallback(() => {
+    if (autoScrollRef.current) {
+      const container = scrollContainerRef.current
+      if (container) {
+        requestAnimationFrame(() => {
+          container.scrollTop = container.scrollHeight
+        })
       }
-    },
-  })
+    }
+  }, [])
   
-  // 将打字机的 texts 同步到 agents 的 content（用于渲染）
+  // 使用两个独立的多通道打字机：分别处理思考和结果内容
+  const thoughtTypewriter = useMultiTypewriter(3, { onTick: handleTypewriterTick })
+  const answerTypewriter = useMultiTypewriter(3, { onTick: handleTypewriterTick })
+  
+  // 将打字机的 texts 同步到 agents（用于渲染）
   const agentsWithContent = agents.map((agent, idx) => ({
     ...agent,
-    content: typewriter.texts[idx] || '',
+    thoughtContent: agent.status === 'completed' ? agent.thoughtContent : (thoughtTypewriter.texts[idx] || ''),
+    answerContent: agent.status === 'completed' ? agent.answerContent : (answerTypewriter.texts[idx] || ''),
   }))
   
   // 重置状态
   const resetState = useCallback(() => {
-    typewriter.reset()
+    thoughtTypewriter.reset()
+    answerTypewriter.reset()
     setStep('input')
     setError(null)
     setCanvasData(null)
-    setAgents([
-      { name: '数据分析师', description: '分析原始技术数据', status: 'pending', content: '', output: '' },
-      { name: '流程设计师', description: '设计业务流程步骤', status: 'pending', content: '', output: '' },
-      { name: '技术架构师', description: '补充技术实现细节', status: 'pending', content: '', output: '' },
-    ])
+    setAgents(defaultAgents.map(a => ({ ...a })))
     if (wsRef.current) {
       wsRef.current.close()
       wsRef.current = null
     }
-  }, [typewriter])
+  }, [thoughtTypewriter, answerTypewriter])
   
   // 关闭弹窗时重置
   useEffect(() => {
@@ -191,27 +197,71 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
       case 'agent_start':
         setAgents(prev => prev.map((agent, idx) => 
           idx === chunk.agent_index
-            ? { ...agent, status: 'running', content: '', startTime: Date.now() }
+            ? { 
+                ...agent, 
+                status: 'running', 
+                content: '', 
+                thoughtContent: '', 
+                answerContent: '', 
+                currentSection: 'unknown',
+                startTime: Date.now() 
+              }
             : agent
         ))
         break
         
       case 'stream':
-        // 追加到打字机缓冲区
+        // 根据 section 字段将内容追加到对应的打字机缓冲区
         if (chunk.content && chunk.agent_index !== undefined) {
-          typewriter.append(chunk.agent_index, chunk.content)
+          const section = (chunk as any).section as string
+          const agentIdx = chunk.agent_index
+          
+          // 更新当前区域状态，并累积原始内容（用于 agent_end 时的后备）
+          setAgents(prev => prev.map((agent, idx) => {
+            if (idx !== agentIdx) return agent
+            if (section === 'thought') {
+              return { 
+                ...agent, 
+                currentSection: 'thought',
+                thoughtContent: agent.thoughtContent + chunk.content,
+              }
+            } else if (section === 'answer') {
+              return { 
+                ...agent, 
+                currentSection: 'answer',
+                answerContent: agent.answerContent + chunk.content,
+              }
+            }
+            return agent
+          }))
+          
+          // 将内容追加到对应的打字机缓冲区（实现丝滑逐字输出）
+          if (section === 'thought') {
+            thoughtTypewriter.append(agentIdx, chunk.content)
+          } else if (section === 'answer') {
+            answerTypewriter.append(agentIdx, chunk.content)
+          }
         }
         break
         
       case 'agent_end':
-        // 标记完成，触发加速显示剩余内容
-        typewriter.finish(chunk.agent_index)
+        // 标记打字机完成，触发加速清空缓冲区
+        if (chunk.agent_index !== undefined) {
+          thoughtTypewriter.finish(chunk.agent_index)
+          answerTypewriter.finish(chunk.agent_index)
+        }
+        // 标记完成，并保存最终内容
         setAgents(prev => prev.map((agent, idx) => 
           idx === chunk.agent_index
             ? {
                 ...agent,
                 status: 'completed',
                 output: chunk.agent_output || '',
+                thought: (chunk as any).thought || '',
+                finalAnswer: (chunk as any).final_answer || '',
+                // 将流式累积的内容保存为最终内容（如果后端没返回最终内容）
+                thoughtContent: (chunk as any).thought || agent.thoughtContent,
+                answerContent: (chunk as any).final_answer || agent.answerContent,
                 durationMs: chunk.duration_ms,
               }
             : agent
@@ -225,7 +275,6 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
         break
         
       case 'error':
-        typewriter.reset()
         setError(chunk.error || '生成失败')
         setAgents(prev => prev.map(agent => 
           agent.status === 'running'
@@ -234,7 +283,7 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
         ))
         break
     }
-  }, [typewriter])
+  }, [scrollToBottom, thoughtTypewriter, answerTypewriter])
   
   // 开始生成
   const handleGenerate = useCallback(async () => {
@@ -247,14 +296,11 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
       autoScrollRef.current = true
       userScrollingRef.current = false
       lastScrollTopRef.current = 0
-      typewriter.reset()
+      thoughtTypewriter.reset()
+      answerTypewriter.reset()
       
       // 重置Agent状态
-      setAgents([
-        { name: '数据分析师', description: '分析原始技术数据', status: 'pending', content: '', output: '' },
-        { name: '流程设计师', description: '设计业务流程步骤', status: 'pending', content: '', output: '' },
-        { name: '技术架构师', description: '补充技术实现细节', status: 'pending', content: '', output: '' },
-      ])
+      setAgents(defaultAgents.map(a => ({ ...a })))
       
       const request: SkeletonGenerateRequest = {
         business_name: values.business_name,
@@ -279,7 +325,7 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
       if (e?.errorFields) return
       setError('表单验证失败')
     }
-  }, [form, handleChunk, typewriter])
+  }, [form, handleChunk, thoughtTypewriter, answerTypewriter])
   
   // 确认创建
   const handleConfirm = useCallback(async () => {
@@ -354,6 +400,32 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
     return null
   }
   
+  // 苹果风格滚动条样式
+  const scrollbarStyles = `
+    .skeleton-modal-scroll::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    .skeleton-modal-scroll::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    .skeleton-modal-scroll::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 4px;
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    .skeleton-modal-scroll::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.25);
+      border: 2px solid transparent;
+      background-clip: padding-box;
+    }
+    .skeleton-modal-scroll {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+    }
+  `
+  
   return (
     <Modal
       open={open}
@@ -365,9 +437,11 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
       destroyOnClose
       styles={{ body: { padding: 0 } }}
     >
+      <style>{scrollbarStyles}</style>
       <div
         ref={scrollContainerRef}
         onScroll={handleContainerScroll}
+        className="skeleton-modal-scroll"
         style={{
           maxHeight: 'calc(80vh - 160px)',
           overflow: 'auto',
@@ -413,65 +487,223 @@ interface InputStepProps {
 }
 
 const InputStep: React.FC<InputStepProps> = ({ form, error, onGenerate }) => {
+  const [showAdvanced, setShowAdvanced] = React.useState(false)
+  
   return (
-    <Form form={form} layout="vertical">
-      <Form.Item
-        label="业务名称"
-        name="business_name"
-        rules={[{ required: true, message: '请输入业务名称' }]}
+    <div style={{ padding: '8px 0' }}>
+      {/* 简洁引导文案 */}
+      <div style={{
+        marginBottom: 32,
+        textAlign: 'center',
+      }}>
+        <div style={{
+          fontSize: 13,
+          color: '#86868b',
+          letterSpacing: '0.02em',
+          lineHeight: 1.5,
+        }}>
+          描述你的业务场景，自动生成流程骨架
+        </div>
+      </div>
+
+      <Form
+        form={form}
+        layout="vertical"
+        requiredMark={false}
       >
-        <Input placeholder="如：C端用户开通月卡" />
-      </Form.Item>
-      
-      <Form.Item
-        label="业务描述"
-        name="business_description"
-        rules={[{ required: true, message: '请输入业务描述' }]}
-        extra={<span style={{ color: '#8c8c8c', fontSize: 12 }}>详细描述业务流程，AI将根据描述生成步骤、实现和数据资源</span>}
-      >
-        <TextArea
-          rows={5}
-          placeholder="描述业务流程的步骤和涉及的系统，例如：&#10;用户在App点击开通月卡 → 系统校验用户资格 → 展示套餐列表 → 用户选择并支付 → 开通成功"
-        />
-      </Form.Item>
-      
-      <Form.Item label="渠道" name="channel">
-        <Input placeholder="app / web / mini_program（可选）" />
-      </Form.Item>
-      
-      <Collapse
-        size="small"
-        ghost
-        items={[
-          {
-            key: 'advanced',
-            label: <Text type="secondary">补充技术数据（可选，提高生成准确度）</Text>,
-            children: (
-              <Space direction="vertical" style={{ width: '100%' }} size={12}>
-                <Form.Item label="结构化日志" name="structured_logs" style={{ marginBottom: 0 }}>
-                  <TextArea
-                    rows={3}
-                    placeholder="粘贴JSON格式的日志或trace数据"
-                    style={{ fontFamily: 'monospace', fontSize: 12 }}
-                  />
-                </Form.Item>
-                <Form.Item label="抓包接口" name="api_captures" style={{ marginBottom: 0 }}>
-                  <TextArea
-                    rows={3}
-                    placeholder="粘贴curl命令或HTTP请求信息"
-                    style={{ fontFamily: 'monospace', fontSize: 12 }}
-                  />
-                </Form.Item>
-              </Space>
-            ),
-          },
-        ]}
-      />
+        {/* 业务名称 */}
+        <Form.Item
+          label={
+            <span style={{
+              fontSize: 13,
+              fontWeight: 500,
+              color: '#1d1d1f',
+              letterSpacing: '-0.01em',
+            }}>
+              业务名称
+            </span>
+          }
+          name="business_name"
+          rules={[{ required: true, message: '请输入业务名称' }]}
+          style={{ marginBottom: 24 }}
+        >
+          <Input
+            placeholder="例如：用户开通月卡"
+            style={{
+              height: 48,
+              borderRadius: 12,
+              fontSize: 15,
+              border: '1px solid #d2d2d7',
+              boxShadow: 'none',
+            }}
+          />
+        </Form.Item>
+        
+        {/* 业务描述 */}
+        <Form.Item
+          label={
+            <span style={{
+              fontSize: 13,
+              fontWeight: 500,
+              color: '#1d1d1f',
+              letterSpacing: '-0.01em',
+            }}>
+              业务描述
+            </span>
+          }
+          name="business_description"
+          rules={[{ required: true, message: '请输入业务描述' }]}
+          style={{ marginBottom: 8 }}
+        >
+          <TextArea
+            rows={6}
+            placeholder="描述业务流程的关键步骤..."
+            style={{
+              borderRadius: 12,
+              fontSize: 15,
+              lineHeight: 1.6,
+              border: '1px solid #d2d2d7',
+              padding: '14px 16px',
+              resize: 'none',
+            }}
+          />
+        </Form.Item>
+        <div style={{
+          fontSize: 12,
+          color: '#86868b',
+          marginBottom: 28,
+          lineHeight: 1.5,
+        }}>
+          描述越详细，生成结果越准确
+        </div>
+
+        {/* 渠道 - 选择框 */}
+        <Form.Item
+          label={
+            <span style={{
+              fontSize: 13,
+              fontWeight: 500,
+              color: '#1d1d1f',
+              letterSpacing: '-0.01em',
+            }}>
+              渠道
+              <span style={{ fontWeight: 400, color: '#86868b', marginLeft: 6 }}>可选</span>
+            </span>
+          }
+          name="channel"
+          style={{ marginBottom: 24 }}
+        >
+          <Select
+            placeholder="选择渠道"
+            allowClear
+            style={{ height: 48 }}
+            options={[
+              { value: 'mobile', label: '移动端' },
+              { value: 'admin', label: '后台' },
+            ]}
+          />
+        </Form.Item>
+        
+        {/* 高级选项 - 更明显的按钮 */}
+        <div
+          onClick={() => setShowAdvanced(!showAdvanced)}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '14px 16px',
+            background: '#f5f5f7',
+            borderRadius: 12,
+            cursor: 'pointer',
+            userSelect: 'none',
+            marginBottom: 16,
+            transition: 'background 0.2s ease',
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.background = '#ebebed'}
+          onMouseLeave={(e) => e.currentTarget.style.background = '#f5f5f7'}
+        >
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 500, color: '#1d1d1f' }}>
+              补充技术数据
+            </div>
+            <div style={{ fontSize: 12, color: '#86868b', marginTop: 2 }}>
+              提供日志或接口数据可提高准确度
+            </div>
+          </div>
+          <span style={{
+            display: 'inline-block',
+            transition: 'transform 0.2s ease',
+            transform: showAdvanced ? 'rotate(180deg)' : 'rotate(0deg)',
+            fontSize: 12,
+            color: '#86868b',
+          }}>
+            ▼
+          </span>
+        </div>
+        
+        {showAdvanced && (
+          <div style={{
+            background: '#f5f5f7',
+            borderRadius: 12,
+            padding: '20px',
+            marginBottom: 16,
+          }}>
+            <Form.Item
+              label={
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#1d1d1f' }}>
+                  结构化日志
+                </span>
+              }
+              name="structured_logs"
+              style={{ marginBottom: 20 }}
+            >
+              <TextArea
+                rows={3}
+                placeholder="粘贴 JSON 格式的日志或 trace 数据"
+                style={{
+                  fontFamily: 'SF Mono, Monaco, monospace',
+                  fontSize: 13,
+                  borderRadius: 8,
+                  border: '1px solid #d2d2d7',
+                  background: '#fff',
+                }}
+              />
+            </Form.Item>
+            
+            <Form.Item
+              label={
+                <span style={{ fontSize: 13, fontWeight: 500, color: '#1d1d1f' }}>
+                  抓包接口
+                </span>
+              }
+              name="api_captures"
+              style={{ marginBottom: 0 }}
+            >
+              <TextArea
+                rows={3}
+                placeholder="粘贴 curl 命令或 HTTP 请求信息"
+                style={{
+                  fontFamily: 'SF Mono, Monaco, monospace',
+                  fontSize: 13,
+                  borderRadius: 8,
+                  border: '1px solid #d2d2d7',
+                  background: '#fff',
+                }}
+              />
+            </Form.Item>
+          </div>
+        )}
+      </Form>
       
       {error && (
-        <Alert type="error" message={error} style={{ marginTop: 16 }} showIcon />
+        <Alert
+          type="error"
+          message={error}
+          style={{ marginTop: 16, borderRadius: 12 }}
+          showIcon
+        />
       )}
-    </Form>
+    </div>
   )
 }
 
@@ -484,6 +716,64 @@ interface GeneratingStepProps {
   onRetry: () => void
 }
 
+// Markdown 渲染样式 + 动画
+const markdownStyles = `
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+  .agent-markdown {
+    font-size: 13px;
+    line-height: 1.7;
+    color: #1d1d1f;
+  }
+  .agent-markdown p {
+    margin: 0 0 8px 0;
+  }
+  .agent-markdown p:last-child {
+    margin-bottom: 0;
+  }
+  .agent-markdown ul, .agent-markdown ol {
+    margin: 8px 0;
+    padding-left: 20px;
+  }
+  .agent-markdown li {
+    margin: 4px 0;
+  }
+  .agent-markdown code {
+    background: #e8e8ed;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: SF Mono, Monaco, monospace;
+    font-size: 12px;
+    color: #1d1d1f;
+  }
+  .agent-markdown pre {
+    background: #e8e8ed;
+    padding: 12px 14px;
+    border-radius: 8px;
+    overflow-x: auto;
+    margin: 8px 0;
+    border: 1px solid #d2d2d7;
+  }
+  .agent-markdown pre code {
+    background: none;
+    padding: 0;
+    color: #1d1d1f;
+  }
+  .agent-markdown strong {
+    font-weight: 600;
+  }
+  .agent-markdown h1, .agent-markdown h2, .agent-markdown h3 {
+    font-weight: 600;
+    margin: 12px 0 8px 0;
+    color: #1d1d1f;
+  }
+  .agent-markdown h1 { font-size: 16px; }
+  .agent-markdown h2 { font-size: 15px; }
+  .agent-markdown h3 { font-size: 14px; }
+`
+
 const GeneratingStep: React.FC<GeneratingStepProps> = ({
   agents,
   contentRefs,
@@ -492,6 +782,10 @@ const GeneratingStep: React.FC<GeneratingStepProps> = ({
 }) => {
   // 展开状态：默认展开正在运行的agent
   const [expandedIndexes, setExpandedIndexes] = React.useState<Set<number>>(new Set())
+  // 思考区域折叠状态：key 是 agent index，默认展开
+  const [thoughtCollapsed, setThoughtCollapsed] = React.useState<Set<number>>(new Set())
+  // Markdown 渲染开关
+  const [markdownEnabled, setMarkdownEnabled] = React.useState(true)
   
   // 当agent状态变化时，自动展开正在运行的agent
   React.useEffect(() => {
@@ -501,6 +795,19 @@ const GeneratingStep: React.FC<GeneratingStepProps> = ({
       }
     })
   }, [agents])
+  
+  // 切换思考区域折叠状态
+  const toggleThoughtCollapsed = (index: number) => {
+    setThoughtCollapsed(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(index)) {
+        newSet.delete(index)
+      } else {
+        newSet.add(index)
+      }
+      return newSet
+    })
+  }
   
   const toggleExpand = (index: number) => {
     setExpandedIndexes(prev => {
@@ -514,126 +821,325 @@ const GeneratingStep: React.FC<GeneratingStepProps> = ({
     })
   }
   
-  const getStatusIcon = (status: AgentState['status']) => {
+  // 获取状态样式
+  const getStatusStyle = (status: AgentState['status']) => {
     switch (status) {
-      case 'pending': return <ClockCircleOutlined style={{ color: '#bfbfbf' }} />
-      case 'running': return <LoadingOutlined style={{ color: '#1677ff' }} spin />
-      case 'completed': return <CheckCircleOutlined style={{ color: '#52c41a' }} />
-      case 'failed': return <CloseCircleOutlined style={{ color: '#ff4d4f' }} />
+      case 'pending': return { bg: '#f5f5f7', color: '#86868b', icon: <ClockCircleOutlined /> }
+      case 'running': return { bg: '#007aff', color: '#fff', icon: <LoadingOutlined spin /> }
+      case 'completed': return { bg: '#34c759', color: '#fff', icon: <CheckCircleOutlined /> }
+      case 'failed': return { bg: '#ff3b30', color: '#fff', icon: <CloseCircleOutlined /> }
     }
   }
   
   return (
-    <div>
-      {/* 进度条 */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 20 }}>
-        {agents.map((agent, index) => {
-          const isCompleted = agent.status === 'completed'
-          const isActive = agent.status === 'running'
-          return (
-            <React.Fragment key={index}>
-              <div style={{
-                width: 28,
-                height: 28,
-                borderRadius: '50%',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: isCompleted ? '#52c41a' : isActive ? '#1677ff' : '#f0f0f0',
-                color: isCompleted || isActive ? '#fff' : '#8c8c8c',
-                fontSize: 12,
-                fontWeight: 500,
-              }}>
-                {isCompleted ? <CheckCircleOutlined /> : index + 1}
-              </div>
-              {index < agents.length - 1 && (
-                <div style={{
-                  flex: 1,
-                  height: 2,
-                  background: isCompleted ? '#52c41a' : '#f0f0f0',
-                }} />
-              )}
-            </React.Fragment>
-          )
-        })}
+    <div style={{ padding: '8px 0' }}>
+      <style>{markdownStyles}</style>
+      
+      {/* Markdown 渲染开关 */}
+      <div style={{
+        display: 'flex',
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+        marginBottom: 8,
+        fontSize: 12,
+        color: '#86868b',
+      }}>
+        <span style={{ marginRight: 8 }}>Markdown 渲染</span>
+        <Switch size="small" checked={markdownEnabled} onChange={setMarkdownEnabled} />
       </div>
       
-      {/* Agent 列表 */}
-      <Space direction="vertical" style={{ width: '100%' }} size={12}>
+      {/* 简洁进度指示 */}
+      <div style={{
+        textAlign: 'center',
+        marginBottom: 32,
+      }}>
+        <div style={{ fontSize: 13, color: '#86868b', marginBottom: 16 }}>
+          正在分析并生成流程骨架
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+          {agents.map((agent, index) => {
+            const style = getStatusStyle(agent.status)
+            return (
+              <React.Fragment key={index}>
+                <div style={{
+                  width: 32,
+                  height: 32,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: style.bg,
+                  color: style.color,
+                  fontSize: 14,
+                  transition: 'all 0.3s ease',
+                }}>
+                  {agent.status === 'pending' ? index + 1 : style.icon}
+                </div>
+                {index < agents.length - 1 && (
+                  <div style={{
+                    width: 40,
+                    height: 2,
+                    background: agent.status === 'completed' ? '#34c759' : '#e5e5ea',
+                    borderRadius: 1,
+                    transition: 'background 0.3s ease',
+                  }} />
+                )}
+              </React.Fragment>
+            )
+          })}
+        </div>
+      </div>
+      
+      {/* Agent 卡片列表 */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {agents.map((agent, index) => {
           const hasContent = agent.status === 'running' || agent.status === 'completed' || agent.status === 'failed'
           const isExpanded = hasContent && expandedIndexes.has(index)
+          const isActive = agent.status === 'running'
+          const style = getStatusStyle(agent.status)
+          const text = agent.status === 'completed'
+            ? (agent.output || agent.content || '已完成')
+            : (agent.content || '处理中...')
+          
           return (
             <div
               key={index}
               style={{
-                border: `1px solid ${agent.status === 'running' ? '#1677ff' : '#f0f0f0'}`,
-                borderRadius: 8,
-                background: agent.status === 'pending' ? '#fafafa' : '#fff',
+                background: '#fff',
+                borderRadius: 12,
+                border: isActive ? '1px solid #007aff' : '1px solid #e5e5ea',
+                overflow: 'hidden',
+                transition: 'border-color 0.2s ease',
               }}
             >
+              {/* 卡片头部 */}
               <div 
                 style={{ 
                   display: 'flex', 
                   alignItems: 'center', 
-                  padding: '10px 12px', 
-                  gap: 10,
+                  padding: '14px 16px', 
+                  gap: 12,
                   cursor: hasContent ? 'pointer' : 'default',
                 }}
                 onClick={() => hasContent && toggleExpand(index)}
               >
-                {getStatusIcon(agent.status)}
-                <div style={{ flex: 1 }}>
+                <div style={{
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: style.bg,
+                  color: style.color,
+                  fontSize: 12,
+                  flexShrink: 0,
+                }}>
+                  {agent.status === 'pending' ? index + 1 : style.icon}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ 
+                    fontSize: 14,
                     fontWeight: 500, 
-                    color: agent.status === 'pending' ? '#8c8c8c' : '#262626',
+                    color: agent.status === 'pending' ? '#86868b' : '#1d1d1f',
                   }}>
                     {agent.name}
                   </div>
-                  <div style={{ fontSize: 12, color: '#8c8c8c' }}>{agent.description}</div>
+                  <div style={{ fontSize: 12, color: '#86868b', marginTop: 2 }}>
+                    {agent.description}
+                  </div>
                 </div>
                 {agent.durationMs && (
-                  <Text type="secondary" style={{ fontSize: 12 }}>
+                  <span style={{ fontSize: 12, color: '#86868b' }}>
                     {(agent.durationMs / 1000).toFixed(1)}s
-                  </Text>
+                  </span>
                 )}
                 {hasContent && (
-                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>
-                    {isExpanded ? <UpOutlined /> : <DownOutlined />}
+                  <span style={{
+                    color: '#86868b',
+                    fontSize: 10,
+                    transition: 'transform 0.2s ease',
+                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                  }}>
+                    ▼
                   </span>
                 )}
               </div>
               
-              {hasContent && (
+              {/* 内容区域 - 实时分区展示思考过程和最终结果 */}
+              {hasContent && isExpanded && (
                 <div
+                  ref={(el) => { contentRefs.current[index] = el }}
                   style={{
-                    // 不再设置高度上限，依靠整体 Modal 滚动展示完整内容
-                    display: isExpanded ? 'block' : 'none',
+                    padding: '0 16px 16px',
                   }}
                 >
-                  <div
-                    ref={(el) => { contentRefs.current[index] = el }}
-                    style={{ padding: '0 12px 12px' }}
-                  >
-                    <div style={{
-                      background: '#f5f5f5',
-                      borderRadius: 6,
-                      padding: 10,
-                      fontSize: 12,
-                      lineHeight: 1.6,
-                      color: '#595959',
-                      whiteSpace: 'pre-wrap',
-                      wordBreak: 'break-word',
-                    }}>
-                      {agent.status === 'completed' ? (agent.output || agent.content || '已完成') : (agent.content || '处理中...')}
-                    </div>
-                  </div>
+                  {/* 实时分区展示：运行中用 thoughtContent/answerContent，完成后用 thought/finalAnswer */}
+                  {(() => {
+                    const showThought = agent.status === 'completed' ? agent.thought : agent.thoughtContent
+                    const showAnswer = agent.status === 'completed' ? agent.finalAnswer : agent.answerContent
+                    const hasStructuredContent = showThought || showAnswer
+                    
+                    if (hasStructuredContent) {
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                          {/* 思考过程区域 - 可折叠 */}
+                          {(showThought || agent.currentSection === 'thought') && (
+                            <div>
+                              <div 
+                                onClick={() => showThought && toggleThoughtCollapsed(index)}
+                                style={{
+                                  fontSize: 11,
+                                  fontWeight: 500,
+                                  color: '#86868b',
+                                  marginBottom: thoughtCollapsed.has(index) ? 0 : 8,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 6,
+                                  textTransform: 'uppercase',
+                                  letterSpacing: '0.5px',
+                                  cursor: showThought ? 'pointer' : 'default',
+                                  userSelect: 'none',
+                                }}
+                              >
+                                <span style={{ 
+                                  width: 6, 
+                                  height: 6, 
+                                  borderRadius: '50%', 
+                                  background: agent.currentSection === 'thought' && agent.status === 'running' 
+                                    ? '#f5a623' 
+                                    : '#d2d2d7',
+                                  animation: agent.currentSection === 'thought' && agent.status === 'running'
+                                    ? 'pulse 1.5s ease-in-out infinite'
+                                    : 'none',
+                                }} />
+                                思考
+                                {showThought && (
+                                  <span style={{
+                                    fontSize: 10,
+                                    color: '#c7c7cc',
+                                    marginLeft: 2,
+                                    transition: 'transform 0.2s ease',
+                                    display: 'inline-block',
+                                    transform: thoughtCollapsed.has(index) ? 'rotate(-90deg)' : 'rotate(0deg)',
+                                  }}>
+                                    ▼
+                                  </span>
+                                )}
+                              </div>
+                              {!thoughtCollapsed.has(index) && (
+                                <div style={{
+                                  fontSize: 13,
+                                  lineHeight: 1.7,
+                                  color: '#1d1d1f',
+                                  paddingLeft: 12,
+                                  borderLeft: '2px solid #e5e5ea',
+                                }}>
+                                  {showThought ? (
+                                    markdownEnabled ? (
+                                      <div className="agent-markdown">
+                                        <ReactMarkdown>{showThought}</ReactMarkdown>
+                                      </div>
+                                    ) : (
+                                      <div style={{ whiteSpace: 'pre-wrap' }}>
+                                        {showThought}
+                                      </div>
+                                    )
+                                  ) : (
+                                    <span style={{ color: '#86868b', fontStyle: 'italic' }}>正在思考...</span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+                          {/* 最终结果区域 - 突出显示 */}
+                          {(showAnswer || agent.currentSection === 'answer') && (
+                            <div>
+                              <div style={{
+                                fontSize: 11,
+                                fontWeight: 500,
+                                color: '#86868b',
+                                marginBottom: 8,
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 6,
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px',
+                              }}>
+                                <span style={{ 
+                                  width: 6, 
+                                  height: 6, 
+                                  borderRadius: '50%', 
+                                  background: agent.currentSection === 'answer' && agent.status === 'running' 
+                                    ? '#34c759' 
+                                    : (agent.status === 'completed' ? '#34c759' : '#d2d2d7'),
+                                  animation: agent.currentSection === 'answer' && agent.status === 'running'
+                                    ? 'pulse 1.5s ease-in-out infinite'
+                                    : 'none',
+                                }} />
+                                结果
+                              </div>
+                              <div style={{
+                                background: '#f5f5f7',
+                                borderRadius: 8,
+                                padding: '12px 14px',
+                                fontSize: 13,
+                                lineHeight: 1.6,
+                              }}>
+                                {showAnswer ? (
+                                  markdownEnabled ? (
+                                    <div className="agent-markdown">
+                                      <ReactMarkdown>{showAnswer}</ReactMarkdown>
+                                    </div>
+                                  ) : (
+                                    <div style={{
+                                      fontFamily: 'SF Mono, Monaco, monospace',
+                                      fontSize: 12,
+                                      whiteSpace: 'pre-wrap',
+                                      color: '#1d1d1f',
+                                    }}>
+                                      {showAnswer}
+                                    </div>
+                                  )
+                                ) : (
+                                  <span style={{ color: '#86868b', fontStyle: 'italic' }}>正在生成...</span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    } else {
+                      // 没有结构化内容时，显示原始流式内容
+                      return (
+                        <div style={{
+                          fontSize: 13,
+                          lineHeight: 1.7,
+                          color: '#1d1d1f',
+                          paddingLeft: 12,
+                          borderLeft: '2px solid #e5e5ea',
+                        }}>
+                          {markdownEnabled ? (
+                            <div className="agent-markdown">
+                              <ReactMarkdown>{text}</ReactMarkdown>
+                            </div>
+                          ) : (
+                            <div style={{
+                              whiteSpace: 'pre-wrap',
+                            }}>
+                              {text}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    }
+                  })()}
                 </div>
               )}
             </div>
           )
         })}
-      </Space>
+      </div>
       
       {error && (
         <Alert
@@ -641,7 +1147,7 @@ const GeneratingStep: React.FC<GeneratingStepProps> = ({
           message="生成失败"
           description={error}
           showIcon
-          style={{ marginTop: 16 }}
+          style={{ marginTop: 16, borderRadius: 12 }}
           action={<Button size="small" onClick={onRetry}>重试</Button>}
         />
       )}
@@ -741,7 +1247,25 @@ function layoutCanvasNodes(canvasData: CanvasData) {
   const implY = stepHeight + verticalGap
   let implX = 0
   const placedImpls = new Set<string>()
-  
+  const implGap = 30
+  let implOccupiedRanges: Array<{ start: number; end: number }> = []
+
+  const findNonOverlappingImplX = (preferredX: number, width: number): number => {
+    let x = preferredX
+    let attempts = 0
+    const maxAttempts = 100
+
+    while (attempts < maxAttempts) {
+      const hasOverlap = implOccupiedRanges.some(range =>
+        !(x + width + implGap < range.start || x > range.end + implGap)
+      )
+      if (!hasOverlap) break
+      x += 50
+      attempts++
+    }
+    return x
+  }
+
   canvasData.steps.forEach((step) => {
     const stepPos = positions.get(step.step_id)
     const implIds = stepToImpls.get(step.step_id) || []
@@ -749,7 +1273,6 @@ function layoutCanvasNodes(canvasData: CanvasData) {
     if (stepPos && implIds.length > 0) {
       // 计算该步骤下所有实现的总宽度
       const totalImplWidth = implIds.reduce((sum, id) => sum + (implWidthMap.get(id) || 150), 0)
-      const implGap = 30
       const totalWidth = totalImplWidth + (implIds.length - 1) * implGap
       // 居中对齐到步骤节点
       let startX = stepPos.x + stepPos.width / 2 - totalWidth / 2
@@ -757,13 +1280,15 @@ function layoutCanvasNodes(canvasData: CanvasData) {
       implIds.forEach((implId) => {
         if (!placedImpls.has(implId)) {
           const implWidth = implWidthMap.get(implId) || 150
+          const finalX = findNonOverlappingImplX(startX, implWidth)
           positions.set(implId, {
-            x: startX,
+            x: finalX,
             y: implY,
             width: implWidth,
           })
           placedImpls.add(implId)
-          startX += implWidth + implGap
+          implOccupiedRanges.push({ start: finalX, end: finalX + implWidth })
+          startX = finalX + implWidth + implGap
         }
       })
     }
@@ -773,8 +1298,10 @@ function layoutCanvasNodes(canvasData: CanvasData) {
   canvasData.implementations.forEach(impl => {
     if (!placedImpls.has(impl.impl_id)) {
       const implWidth = implWidthMap.get(impl.impl_id) || 150
-      positions.set(impl.impl_id, { x: implX, y: implY, width: implWidth })
-      implX += implWidth + 40
+      const finalX = findNonOverlappingImplX(implX, implWidth)
+      positions.set(impl.impl_id, { x: finalX, y: implY, width: implWidth })
+      implOccupiedRanges.push({ start: finalX, end: finalX + implWidth })
+      implX = finalX + implWidth + 40
     }
   })
   
@@ -1016,11 +1543,11 @@ const previewNodeTypes = {
   preview: PreviewNode,
 }
 
-// 详情列表使用的样式常量
-const previewNodeStyles = {
-  step: { headerBg: '#e6f4ff', headerColor: '#0958d9' },
-  impl: { headerBg: '#f6ffed', headerColor: '#237804' },
-  data: { headerBg: '#fff7e6', headerColor: '#ad6800' },
+// 苹果风格色彩
+const appleColors = {
+  step: { bg: '#f5f5f7', color: '#1d1d1f', accent: '#007aff' },
+  impl: { bg: '#f5f5f7', color: '#1d1d1f', accent: '#34c759' },
+  data: { bg: '#f5f5f7', color: '#1d1d1f', accent: '#ff9500' },
 }
 
 const PreviewStep: React.FC<PreviewStepProps> = ({
@@ -1113,7 +1640,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
       return { sourceHandle: 'r-out', targetHandle: 'l-in' }
     }
     
-    // 4. 步骤之间的边
+    // 4. 步骤之间的边（不再在连线上展示文字）
     canvasData.edges.forEach((edge, index) => {
       const handles = getHandles(edge.from_step_id, edge.to_step_id)
       edges.push({
@@ -1122,7 +1649,6 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
         target: edge.to_step_id,
         sourceHandle: handles.sourceHandle,
         targetHandle: handles.targetHandle,
-        label: edge.label || edge.condition,
         type: 'simplebezier',
         markerEnd: { type: MarkerType.ArrowClosed },
         style: { stroke: '#1677ff', strokeWidth: 2 },
@@ -1163,46 +1689,47 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
   }, [canvasData])
   
   return (
-    <div>
-      {/* 流程预览标题 */}
+    <div style={{ padding: '4px 0' }}>
+      {/* 简洁顶部信息栏 */}
       <div style={{
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'space-between',
         marginBottom: 12,
       }}>
-        <div>
-          <Text strong style={{ fontSize: 16 }}>{canvasData.process.name}</Text>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 15, fontWeight: 500, color: '#1d1d1f' }}>
+            {canvasData.process.name}
+          </span>
           {canvasData.process.channel && (
             <span style={{
-              marginLeft: 8,
               padding: '2px 8px',
-              background: '#f0f0f0',
+              background: '#f5f5f7',
               borderRadius: 4,
-              fontSize: 12,
-              color: '#666',
+              fontSize: 11,
+              color: '#86868b',
             }}>
-              {canvasData.process.channel}
+              {canvasData.process.channel === 'mobile' ? '移动端' : canvasData.process.channel === 'admin' ? '后台' : canvasData.process.channel}
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', gap: 16, fontSize: 13, color: '#8c8c8c' }}>
-          <span><Text strong>{canvasData.steps.length}</Text> 步骤</span>
-          <span><Text strong>{canvasData.implementations.length}</Text> 实现</span>
-          <span><Text strong>{canvasData.data_resources.length}</Text> 数据资源</span>
+        <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#86868b' }}>
+          <span><span style={{ color: '#007aff', fontWeight: 500 }}>{canvasData.steps.length}</span> 步骤</span>
+          <span><span style={{ color: '#34c759', fontWeight: 500 }}>{canvasData.implementations.length}</span> 实现</span>
+          <span><span style={{ color: '#ff9500', fontWeight: 500 }}>{canvasData.data_resources.length}</span> 资源</span>
         </div>
       </div>
       
       {/* 流程图预览 */}
       <div
         style={{
-          height: 'calc(60vh - 100px)',
-          minHeight: 400,
-          maxHeight: 550,
-          border: '1px solid #e8e8e8',
+          height: 'calc(55vh - 100px)',
+          minHeight: 350,
+          maxHeight: 480,
+          border: '1px solid #e5e5ea',
           borderRadius: 12,
-          marginBottom: 16,
-          background: '#fafafa',
+          marginBottom: 20,
+          background: '#f5f5f7',
           overflow: 'hidden',
         }}
       >
@@ -1218,116 +1745,145 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
           minZoom={0.3}
           maxZoom={1.5}
         >
-          <Background color="#e8e8e8" gap={16} />
+          <Background color="#e5e5ea" gap={20} />
           <Controls showInteractive={false} position="bottom-right" />
         </ReactFlow>
       </div>
       
-      {/* 详细列表 - 默认折叠 */}
-      <Collapse
-        ghost
-        size="small"
-        defaultActiveKey={[]}
-        items={[
-          {
-            key: 'steps',
-            label: (
-              <span style={{ fontSize: 13 }}>
-                📋 步骤详情 ({canvasData.steps.length})
-              </span>
-            ),
-            children: (
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(2, 1fr)', 
-                gap: 8,
-                padding: '4px 0',
-              }}>
-                {canvasData.steps.map((step, i) => (
-                  <div 
-                    key={step.step_id} 
-                    style={{ 
-                      padding: '6px 10px',
-                      background: previewNodeStyles.step.headerBg,
-                      borderRadius: 6,
-                      fontSize: 12,
-                    }}
-                  >
-                    <div style={{ fontWeight: 500, color: previewNodeStyles.step.headerColor }}>{i + 1}. {step.name}</div>
-                    <div style={{ color: '#8c8c8c', fontSize: 11 }}>{step.step_type}</div>
-                  </div>
-                ))}
+      {/* 节点概览 - 三列等宽布局 */}
+      <div style={{ 
+        background: '#f5f5f7', 
+        borderRadius: 10, 
+        padding: '14px 16px',
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr 1fr',
+        gap: 16,
+      }}>
+        {/* 步骤列表 */}
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontSize: 11,
+            fontWeight: 500,
+            color: '#86868b',
+            marginBottom: 6,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#007aff' }} />
+            步骤
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {canvasData.steps.map((step) => (
+              <div 
+                key={step.step_id} 
+                style={{ 
+                  fontSize: 12,
+                  color: '#1d1d1f',
+                  lineHeight: 1.5,
+                  wordBreak: 'break-word',
+                }}
+              >
+                {step.name}
               </div>
-            ),
-          },
-          {
-            key: 'implementations',
-            label: (
-              <span style={{ fontSize: 13 }}>
-                ⚙️ 实现列表 ({canvasData.implementations.length})
-              </span>
-            ),
-            children: (
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(2, 1fr)', 
-                gap: 8,
-                padding: '4px 0',
-              }}>
-                {canvasData.implementations.map((impl) => (
-                  <div 
-                    key={impl.impl_id} 
-                    style={{ 
-                      padding: '6px 10px',
-                      background: previewNodeStyles.impl.headerBg,
-                      borderRadius: 6,
-                      fontSize: 12,
-                    }}
-                  >
-                    <div style={{ fontWeight: 500, color: previewNodeStyles.impl.headerColor }}>{impl.name}</div>
-                    <div style={{ color: '#8c8c8c', fontSize: 11 }}>
-                      {impl.system} · {impl.type}
-                    </div>
-                  </div>
-                ))}
+            ))}
+          </div>
+        </div>
+
+        {/* 实现列表 */}
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontSize: 11,
+            fontWeight: 500,
+            color: '#86868b',
+            marginBottom: 6,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#34c759' }} />
+            实现
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {canvasData.implementations.map((impl) => (
+              <div 
+                key={impl.impl_id} 
+                style={{ 
+                  fontSize: 12,
+                  color: '#1d1d1f',
+                  lineHeight: 1.5,
+                  wordBreak: 'break-word',
+                }}
+              >
+                <span>{impl.name}</span>
+                {impl.system && (
+                  <span style={{ 
+                    fontSize: 10, 
+                    color: '#86868b',
+                    background: '#e5e5ea',
+                    padding: '1px 5px',
+                    borderRadius: 3,
+                    marginLeft: 4,
+                  }}>{impl.system}</span>
+                )}
               </div>
-            ),
-          },
-          {
-            key: 'resources',
-            label: (
-              <span style={{ fontSize: 13 }}>
-                🗃️ 数据资源 ({canvasData.data_resources.length})
-              </span>
-            ),
-            children: (
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(2, 1fr)', 
-                gap: 8,
-                padding: '4px 0',
-              }}>
-                {canvasData.data_resources.map((res) => (
-                  <div 
-                    key={res.resource_id} 
-                    style={{ 
-                      padding: '6px 10px',
-                      background: previewNodeStyles.data.headerBg,
-                      borderRadius: 6,
-                      fontSize: 12,
-                    }}
-                  >
-                    <div style={{ fontWeight: 500, color: previewNodeStyles.data.headerColor }}>{res.name}</div>
-                    <div style={{ color: '#8c8c8c', fontSize: 11 }}>
-                      {res.system} · {res.type}
-                    </div>
-                  </div>
-                ))}
+            ))}
+            {canvasData.implementations.length === 0 && (
+              <div style={{ fontSize: 12, color: '#86868b', fontStyle: 'italic' }}>无</div>
+            )}
+          </div>
+        </div>
+        
+        {/* 数据资源列表 */}
+        <div style={{ minWidth: 0 }}>
+          <div style={{
+            fontSize: 11,
+            fontWeight: 500,
+            color: '#86868b',
+            marginBottom: 6,
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+          }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ff9500' }} />
+            数据
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {canvasData.data_resources.map((res) => (
+              <div 
+                key={res.resource_id} 
+                style={{ 
+                  fontSize: 12,
+                  color: '#1d1d1f',
+                  lineHeight: 1.5,
+                  wordBreak: 'break-word',
+                }}
+              >
+                <span>{res.name}</span>
+                {res.type && (
+                  <span style={{ 
+                    fontSize: 10, 
+                    color: '#86868b',
+                    background: '#e5e5ea',
+                    padding: '1px 5px',
+                    borderRadius: 3,
+                    marginLeft: 4,
+                  }}>{res.type}</span>
+                )}
               </div>
-            ),
-          },
-        ]}
-      />
+            ))}
+            {canvasData.data_resources.length === 0 && (
+              <div style={{ fontSize: 12, color: '#86868b', fontStyle: 'italic' }}>无</div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

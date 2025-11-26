@@ -7,12 +7,13 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 from crewai import Crew
+from crewai.utilities.prompts import Prompts
 from starlette.websockets import WebSocket
 
 from backend.app.llm.base import get_crewai_llm
 from backend.app.llm.streaming import run_agent_stream
-from backend.app.llm.agents import SkeletonAgents
-from backend.app.llm.tasks import SkeletonTasks
+from backend.app.llm.agents import CrewAiAgents
+from backend.app.llm.tasks import CrewAiTasks
 from backend.app.llm.prompts import (
     DATA_ANALYSIS_PROMPT,
     FLOW_DESIGN_PROMPT,
@@ -43,7 +44,6 @@ from backend.app.schemas.canvas import (
     CanvasImplDataLink,
 )
 from backend.app.core.logger import logger
-
 
 # ==================== 核心服务函数 ====================
 
@@ -80,8 +80,8 @@ async def generate_skeleton(
         known_data_resources=", ".join(request.known_data_resources) if request.known_data_resources else "无",
     )
 
-    analyst_agent = SkeletonAgents.create_data_analysis_agent(llm)
-    analyst_task = SkeletonTasks.create_data_analysis_task(analyst_agent, analysis_prompt)
+    analyst_agent = CrewAiAgents.create_data_analysis_agent(llm)
+    analyst_task = CrewAiTasks.create_data_analysis_task(analyst_agent, analysis_prompt)
     crew = Crew(
         agents=[analyst_agent],
         tasks=[analyst_task],
@@ -90,7 +90,7 @@ async def generate_skeleton(
     )
 
     # 直接调用，streaming 层自动处理 chunk 发送
-    analysis_output = await run_agent_stream(crew, websocket, SkeletonAgents.get_meta(0))
+    analysis_output = await run_agent_stream(crew, websocket, CrewAiAgents.get_meta(0))
 
     # ========== Agent 2: 流程设计 ==========
     flow_prompt = FLOW_DESIGN_PROMPT.format(
@@ -100,8 +100,8 @@ async def generate_skeleton(
         analysis_result=analysis_output,
     )
 
-    designer_agent = SkeletonAgents.create_flow_design_agent(llm)
-    designer_task = SkeletonTasks.create_flow_design_task(designer_agent, flow_prompt)
+    designer_agent = CrewAiAgents.create_flow_design_agent(llm)
+    designer_task = CrewAiTasks.create_flow_design_task(designer_agent, flow_prompt)
     crew = Crew(
         agents=[designer_agent],
         tasks=[designer_task],
@@ -109,7 +109,7 @@ async def generate_skeleton(
         stream=True
     )
 
-    flow_output = await run_agent_stream(crew, websocket, SkeletonAgents.get_meta(1))
+    flow_output = await run_agent_stream(crew, websocket, CrewAiAgents.get_meta(1))
 
     # ========== Agent 3: 技术充实 ==========
     enrich_prompt = TECH_ENRICH_PROMPT.format(
@@ -120,8 +120,8 @@ async def generate_skeleton(
         analysis_result=analysis_output,
     )
 
-    architect_agent = SkeletonAgents.create_tech_architect_agent(llm)
-    architect_task = SkeletonTasks.create_tech_enrich_task(architect_agent, enrich_prompt)
+    architect_agent = CrewAiAgents.create_tech_architect_agent(llm)
+    architect_task = CrewAiTasks.create_tech_enrich_task(architect_agent, enrich_prompt)
     crew = Crew(
         agents=[architect_agent],
         tasks=[architect_task],
@@ -129,7 +129,7 @@ async def generate_skeleton(
         stream=True
     )
 
-    enrich_output = await run_agent_stream(crew, websocket, SkeletonAgents.get_meta(2))
+    enrich_output = await run_agent_stream(crew, websocket, CrewAiAgents.get_meta(2))
 
     # ========== 转换为画布结构 ==========
     skeleton = _parse_skeleton_output(enrich_output, request)
@@ -253,15 +253,13 @@ def _parse_skeleton_output(output: str, request: SkeletonGenerateRequest) -> Ske
                 step_type=step_data.get("step_type", "process"),
             ))
 
-        # 解析edges
+        # 解析edges（目前仅保留基础连线类型，不再携带条件/标签语义）
         edges = []
         for edge_data in data.get("edges", []):
             edges.append(EdgeSkeleton(
                 from_step_name=edge_data.get("from_step_name", ""),
                 to_step_name=edge_data.get("to_step_name", ""),
                 edge_type=edge_data.get("edge_type", "normal"),
-                condition=edge_data.get("condition"),
-                label=edge_data.get("label"),
             ))
 
         # 解析implementations
@@ -358,6 +356,7 @@ def convert_skeleton_to_canvas(skeleton: SkeletonAgentOutput) -> SaveProcessCanv
     logger.info(f"生成{len(steps)}个步骤节点")
 
     # 2. 生成边（从edges列表）
+    # 目前仅生成基础连线信息，不再写入条件/标签语义
     edges: List[CanvasEdge] = []
     for edge in skeleton.edges:
         from_id = step_name_to_id.get(edge.from_step_name)
@@ -367,8 +366,6 @@ def convert_skeleton_to_canvas(skeleton: SkeletonAgentOutput) -> SaveProcessCanv
                 from_step_id=from_id,
                 to_step_id=to_id,
                 edge_type=edge.edge_type,
-                condition=edge.condition,
-                label=edge.label,
             ))
     logger.info(f"生成{len(edges)}条边")
 
