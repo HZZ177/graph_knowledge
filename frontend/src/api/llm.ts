@@ -11,6 +11,6 @@ export interface ChatResponse {
 }
 
 export async function askChat(payload: ChatRequest): Promise<ChatResponse> {
-  const res = await http.post<ChatResponse>('/chat/ask', payload)
+  const res = await http.post<ChatResponse>('/llm/chat/ask', payload)
   return res.data
 }

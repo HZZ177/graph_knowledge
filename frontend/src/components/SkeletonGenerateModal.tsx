@@ -29,6 +29,8 @@ import {
   SendOutlined,
   ReloadOutlined,
   CheckOutlined,
+  UpOutlined,
+  DownOutlined,
 } from '@ant-design/icons'
 import { ReactFlow, Background, Controls, type Node, type Edge } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
@@ -41,6 +43,7 @@ import {
   type CanvasData,
 } from '../api/skeleton'
 import { showError, showSuccess } from '../utils/message'
+import { useMultiTypewriter } from '../hooks/useTypewriter'
 
 const { TextArea } = Input
 const { Text, Paragraph } = Typography
@@ -86,10 +89,36 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
   ])
   
   const wsRef = useRef<WebSocket | null>(null)
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null)
   const contentRefs = useRef<(HTMLDivElement | null)[]>([])
+  const autoScrollRef = useRef(true)
+  const userScrollingRef = useRef(false)
+  const lastScrollTopRef = useRef(0)
+  
+  // 使用通用的多通道打字机 hook
+  const typewriter = useMultiTypewriter(3, {
+    onTick: () => {
+      // 打字机每次显示字符时触发滚动
+      if (autoScrollRef.current) {
+        const container = scrollContainerRef.current
+        if (container) {
+          requestAnimationFrame(() => {
+            container.scrollTop = container.scrollHeight
+          })
+        }
+      }
+    },
+  })
+  
+  // 将打字机的 texts 同步到 agents 的 content（用于渲染）
+  const agentsWithContent = agents.map((agent, idx) => ({
+    ...agent,
+    content: typewriter.texts[idx] || '',
+  }))
   
   // 重置状态
   const resetState = useCallback(() => {
+    typewriter.reset()
     setStep('input')
     setError(null)
     setCanvasData(null)
@@ -102,15 +131,59 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
       wsRef.current.close()
       wsRef.current = null
     }
-  }, [])
+  }, [typewriter])
   
   // 关闭弹窗时重置
   useEffect(() => {
     if (!open) {
       resetState()
       form.resetFields()
+      autoScrollRef.current = true
+      userScrollingRef.current = false
     }
   }, [open, resetState, form])
+  
+  // 智能自动滚动：检测用户是否在手动滚动
+  const handleContainerScroll = useCallback(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    
+    const threshold = 50 // 距离底部阈值
+    const currentScrollTop = container.scrollTop
+    const isAtBottom = container.scrollHeight - currentScrollTop - container.clientHeight <= threshold
+    
+    // 检测用户是否向上滚动（手动查看历史）
+    if (currentScrollTop < lastScrollTopRef.current - 5) {
+      // 用户向上滚动，停止自动滚动
+      userScrollingRef.current = true
+      autoScrollRef.current = false
+    }
+    
+    // 如果用户滚动到底部，恢复自动滚动
+    if (isAtBottom) {
+      userScrollingRef.current = false
+      autoScrollRef.current = true
+    }
+    
+    lastScrollTopRef.current = currentScrollTop
+  }, [])
+  
+  // 执行滚动到底部
+  const scrollToBottom = useCallback(() => {
+    if (!autoScrollRef.current) return
+    
+    const container = scrollContainerRef.current
+    if (container) {
+      // 使用 requestAnimationFrame 确保在 DOM 更新后执行
+      requestAnimationFrame(() => {
+        container.scrollTo({
+          top: container.scrollHeight,
+          behavior: 'auto', // 使用 auto 避免动画延迟
+        })
+        lastScrollTopRef.current = container.scrollHeight
+      })
+    }
+  }, [])
   
   // 处理WebSocket消息
   const handleChunk = useCallback((chunk: AgentStreamChunk) => {
@@ -124,27 +197,21 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
         break
         
       case 'stream':
-        setAgents(prev => prev.map((agent, idx) => 
-          idx === chunk.agent_index
-            ? { ...agent, content: agent.content + (chunk.content || '') }
-            : agent
-        ))
-        // 自动滚动到底部
-        setTimeout(() => {
-          const ref = contentRefs.current[chunk.agent_index]
-          if (ref) {
-            ref.scrollTop = ref.scrollHeight
-          }
-        }, 0)
+        // 追加到打字机缓冲区
+        if (chunk.content && chunk.agent_index !== undefined) {
+          typewriter.append(chunk.agent_index, chunk.content)
+        }
         break
         
       case 'agent_end':
+        // 标记完成，触发加速显示剩余内容
+        typewriter.finish(chunk.agent_index)
         setAgents(prev => prev.map((agent, idx) => 
           idx === chunk.agent_index
             ? {
                 ...agent,
                 status: 'completed',
-                output: chunk.agent_output || agent.content,
+                output: chunk.agent_output || '',
                 durationMs: chunk.duration_ms,
               }
             : agent
@@ -154,11 +221,11 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
       case 'result':
         if (chunk.canvas_data) {
           setCanvasData(chunk.canvas_data)
-          setStep('preview')
         }
         break
         
       case 'error':
+        typewriter.reset()
         setError(chunk.error || '生成失败')
         setAgents(prev => prev.map(agent => 
           agent.status === 'running'
@@ -167,7 +234,7 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
         ))
         break
     }
-  }, [])
+  }, [typewriter])
   
   // 开始生成
   const handleGenerate = useCallback(async () => {
@@ -175,6 +242,12 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
       const values = await form.validateFields()
       setError(null)
       setStep('generating')
+      
+      // 重置自动滚动状态和打字机
+      autoScrollRef.current = true
+      userScrollingRef.current = false
+      lastScrollTopRef.current = 0
+      typewriter.reset()
       
       // 重置Agent状态
       setAgents([
@@ -206,7 +279,7 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
       if (e?.errorFields) return
       setError('表单验证失败')
     }
-  }, [form, handleChunk])
+  }, [form, handleChunk, typewriter])
   
   // 确认创建
   const handleConfirm = useCallback(async () => {
@@ -236,7 +309,7 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
   const renderTitle = () => {
     const titles: Record<ModalStep, string> = {
       input: 'AI 生成流程骨架',
-      generating: 'AI 正在生成...',
+      generating: '业务骨架预测',
       preview: '预览生成结果',
     }
     return (
@@ -247,16 +320,60 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
     )
   }
   
+  // 渲染固定底部按钮
+  const renderFooter = () => {
+    if (step === 'input') {
+      return (
+        <Button type="primary" icon={<SendOutlined />} onClick={handleGenerate} block size="large">
+          开始生成
+        </Button>
+      )
+    }
+    if (step === 'generating') {
+      const completed = agents.filter(a => a.status === 'completed').length
+      return (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+          <Button onClick={onClose}>取消</Button>
+          <Button icon={<ReloadOutlined />} onClick={handleRegenerate}>重新生成</Button>
+          <Button type="primary" icon={<CheckOutlined />} disabled={!canvasData || completed < agents.length} onClick={() => setStep('preview')}>
+            预览画布
+          </Button>
+        </div>
+      )
+    }
+    if (step === 'preview') {
+      return (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+          <Button icon={<ReloadOutlined />} onClick={handleRegenerate}>重新生成</Button>
+          <Button type="primary" icon={<CheckOutlined />} onClick={handleConfirm} loading={confirmLoading}>
+            确认创建
+          </Button>
+        </div>
+      )
+    }
+    return null
+  }
+  
   return (
     <Modal
       open={open}
       onCancel={onClose}
       title={renderTitle()}
       width={900}
-      footer={null}
+      footer={renderFooter()}
       maskClosable={false}
       destroyOnClose
+      styles={{ body: { padding: 0 } }}
     >
+      <div
+        ref={scrollContainerRef}
+        onScroll={handleContainerScroll}
+        style={{
+          maxHeight: 'calc(80vh - 160px)',
+          overflow: 'auto',
+          padding: '20px 24px',
+        }}
+      >
       {step === 'input' && (
         <InputStep
           form={form}
@@ -267,7 +384,7 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
       
       {step === 'generating' && (
         <GeneratingStep
-          agents={agents}
+          agents={agentsWithContent}
           contentRefs={contentRefs}
           error={error}
           onRetry={handleRegenerate}
@@ -282,6 +399,7 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
           onConfirm={handleConfirm}
         />
       )}
+      </div>
     </Modal>
   )
 }
@@ -353,12 +471,6 @@ const InputStep: React.FC<InputStepProps> = ({ form, error, onGenerate }) => {
       {error && (
         <Alert type="error" message={error} style={{ marginTop: 16 }} showIcon />
       )}
-      
-      <Form.Item style={{ marginBottom: 0, marginTop: 20 }}>
-        <Button type="primary" icon={<SendOutlined />} onClick={onGenerate} block size="large">
-          开始生成
-        </Button>
-      </Form.Item>
     </Form>
   )
 }
@@ -378,6 +490,30 @@ const GeneratingStep: React.FC<GeneratingStepProps> = ({
   error,
   onRetry,
 }) => {
+  // 展开状态：默认展开正在运行的agent
+  const [expandedIndexes, setExpandedIndexes] = React.useState<Set<number>>(new Set())
+  
+  // 当agent状态变化时，自动展开正在运行的agent
+  React.useEffect(() => {
+    agents.forEach((agent, index) => {
+      if (agent.status === 'running') {
+        setExpandedIndexes(prev => new Set(prev).add(index))
+      }
+    })
+  }, [agents])
+  
+  const toggleExpand = (index: number) => {
+    setExpandedIndexes(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(index)) {
+        newSet.delete(index)
+      } else {
+        newSet.add(index)
+      }
+      return newSet
+    })
+  }
+  
   const getStatusIcon = (status: AgentState['status']) => {
     switch (status) {
       case 'pending': return <ClockCircleOutlined style={{ color: '#bfbfbf' }} />
@@ -425,7 +561,8 @@ const GeneratingStep: React.FC<GeneratingStepProps> = ({
       {/* Agent 列表 */}
       <Space direction="vertical" style={{ width: '100%' }} size={12}>
         {agents.map((agent, index) => {
-          const isExpanded = agent.status === 'running' || agent.status === 'completed'
+          const hasContent = agent.status === 'running' || agent.status === 'completed' || agent.status === 'failed'
+          const isExpanded = hasContent && expandedIndexes.has(index)
           return (
             <div
               key={index}
@@ -435,7 +572,16 @@ const GeneratingStep: React.FC<GeneratingStepProps> = ({
                 background: agent.status === 'pending' ? '#fafafa' : '#fff',
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', padding: '10px 12px', gap: 10 }}>
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  padding: '10px 12px', 
+                  gap: 10,
+                  cursor: hasContent ? 'pointer' : 'default',
+                }}
+                onClick={() => hasContent && toggleExpand(index)}
+              >
                 {getStatusIcon(agent.status)}
                 <div style={{ flex: 1 }}>
                   <div style={{ 
@@ -451,25 +597,36 @@ const GeneratingStep: React.FC<GeneratingStepProps> = ({
                     {(agent.durationMs / 1000).toFixed(1)}s
                   </Text>
                 )}
+                {hasContent && (
+                  <span style={{ color: '#8c8c8c', fontSize: 12 }}>
+                    {isExpanded ? <UpOutlined /> : <DownOutlined />}
+                  </span>
+                )}
               </div>
               
-              {isExpanded && (
+              {hasContent && (
                 <div
-                  ref={(el) => { contentRefs.current[index] = el }}
-                  style={{ maxHeight: 150, overflow: 'auto', padding: '0 12px 12px' }}
+                  style={{
+                    // 不再设置高度上限，依靠整体 Modal 滚动展示完整内容
+                    display: isExpanded ? 'block' : 'none',
+                  }}
                 >
-                  <div style={{
-                    background: '#f5f5f5',
-                    borderRadius: 6,
-                    padding: 10,
-                    fontSize: 12,
-                    lineHeight: 1.6,
-                    color: '#595959',
-                    whiteSpace: 'pre-wrap',
-                    wordBreak: 'break-word',
-                  }}>
-                    {agent.content || agent.output || '处理中...'}
-                    {agent.status === 'running' && <span style={{ color: '#1677ff' }}>|</span>}
+                  <div
+                    ref={(el) => { contentRefs.current[index] = el }}
+                    style={{ padding: '0 12px 12px' }}
+                  >
+                    <div style={{
+                      background: '#f5f5f5',
+                      borderRadius: 6,
+                      padding: 10,
+                      fontSize: 12,
+                      lineHeight: 1.6,
+                      color: '#595959',
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                    }}>
+                      {agent.status === 'completed' ? (agent.output || agent.content || '已完成') : (agent.content || '处理中...')}
+                    </div>
                   </div>
                 </div>
               )}
@@ -860,8 +1017,6 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                 display: 'grid', 
                 gridTemplateColumns: 'repeat(2, 1fr)', 
                 gap: 8,
-                maxHeight: 120, 
-                overflow: 'auto',
                 padding: '4px 0',
               }}>
                 {canvasData.steps.map((step, i) => (
@@ -893,8 +1048,6 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                 display: 'grid', 
                 gridTemplateColumns: 'repeat(2, 1fr)', 
                 gap: 8,
-                maxHeight: 120, 
-                overflow: 'auto',
                 padding: '4px 0',
               }}>
                 {canvasData.implementations.map((impl) => (
@@ -928,8 +1081,6 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                 display: 'grid', 
                 gridTemplateColumns: 'repeat(2, 1fr)', 
                 gap: 8,
-                maxHeight: 120, 
-                overflow: 'auto',
                 padding: '4px 0',
               }}>
                 {canvasData.data_resources.map((res) => (
@@ -953,28 +1104,6 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
           },
         ]}
       />
-      
-      <Divider style={{ margin: '16px 0' }} />
-      
-      {/* 操作按钮 */}
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
-        <Button
-          icon={<ReloadOutlined />}
-          onClick={onRegenerate}
-          size="large"
-        >
-          重新生成
-        </Button>
-        <Button
-          type="primary"
-          icon={<CheckOutlined />}
-          onClick={onConfirm}
-          loading={confirmLoading}
-          size="large"
-        >
-          确认创建
-        </Button>
-      </div>
     </div>
   )
 }

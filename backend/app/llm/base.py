@@ -5,9 +5,6 @@ from crewai import LLM
 from backend.app.services.ai_model_service import AIModelService
 from backend.app.core.logger import logger
 
-# 开启CrewAI调试模式
-os.environ["CREWAI_DEBUG"] = "true"
-
 
 def get_crewai_llm(db: Session) -> LLM:
     """基于当前激活的 AIModel 构造一个 crewai.LLM 实例。"""
@@ -26,7 +23,7 @@ def get_crewai_llm(db: Session) -> LLM:
         base_url=config.base_url,
         temperature=config.temperature,
         max_tokens=config.max_tokens,
-        verbose=True,  # 开启详细日志
+        verbose=False,  # 开启详细日志
     )
     
     logger.info(f"[LLM] LLM实例创建成功")

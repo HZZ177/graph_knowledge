@@ -3,4 +3,4 @@ uvicorn[standard]
 neo4j==6.0.3
 sqlalchemy==2.0.44
 loguru==0.7.3
-crewai==0.177.0
+crewai==1.6.0

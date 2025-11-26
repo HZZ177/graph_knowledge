@@ -10,7 +10,6 @@ from backend.app.api.v1 import (
     canvas,
     health,
     llm_models,
-    skeleton,
 )
 
 from backend.app.db.sqlite import Base, engine, SessionLocal
@@ -38,7 +37,6 @@ app.include_router(resource_nodes.router, prefix="/api/v1")
 app.include_router(canvas.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(llm_models.router, prefix="/api/v1")
-app.include_router(skeleton.router, prefix="/api/v1")
 
 
 @app.on_event("startup")

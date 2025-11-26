@@ -113,7 +113,7 @@ export function createSkeletonWebSocket(
   options: SkeletonWebSocketOptions
 ): WebSocket {
   // 构建WebSocket URL - 使用后端地址
-  const wsUrl = 'ws://localhost:8000/api/v1/skeleton/ws/generate'
+  const wsUrl = 'ws://localhost:8000/api/v1/llm/skeleton/ws/generate'
   
   const ws = new WebSocket(wsUrl)
   
@@ -150,7 +150,7 @@ export function createSkeletonWebSocket(
  * 确认骨架，写入数据库
  */
 export async function confirmSkeleton(canvasData: CanvasData): Promise<CanvasData> {
-  const res = await http.post<CanvasData>('/skeleton/confirm', canvasData)
+  const res = await http.post<CanvasData>('/llm/skeleton/confirm', canvasData)
   return res.data
 }
 
@@ -158,6 +158,6 @@ export async function confirmSkeleton(canvasData: CanvasData): Promise<CanvasDat
  * 非流式骨架预览（备用）
  */
 export async function previewSkeleton(request: SkeletonGenerateRequest): Promise<CanvasData> {
-  const res = await http.post<CanvasData>('/skeleton/preview', request)
+  const res = await http.post<CanvasData>('/llm/skeleton/preview', request)
   return res.data
 }
