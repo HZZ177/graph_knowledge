@@ -387,9 +387,10 @@ const LLMModelManagePage: React.FC = () => {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
+      {/* 顶部标题区 */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
-          <Title level={4} style={{ marginBottom: 0 }}>
+          <Title level={4} style={{ marginBottom: 4 }}>
             AI 模型管理
           </Title>
           <Text type="secondary">管理你的大语言模型配置，并选择需要使用的当前模型。</Text>
@@ -404,23 +405,29 @@ const LLMModelManagePage: React.FC = () => {
         </Space>
       </div>
 
-      <Card>
+      {/* 当前激活模型选择区 */}
+      <Card
+        bodyStyle={{ padding: '12px 16px' }}
+        style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(15,23,42,0.03)' }}
+      >
         <div
           style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
             gap: 16,
+            flexWrap: 'wrap',
           }}
         >
-          <Space align="center">
-            <Text strong>当前使用的模型：</Text>
+          <Space align="center" size={12} wrap>
+            <Text strong>当前使用的模型</Text>
             <Select
               style={{ minWidth: 260 }}
               placeholder="选择模型"
               value={currentActiveId ?? undefined}
               onChange={handleChangeActive}
               loading={activating}
+              size="middle"
             >
               {models.map((m) => {
                 const modelLabel = m.provider ? `${m.provider}/${m.model_name}` : m.model_name
@@ -432,86 +439,141 @@ const LLMModelManagePage: React.FC = () => {
               })}
             </Select>
           </Space>
-          <Text type="secondary">共 {models.length} 个模型配置</Text>
+          <Text type="secondary" style={{ fontSize: 12 }}>
+            共 {models.length} 个模型配置
+          </Text>
         </div>
       </Card>
 
+      {/* 列表区：三列瀑布式卡片 */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
         {loading ? (
-          <Card style={{ marginTop: 8 }}>
+          <Card style={{ marginTop: 8, borderRadius: 12 }}>
             <div style={{ padding: 16, textAlign: 'center' }}>
               <Spin />
             </div>
           </Card>
         ) : models.length === 0 ? (
-          <Card style={{ marginTop: 8 }}>
+          <Card style={{ marginTop: 8, borderRadius: 12 }}>
             <div style={{ padding: 16, textAlign: 'center', color: '#999' }}>暂无模型配置</div>
           </Card>
         ) : (
-          <Space direction="vertical" style={{ width: '100%', marginTop: 8 }} size={12}>
+          <div
+            style={{
+              width: '100%',
+              marginTop: 8,
+              display: 'grid',
+              gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+              gap: 16,
+            }}
+          >
             {models.map((m) => {
               const isCustomGateway = m.provider_type === 'custom_gateway'
               const typeLabel = isCustomGateway ? '自定义网关' : (m.provider || '默认').toUpperCase()
               const endpointDisplay = isCustomGateway && m.gateway_endpoint
                 ? new URL(m.gateway_endpoint).host
                 : null
-              
+
+              const modelLabel = m.provider ? `${m.provider}/${m.model_name}` : m.model_name
+
               return (
                 <Card
                   key={m.id}
-                  bodyStyle={{ padding: '12px 16px' }}
-                  style={{ borderRadius: 8, boxShadow: '0 1px 3px rgba(0,0,0,0.04)' }}
+                  hoverable
+                  bodyStyle={{
+                    padding: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 16,
+                    height: 160,
+                  }}
+                  style={{
+                    breakInside: 'avoid',
+                    marginBottom: 16,
+                    borderRadius: 12,
+                    border: m.is_active ? '1px solid #1677ff' : '1px solid #f0f0f0',
+                    boxShadow: m.is_active
+                      ? '0 0 0 1px rgba(22,119,255,0.15), 0 6px 16px rgba(15,23,42,0.08)'
+                      : '0 2px 8px rgba(15,23,42,0.04)',
+                    background: m.is_active
+                      ? 'linear-gradient(135deg, #f0f5ff, #ffffff)'
+                      : '#ffffff',
+                    transition: 'all 0.2s ease',
+                  }}
                 >
+                  {/* 左侧：头像 */}
+                  <Avatar
+                    size={40}
+                    style={{
+                      width: 40,
+                      height: 40,
+                      lineHeight: '40px',
+                      backgroundColor: isCustomGateway ? '#722ed1' : '#1677ff',
+                      fontSize: 16,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {isCustomGateway
+                      ? 'GW'
+                      : (m.provider || 'LL').slice(0, 2).toUpperCase()}
+                  </Avatar>
+                  {/* 中间：内容区 */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Text strong style={{ fontSize: 14, marginBottom: 4, display: 'block' }}>
+                      {m.name}
+                    </Text>
+                    <div style={{ fontSize: 12, color: '#8c8c8c', marginBottom: 4 }}>
+                      {m.model_name}
+                    </div>
+                    <Space size={6} style={{ flexWrap: 'wrap' }}>
+                      <Tag color={m.is_active ? 'blue' : 'default'} style={{ borderRadius: 999 }}>
+                        {m.is_active ? '已启用' : '未启用'}
+                      </Tag>
+                      <Tag color={isCustomGateway ? 'purple' : 'default'}>{typeLabel}</Tag>
+                      {m.temperature !== undefined && (
+                        <Tag color="geekblue">temp {m.temperature}</Tag>
+                      )}
+                      {m.max_tokens && (
+                        <Tag color="gold">max {m.max_tokens}</Tag>
+                      )}
+                      {m.timeout && (
+                        <Tag color="default">timeout {m.timeout}s</Tag>
+                      )}
+                    </Space>
+                  </div>
+                  {/* 右侧：操作按钮竖向排列 */}
                   <div
                     style={{
                       display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'space-between',
-                      gap: 16,
+                      flexDirection: 'column',
+                      gap: 8,
+                      flexShrink: 0,
                     }}
                   >
-                    <Space size={16}>
-                      <Avatar
-                        size={40}
-                        style={{ backgroundColor: isCustomGateway ? '#722ed1' : '#1677ff' }}
-                        icon={<FileTextOutlined />}
-                      />
-                      <div>
-                        <Space size={8} align="center">
-                          <Text strong>{m.name}</Text>
-                          {m.is_active && <Tag color="blue">启用</Tag>}
-                        </Space>
-                        <Space size={8} style={{ marginTop: 4, flexWrap: 'wrap' }}>
-                          <Tag color={isCustomGateway ? 'purple' : 'default'}>{typeLabel}</Tag>
-                          <Tag>{m.model_name}</Tag>
-                          {endpointDisplay && <Tag color="cyan">{endpointDisplay}</Tag>}
-                        </Space>
-                      </div>
-                    </Space>
-                    <Space size="middle">
-                      <Button
-                        type="text"
-                        icon={<LinkOutlined />}
-                        loading={testingSavedId === m.id}
-                        onClick={() => handleTestSaved(m)}
-                      />
-                      <Button
-                        type="text"
-                        icon={<EditOutlined />}
-                        onClick={() => handleOpenEdit(m)}
-                      />
-                      <Popconfirm
-                        title="确认删除该模型？"
-                        onConfirm={() => handleDelete(m)}
-                      >
-                        <Button type="text" danger icon={<DeleteOutlined />} />
-                      </Popconfirm>
-                    </Space>
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<LinkOutlined />}
+                      loading={testingSavedId === m.id}
+                      onClick={() => handleTestSaved(m)}
+                    />
+                    <Button
+                      type="text"
+                      size="small"
+                      icon={<EditOutlined />}
+                      onClick={() => handleOpenEdit(m)}
+                    />
+                    <Popconfirm
+                      title="确认删除该模型？"
+                      onConfirm={() => handleDelete(m)}
+                    >
+                      <Button type="text" size="small" danger icon={<DeleteOutlined />} />
+                    </Popconfirm>
                   </div>
                 </Card>
               )
             })}
-          </Space>
+          </div>
         )}
       </div>
 
