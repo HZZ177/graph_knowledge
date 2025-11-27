@@ -51,7 +51,7 @@ logger.configure(
             "filter": trace_id_filter,  # 添加自定义过滤器注入traceId
         },
         {
-            "sink": f"{log_path}/yongce_pro_c_engine_{{time:YYYY-MM-DD_HH}}.log",  # 指定日志输出到文件
+            "sink": f"{log_path}/graph_knowledge_engine_{{time:YYYY-MM-DD_HH}}.log",  # 指定日志输出到文件
             "level": "DEBUG",  # 日志级别
             "format": "{time:YYYY-MM-DD HH:mm:ss.SSSS} | traceId:{extra[trace_id]} | {module}:{line} | {level} | {message}",  # 日志格式
             "rotation": "1 hour",  # 每小时自动分割日志
