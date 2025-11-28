@@ -300,7 +300,6 @@ const BusinessTab: React.FC = () => {
                   <div
                     style={{
                       display: 'flex',
-                      justifyContent: 'space-between',
                       alignItems: 'center',
                       marginBottom: 4,
                     }}
@@ -322,14 +321,15 @@ const BusinessTab: React.FC = () => {
                         </Typography.Text>
                       </Tooltip>
                     </Space>
-                    <Space size={4}>
-                      {item.channel && (
-                        <Tag color="blue" style={{ fontSize: 11 }}>
-                          {item.channel}
-                        </Tag>
-                      )}
-                    </Space>
                   </div>
+
+                  {item.channel && (
+                    <div style={{ marginBottom: 4 }}>
+                      <Tag color="blue" style={{ fontSize: 11 }}>
+                        {item.channel}
+                      </Tag>
+                    </div>
+                  )}
 
                   <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
                     <div>流程ID: {item.process_id}</div>
@@ -760,7 +760,6 @@ const StepTab: React.FC = () => {
                   <div
                     style={{
                       display: 'flex',
-                      justifyContent: 'space-between',
                       alignItems: 'center',
                       marginBottom: 4,
                     }}
@@ -782,14 +781,15 @@ const StepTab: React.FC = () => {
                         </Typography.Text>
                       </Tooltip>
                     </Space>
-                    <Space size={4}>
-                      {item.step_type && (
-                        <Tag color="green" style={{ fontSize: 11 }}>
-                          {item.step_type}
-                        </Tag>
-                      )}
-                    </Space>
                   </div>
+
+                  {item.step_type && (
+                    <div style={{ marginBottom: 4 }}>
+                      <Tag color="green" style={{ fontSize: 11 }}>
+                        {item.step_type}
+                      </Tag>
+                    </div>
+                  )}
 
                   <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
                     <div>步骤ID: {item.step_id}</div>
@@ -1316,7 +1316,6 @@ const ImplementationTab: React.FC = () => {
                   <div
                     style={{
                       display: 'flex',
-                      justifyContent: 'space-between',
                       alignItems: 'center',
                       marginBottom: 4,
                     }}
@@ -1338,19 +1337,24 @@ const ImplementationTab: React.FC = () => {
                         </Typography.Text>
                       </Tooltip>
                     </Space>
-                    <Space size={4}>
-                      {impl.system && (
-                        <Tag color="geekblue" style={{ fontSize: 11 }}>
-                          {impl.system}
-                        </Tag>
-                      )}
-                      {impl.type && (
-                        <Tag color="default" style={{ fontSize: 11 }}>
-                          {impl.type}
-                        </Tag>
-                      )}
-                    </Space>
                   </div>
+
+                  {(impl.system || impl.type) && (
+                    <div style={{ marginBottom: 4 }}>
+                      <Space size={4}>
+                        {impl.system && (
+                          <Tag color="geekblue" style={{ fontSize: 11 }}>
+                            {impl.system}
+                          </Tag>
+                        )}
+                        {impl.type && (
+                          <Tag color="default" style={{ fontSize: 11 }}>
+                            {impl.type}
+                          </Tag>
+                        )}
+                      </Space>
+                    </div>
+                  )}
 
                   <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
                     <div>实现ID: {impl.impl_id}</div>
@@ -1968,7 +1972,6 @@ const DataResourceTab: React.FC = () => {
                   <div
                     style={{
                       display: 'flex',
-                      justifyContent: 'space-between',
                       alignItems: 'center',
                       marginBottom: 4,
                     }}
@@ -1990,14 +1993,15 @@ const DataResourceTab: React.FC = () => {
                         </Typography.Text>
                       </Tooltip>
                     </Space>
-                    <Space size={4}>
-                      {r.type && (
-                        <Tag style={{ fontSize: 11 }}>
-                          {r.type}
-                        </Tag>
-                      )}
-                    </Space>
                   </div>
+
+                  {r.type && (
+                    <div style={{ marginBottom: 4 }}>
+                      <Tag style={{ fontSize: 11 }}>
+                        {r.type}
+                      </Tag>
+                    </div>
+                  )}
 
                   <div style={{ fontSize: 11, color: '#6b7280', marginBottom: 4 }}>
                     <div>资源ID: {r.resource_id}</div>

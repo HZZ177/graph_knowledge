@@ -8,6 +8,7 @@ export interface ConfirmOptions {
   okText?: React.ReactNode
   cancelText?: React.ReactNode
   okType?: ButtonProps['type']
+  okButtonProps?: ButtonProps
   centered?: boolean
 }
 

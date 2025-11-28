@@ -182,11 +182,65 @@ frontend/src/
 
 > 所有工具均使用 CrewAI `BaseTool` 类继承方式实现，便于复用 db session 和统一错误处理。
 
+### 5.0 实体发现核心机制：候选列表 + 小 LLM 选择
+
+实体发现工具采用**两阶段架构**，避免将全量实体数据传递给主 Chat Agent，有效控制 Token 消耗：
+
+```
+用户问题 → 主 Agent 调用 search_* 工具
+                    ↓
+            ┌───────────────────────────────────┐
+            │  工具内部执行                      │
+            │  1. 查询所有该类实体               │
+            │  2. 构造候选列表文本               │
+            │  3. 调用小 LLM 进行筛选            │
+            │  4. 只返回精选结果                 │
+            └───────────────────────────────────┘
+                    ↓
+            主 Agent 只看到 ≤5 个精选实体
+```
+
+**小 LLM 选择器实现**：
+
+```python
+ENTITY_SELECTOR_PROMPT = """你是一个实体匹配助手。根据用户的查询描述，从候选列表中选择最相关的实体。
+
+## 用户查询
+{query}
+
+## 候选列表
+{candidates}
+
+## 任务
+请分析用户查询，从候选列表中选择最相关的实体（最多选择 {limit} 个）。
+只返回你认为相关的实体，如果没有相关的可以返回空列表。
+
+## 输出格式
+请严格按 JSON 格式返回选中的实体 ID 列表，例如：
+{{"selected_ids": ["id1", "id2"]}}
+
+只输出 JSON，不要有其他内容。"""
+
+def _call_selector_llm(query: str, candidates_text: str, limit: int = 5) -> List[str]:
+    """调用小 LLM 进行实体选择"""
+    config = get_llm_config(db)
+    response = litellm.completion(
+        model=config.model,
+        api_key=config.api_key,
+        api_base=config.api_base,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.1,  # 低温度，更确定性
+        max_tokens=200,
+    )
+    result = json.loads(response.choices[0].message.content)
+    return result.get("selected_ids", [])
+```
+
 ### 5.1 search_businesses
 
 - **name**: `search_businesses`
 - **description**:
-  > 根据自然语言描述查找可能相关的业务流程。用于当用户提到“某个业务/流程/活动”但没有给出 process_id 时。
+  > 根据自然语言描述查找可能相关的业务流程。用于当用户提到"某个业务/流程/活动"但没有给出 process_id 时。
 
 - **parameters（function schema）**：
 
@@ -213,32 +267,27 @@ frontend/src/
 
 ```ts
 {
+  query: string           // 用户查询
+  total_count: number     // 该类实体总数
+  matched_count: number   // 小 LLM 选中的数量
   candidates: Array<{
     process_id: string
     name: string
     description?: string
-    match_reason: string
+    channel?: string
   }>
 }
 ```
 
-- **实现要点（候选列表 + LLM 选择）**：
-  1. 从 SQLite 查询所有 Business 的 `process_id`, `name`, `description`
-  2. 构造候选列表字符串，格式如：`[1] 开通月卡 - 用户在App中开通会员卡`
-  3. 调用 LLM 从候选中选择最匹配的实体（返回序号 + 匹配理由）
-  4. 解析 LLM 输出，返回候选实体列表
+- **实现要点（候选列表 + 小 LLM 选择）**：
+  1. 从 SQLite 查询所有 Business 的 `process_id`, `name`, `description`, `channel`
+  2. 构造候选列表文本：`- ID: proc_001 | 名称: 开卡流程 [APP] | 描述: ...`
+  3. 调用小 LLM（`_call_selector_llm`）返回选中的 ID 列表
+  4. 根据选中 ID 构造精选结果，返回给主 Agent
 
 - **CrewAI Tool 示例**：
 
 ```python
-from crewai.tools import BaseTool
-from pydantic import BaseModel, Field
-from typing import Type
-
-class SearchBusinessesInput(BaseModel):
-    query: str = Field(..., description="用户对业务流程的自然语言描述")
-    limit: int = Field(default=5, description="最多返回的候选数量")
-
 class SearchBusinessesTool(BaseTool):
     name: str = "search_businesses"
     description: str = "根据自然语言描述查找业务流程，返回最匹配的候选列表"
@@ -246,19 +295,26 @@ class SearchBusinessesTool(BaseTool):
     
     def _run(self, query: str, limit: int = 5) -> str:
         # 1. 查询所有 Business
-        # 2. 构造候选列表
-        # 3. LLM 选择
-        # 4. 返回结果
-        ...
+        businesses = db.query(Business).all()
+        
+        # 2. 构造候选列表文本（供小 LLM 选择）
+        candidates_text = self._build_candidates_text(businesses)
+        
+        # 3. 调用小 LLM 进行筛选
+        selected_ids = _call_selector_llm(query, candidates_text, limit)
+        
+        # 4. 根据选中的 ID 构造精选结果
+        id_to_business = {b.process_id: b for b in businesses}
+        candidates = [id_to_business[pid] for pid in selected_ids if pid in id_to_business]
+        
+        return json.dumps({"query": query, "candidates": candidates, ...})
 ```
-
----
 
 ### 5.2 search_implementations
 
 - **name**: `search_implementations`
 - **description**:
-  > 根据自然语言描述或 URI 片段查找实现/接口，例如“订单详情接口”、“/api/order/detail”。
+  > 根据自然语言描述或 URI 片段查找实现/接口，例如"订单详情接口"、"/api/order/detail"。
 
 - **parameters**：
 
@@ -287,24 +343,25 @@ class SearchBusinessesTool(BaseTool):
 
 ```ts
 {
+  query: string
+  system_filter?: string   // 系统过滤条件
+  total_count: number
+  matched_count: number
   candidates: Array<{
     impl_id: string
     name: string
     system?: string
     type?: string
     description?: string
-    match_reason: string
   }>
 }
 ```
 
 - **实现要点**：
   1. 从 SQLite 查询所有 Implementation（可按 system 过滤）
-  2. 构造候选列表：`[1] POST /api/order/detail (order-service) - 查询订单详情`
-  3. LLM 选择最匹配的候选
-  4. 返回结果
-
----
+  2. 构造候选列表：`- ID: impl_001 | 名称: 订单详情接口 [order-service] (HTTP) | 描述: ...`
+  3. 调用小 LLM 选择最匹配的候选
+  4. 返回精选结果
 
 ### 5.3 search_data_resources
 
@@ -339,22 +396,25 @@ class SearchBusinessesTool(BaseTool):
 
 ```ts
 {
+  query: string
+  system_filter?: string
+  total_count: number
+  matched_count: number
   candidates: Array<{
     resource_id: string
     name: string
     type?: string
     system?: string
     description?: string
-    match_reason: string
   }>
 }
 ```
 
 - **实现要点**：
   1. 从 SQLite 查询所有 DataResource（可按 system 过滤）
-  2. 构造候选列表：`[1] user_profile (db_table, user-service) - 用户基本信息表`
-  3. LLM 选择最匹配的候选
-  4. 返回结果
+  2. 构造候选列表：`- ID: res_001 | 名称: 用户信息表 [user-service] (table) | 描述: ...`
+  3. 调用小 LLM 选择最匹配的候选
+  4. 返回精选结果
 
 ## 6. 上下文 / 拓扑类工具设计
 

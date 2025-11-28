@@ -7,7 +7,6 @@ import {
   createLLMModel,
   updateLLMModel,
   deleteLLMModel,
-  activateLLMModel,
   testLLMModel,
   testSavedLLMModel,
   type AIModelOut,
@@ -303,20 +302,16 @@ const ModelModal: React.FC<ModelModalProps> = ({ open, mode, initial, onOk, onCa
 const LLMModelManagePage: React.FC = () => {
   const [models, setModels] = useState<AIModelOut[]>([])
   const [loading, setLoading] = useState(false)
-  const [currentActiveId, setCurrentActiveId] = useState<number | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
   const [editingModel, setEditingModel] = useState<AIModelOut | null>(null)
   const [testingSavedId, setTestingSavedId] = useState<number | null>(null)
-  const [activating, setActivating] = useState(false)
 
   const fetchModels = async () => {
     setLoading(true)
     try {
       const data = await listLLMModels()
       setModels(data)
-      const active = data.find((m) => m.is_active)
-      setCurrentActiveId(active ? active.id : null)
     } catch (e) {
       showError('加载模型列表失败')
     } finally {
@@ -338,19 +333,6 @@ const LLMModelManagePage: React.FC = () => {
     setModalMode('edit')
     setEditingModel(record)
     setModalOpen(true)
-  }
-
-  const handleActivate = async (record: AIModelOut) => {
-    try {
-      setActivating(true)
-      await activateLLMModel(record.id)
-      showSuccess('已设置为当前激活模型')
-      fetchModels()
-    } catch (e) {
-      showError('激活模型失败')
-    } finally {
-      setActivating(false)
-    }
   }
 
   const handleDelete = async (record: AIModelOut) => {
@@ -379,12 +361,6 @@ const LLMModelManagePage: React.FC = () => {
     }
   }
 
-  const handleChangeActive = async (value: number) => {
-    const record = models.find((m) => m.id === value)
-    if (!record) return
-    await handleActivate(record)
-  }
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16, height: '100%' }}>
       {/* 顶部标题区 */}
@@ -393,7 +369,7 @@ const LLMModelManagePage: React.FC = () => {
           <Title level={4} style={{ marginBottom: 4 }}>
             AI 模型管理
           </Title>
-          <Text type="secondary">管理你的大语言模型配置，并选择需要使用的当前模型。</Text>
+          <Text type="secondary">管理你的大语言模型配置（接入方式、密钥与参数等）。</Text>
         </div>
         <Space>
           <Button icon={<ReloadOutlined />} onClick={fetchModels}>
@@ -404,46 +380,6 @@ const LLMModelManagePage: React.FC = () => {
           </Button>
         </Space>
       </div>
-
-      {/* 当前激活模型选择区 */}
-      <Card
-        bodyStyle={{ padding: '12px 16px' }}
-        style={{ borderRadius: 12, boxShadow: '0 2px 8px rgba(15,23,42,0.03)' }}
-      >
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            gap: 16,
-            flexWrap: 'wrap',
-          }}
-        >
-          <Space align="center" size={12} wrap>
-            <Text strong>当前使用的模型</Text>
-            <Select
-              style={{ minWidth: 260 }}
-              placeholder="选择模型"
-              value={currentActiveId ?? undefined}
-              onChange={handleChangeActive}
-              loading={activating}
-              size="middle"
-            >
-              {models.map((m) => {
-                const modelLabel = m.provider ? `${m.provider}/${m.model_name}` : m.model_name
-                return (
-                  <Option key={m.id} value={m.id}>
-                    {m.name}（{modelLabel}）
-                  </Option>
-                )
-              })}
-            </Select>
-          </Space>
-          <Text type="secondary" style={{ fontSize: 12 }}>
-            共 {models.length} 个模型配置
-          </Text>
-        </div>
-      </Card>
 
       {/* 列表区：三列瀑布式卡片 */}
       <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>

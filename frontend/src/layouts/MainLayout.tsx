@@ -1,5 +1,5 @@
-import React, { useState } from 'react'
-import { Layout, Menu, Button } from 'antd'
+import React, { useState, useEffect } from 'react'
+import { Layout, Menu, Button, Select, Typography, Space } from 'antd'
 import {
   HomeOutlined,
   AppstoreOutlined,
@@ -7,21 +7,67 @@ import {
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   RobotOutlined,
+  MessageOutlined,
 } from '@ant-design/icons'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { listLLMModels, activateLLMModel, type AIModelOut } from '../api/llmModels'
+import { showError, showSuccess } from '../utils/message'
 
 const { Header, Sider, Content } = Layout
+const { Option } = Select
+const { Text } = Typography
 
 const MainLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(true)
+  const [models, setModels] = useState<AIModelOut[]>([])
+  const [activeModelId, setActiveModelId] = useState<number | null>(null)
+  const [modelLoading, setModelLoading] = useState(false)
+  const [activating, setActivating] = useState(false)
+
   const location = useLocation()
   const navigate = useNavigate()
+
+  const fetchModels = async () => {
+    setModelLoading(true)
+    try {
+      const data = await listLLMModels()
+      setModels(data)
+      const active = data.find((m) => m.is_active)
+      setActiveModelId(active ? active.id : null)
+    } catch (e) {
+      showError('加载模型列表失败')
+    } finally {
+      setModelLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchModels()
+  }, [])
+
+  const handleChangeActiveModel = async (value: number) => {
+    try {
+      setActivating(true)
+      await activateLLMModel(value)
+      showSuccess('已设置为当前模型')
+      fetchModels()
+    } catch (e) {
+      showError('激活模型失败')
+    } finally {
+      setActivating(false)
+    }
+  }
 
   const menuItems = [
     {
       key: '/',
       icon: <HomeOutlined />,
       label: <Link to="/">首页</Link>,
+    },
+    {
+      key: '/chat',
+      icon: <MessageOutlined />,
+      label: <Link to="/chat">智能问答</Link>,
     },
     {
       key: '/resources',
@@ -123,7 +169,31 @@ const MainLayout: React.FC = () => {
                 height: 64,
               }}
             />
-            <span style={{ fontSize: 16, fontWeight: 500 }}>业务流程配置中心</span>
+            <span style={{ fontSize: 16, fontWeight: 500 }}>智能问答</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', paddingRight: 16 }}>
+            <Space size={8} align="center">
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                当前模型
+              </Text>
+              <Select
+                style={{ minWidth: 260 }}
+                placeholder="选择模型"
+                size="middle"
+                value={activeModelId ?? undefined}
+                loading={modelLoading || activating}
+                onChange={handleChangeActiveModel}
+              >
+                {models.map((m) => {
+                  const label = m.provider ? `${m.provider}/${m.model_name}` : m.model_name
+                  return (
+                    <Option key={m.id} value={m.id}>
+                      {m.name}（{label}）
+                    </Option>
+                  )
+                })}
+              </Select>
+            </Space>
           </div>
         </Header>
         <Content

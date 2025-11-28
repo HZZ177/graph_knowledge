@@ -1,15 +1,18 @@
-import json
+from typing import List
 from fastapi import APIRouter, Body, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from backend.app.db.sqlite import get_db, SessionLocal
-from backend.app.schemas.llm import ChatRequest, ChatResponse, StreamChatRequest
+from backend.app.schemas.llm import StreamChatRequest, ConversationHistoryResponse, ConversationOut
 from backend.app.schemas.skeleton import SkeletonGenerateRequest
 from backend.app.schemas.canvas import SaveProcessCanvasRequest
+from backend.app.models.conversation import Conversation
 from backend.app.services.llm_chat_service import (
-    answer_question_with_process_context,
-    streaming_chat_with_context,
+    streaming_chat,
+    get_conversation_history,
+    clear_conversation,
 )
+from backend.app.llm.langchain_chat_agent import generate_conversation_title
 from backend.app.services.llm_skeleton_service import generate_skeleton
 from backend.app.services.canvas_service import save_process_canvas
 from backend.app.services.graph_sync_service import sync_process
@@ -20,50 +23,39 @@ from backend.app.core.logger import logger
 router = APIRouter(prefix="/llm", tags=["llm"])
 
 
-@router.post("/chat/ask", response_model=ChatResponse, summary="基于流程上下文的 LLM 问答接口")
-async def chat(
-    req: ChatRequest = Body(...),
-    db: Session = Depends(get_db),
-) -> dict:
-    try:
-        result = answer_question_with_process_context(
-            db=db,
-            question=req.question,
-            process_id=req.process_id,
-        )
-        data = ChatResponse(
-            answer=result["answer"],
-            process_id=result.get("process_id"),
-        )
-        return success_response(data=data)
-    except Exception as exc:
-        return error_response(message=str(exc))
-
-
-@router.websocket("/chat/ws/stream")
-async def websocket_chat_stream(websocket: WebSocket):
-    """WebSocket流式问答接口
+@router.websocket("/chat/ws")
+async def websocket_chat(websocket: WebSocket):
+    """WebSocket 知识图谱问答接口（基于 LangChain）
+    
+    基于 LangChain Agent 的自然语言问答，支持：
+    - 实体发现（业务流程、接口、数据资源）
+    - 图上下文获取
+    - 多轮对话（通过 thread_id 管理会话）
+    - 流式输出
     
     协议：
-    1. 客户端连接后发送 StreamChatRequest JSON
+    1. 客户端连接后发送 StreamChatRequest JSON: {"question": "...", "thread_id": "..."}
+       - thread_id 可选，为空则创建新会话
     2. 服务端流式推送消息：
-       - {"type": "start", "request_id": "..."}
-       - {"type": "chunk", "content": "...", "request_id": "..."}
-       - {"type": "done", "request_id": "...", "metadata": {...}}
-       - {"type": "error", "error": "...", "request_id": "..."}
+       - {"type": "start", "request_id": "...", "thread_id": "..."}
+       - {"type": "stream", "content": "..."}
+       - {"type": "tool_start", "tool_name": "...", "tool_input": {...}}
+       - {"type": "tool_end", "tool_name": "..."}
+       - {"type": "result", "thread_id": "...", "content": "...", "tool_calls": [...]}
+       - {"type": "error", "error": "..."}
     """
     await websocket.accept()
-    logger.info("WebSocket连接已建立 - 流式问答")
+    logger.info("WebSocket 连接已建立 - 知识图谱问答")
     
     db: Session = SessionLocal()
     
     try:
         # 接收请求数据
         data = await websocket.receive_text()
-        logger.info(f"收到流式问答请求: {data[:200]}...")
+        logger.info(f"收到问答请求: {data[:200]}...")
         
         try:
-            request = StreamChatRequest.parse_raw(data)
+            request = StreamChatRequest.model_validate_json(data)
         except Exception as e:
             logger.error(f"解析请求失败: {e}")
             await websocket.send_text(json.dumps({
@@ -72,21 +64,19 @@ async def websocket_chat_stream(websocket: WebSocket):
             }, ensure_ascii=False))
             return
         
-        # 流式生成响应
-        async for message in streaming_chat_with_context(
+        # 调用流式问答服务（支持多轮对话）
+        await streaming_chat(
             db=db,
             question=request.question,
-            process_id=request.process_id,
-        ):
-            await websocket.send_text(json.dumps(
-                message.to_dict(),
-                ensure_ascii=False,
-            ))
+            websocket=websocket,
+            thread_id=request.thread_id,
+        )
         
     except WebSocketDisconnect:
-        logger.info("WebSocket连接断开 - 流式问答")
+        logger.info("WebSocket 连接断开 - 知识图谱问答")
     except Exception as e:
-        logger.error(f"流式问答异常: {e}", exc_info=True)
+        # 使用 lazy 格式化或直接传参，避免 str(e) 中包含大括号导致格式化错误
+        logger.error("问答异常: {}", e)
         try:
             await websocket.send_text(json.dumps({
                 "type": "error",
@@ -100,6 +90,45 @@ async def websocket_chat_stream(websocket: WebSocket):
             await websocket.close()
         except:
             pass
+
+
+@router.get("/conversations", response_model=List[ConversationOut])
+async def list_conversations(
+    skip: int = 0, 
+    limit: int = 100, 
+    db: Session = Depends(get_db)
+):
+    """获取会话列表（按更新时间倒序）"""
+    convs = db.query(Conversation).order_by(Conversation.updated_at.desc()).offset(skip).limit(limit).all()
+    return convs
+
+
+@router.delete("/conversation/{thread_id}")
+async def delete_conversation(thread_id: str, db: Session = Depends(get_db)):
+    """删除会话（同时清除元数据和历史记录）"""
+    # 1. 删除元数据
+    conv = db.query(Conversation).filter(Conversation.id == thread_id).first()
+    if conv:
+        db.delete(conv)
+        db.commit()
+    
+    # 2. 清除 Checkpoint 历史
+    await clear_conversation(thread_id)
+    
+    return success_response(message="会话已删除")
+
+
+@router.get("/conversation/{thread_id}", response_model=ConversationHistoryResponse)
+async def get_conversation(thread_id: str):
+    messages = await get_conversation_history(thread_id)
+    return ConversationHistoryResponse(thread_id=thread_id, messages=messages)
+
+
+@router.post("/conversation/{thread_id}/title")
+async def generate_title(thread_id: str, db: Session = Depends(get_db)):
+    """生成会话标题"""
+    title = await generate_conversation_title(db, thread_id)
+    return {"thread_id": thread_id, "title": title}
 
 
 @router.websocket("/skeleton/ws/generate")

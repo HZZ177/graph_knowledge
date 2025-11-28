@@ -5,6 +5,7 @@ import HomePage from './pages/HomePage'
 import ResourceLibraryPage from './pages/ResourceLibraryPage'
 import BusinessLibraryPage from './pages/BusinessLibraryPage'
 import LLMModelManagePage from './pages/LLMModelManagePage'
+import ChatPage from './pages/ChatPage'
 
 const router = createBrowserRouter([
   {
@@ -14,6 +15,10 @@ const router = createBrowserRouter([
       {
         index: true,
         element: <HomePage />,
+      },
+      {
+        path: '/chat',
+        element: <ChatPage />,
       },
       {
         path: '/resources',

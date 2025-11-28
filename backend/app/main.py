@@ -15,7 +15,7 @@ from backend.app.api.v1 import (
 from backend.app.db.sqlite import Base, engine, SessionLocal
 from backend.app.db.init_db import init_db
 from backend.app.core.middleware import trace_id_middleware
-from backend.app.models import ai_models  # noqa: F401  确保 ai_models 表被创建
+from backend.app.models import ai_models, conversation  # noqa: F401  确保 ai_models, conversations 表被创建
 
 app = FastAPI(title="Graph Knowledge Backend")
 

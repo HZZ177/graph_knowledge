@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@ant-design/icons": "^5.2.6",
+    "@uiw/react-markdown-preview": "^5.1.5",
     "@xyflow/react": "^12.3.2",
     "antd": "^5.12.2",
     "axios": "^1.7.0",

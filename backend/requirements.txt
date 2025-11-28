@@ -5,3 +5,9 @@ sqlalchemy==2.0.44
 loguru==0.7.3
 crewai==1.6.0
 litellm==1.74.9
+# LangChain for conversational agent
+langchain>=1.1.0
+langchain-openai>=0.3.0
+langgraph>=0.2.0
+langgraph-checkpoint>=2.0.0
+aiosqlite==0.21.0
