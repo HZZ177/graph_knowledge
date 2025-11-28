@@ -86,77 +86,168 @@ const WelcomeScreen: React.FC<{ onSuggestionClick: (q: string) => void }> = ({ o
   )
 }
 
-// 2. 工具调用过程展示
+// 2. 工具调用过程展示（单个调用，一个面板）
 interface ToolProcessProps {
-  toolCalls: ToolCallInfo[]
-  isThinking: boolean
-  currentToolName?: string
+  name: string
+  isActive: boolean
 }
 
-const ToolProcess: React.FC<ToolProcessProps> = ({ toolCalls, isThinking, currentToolName }) => {
-  const [isExpanded, setIsExpanded] = useState(false)
+const ToolProcess: React.FC<ToolProcessProps> = ({ name, isActive }) => {
+  const [isExpanded, setIsExpanded] = useState(isActive)
+  const [userToggled, setUserToggled] = useState(false)
   
-  // 如果正在思考或有工具调用，显示
-  if (!isThinking && (!toolCalls || toolCalls.length === 0)) return null
+  // 根据当前是否正在调用自动展开/收起（除非用户手动改动）
+  useEffect(() => {
+    if (userToggled) return
+    setIsExpanded(isActive)
+  }, [isActive, userToggled])
+  
+  if (!name) return null
+  const prettyName = name.replace(/_/g, ' ')
+  const label = isActive
+    ? <span className="status-text">Searching {prettyName}</span>
+    : `Searched ${prettyName}`
 
-  // 格式化工具名称显示
-  const formatToolNames = (tools: ToolCallInfo[]) => {
-    if (tools.length === 0) return ''
-    if (tools.length === 1) return tools[0].name
-    if (tools.length <= 3) return tools.map(t => t.name).join('、')
-    return tools.slice(0, 3).map(t => t.name).join('、') + ' 等工具'
-  }
-
-  // 获取摘要文本
-  const getSummaryText = () => {
-    if (isThinking && currentToolName) {
-      return `正在调用 ${currentToolName} 工具`
-    }
-    if (isThinking) {
-      return '正在思考...'
-    }
-    return `已调用 ${formatToolNames(toolCalls)}`
+  const handleToggle = () => {
+    setUserToggled(true)
+    setIsExpanded(!isExpanded)
   }
 
   return (
-    <div className={`tool-process-container ${isExpanded ? 'expanded' : ''}`}>
-      <div 
-        className={`tool-process-summary ${isExpanded ? 'active' : ''}`}
-        onClick={() => toolCalls.length > 0 && setIsExpanded(!isExpanded)}
-      >
-        {isThinking ? (
-          <span className="tool-icon"><SyncOutlined spin /></span>
-        ) : (
-          <span className="tool-icon"><CheckCircleOutlined style={{ color: '#10b981' }} /></span>
-        )}
-        <span className="tool-summary-text">{getSummaryText()}</span>
-        {toolCalls.length > 0 && (
-          <span className="tool-chevron">
-            {isExpanded ? <DownOutlined /> : <RightOutlined />}
-          </span>
-        )}
-      </div>
-      
-      {isExpanded && toolCalls.length > 0 && (
-        <div className="tool-process-details">
-          {toolCalls.map((tool, idx) => (
-            <div key={idx} className="tool-item">
-              <span className="tool-item-status"><ToolOutlined /></span>
-              <span className="tool-item-text">
-                <b>{tool.name}</b>
-                {tool.output_length > 0 && <span className="tool-output-size">({tool.output_length} chars)</span>}
-              </span>
-            </div>
-          ))}
+    <div className={`inline-expandable ${isExpanded ? 'expanded' : ''}`}>
+      <span className="inline-expandable-toggle" onClick={handleToggle}>
+        {label}
+        <span className="inline-chevron">›</span>
+      </span>
+      <div className="inline-expandable-content">
+        <div className={`inline-expandable-item${isActive ? ' active' : ''}`}>
+          {prettyName}
         </div>
-      )}
+      </div>
     </div>
   )
 }
 
-// 3. 消息气泡
+// 3. 解析思考内容
+interface ParsedContent {
+  thinkContent: string | null  // <think>...</think> 中的内容
+  mainContent: string          // 正式回答内容
+}
+
+const parseThinkContent = (content: string): ParsedContent => {
+  // 匹配 <think>...</think> 标签（支持流式输出时的不完整标签）
+  const thinkMatch = content.match(/<think>([\s\S]*?)(<\/think>|$)/)
+  
+  if (thinkMatch) {
+    const thinkContent = thinkMatch[1].trim()
+    // 移除 think 标签，获取正式回答
+    const mainContent = content
+      .replace(/<think>[\s\S]*?<\/think>/g, '')  // 移除完整的 think 块
+      .replace(/<think>[\s\S]*$/g, '')            // 移除未闭合的 think 块
+      .trim()
+    return { thinkContent, mainContent }
+  }
+  
+  return { thinkContent: null, mainContent: content }
+}
+
+// 4. 思考过程展示组件（Cursor 风格：Thought for Xs）
+interface ThinkBlockProps {
+  content: string
+  isStreaming?: boolean
+  isComplete?: boolean  // think 标签是否已关闭
+}
+
+const ThinkBlock: React.FC<ThinkBlockProps> = ({ content, isStreaming, isComplete }) => {
+  const [isExpanded, setIsExpanded] = useState(true)  // 默认展开
+  const [userToggled, setUserToggled] = useState(false)
+  const [durationMs, setDurationMs] = useState<number | null>(null)
+  const thinkStartRef = useRef<number | null>(null)
+  
+  // 自动收起：think 完成后收起
+  useEffect(() => {
+    if (userToggled) return
+    if (isComplete) {
+      setIsExpanded(false)
+    }
+  }, [isComplete, userToggled])
+
+  // 记录思考耗时：isStreaming 从 false -> true 记开始，完成时计算总时长
+  useEffect(() => {
+    if (isStreaming && thinkStartRef.current === null) {
+      thinkStartRef.current = performance.now()
+    }
+    if (!isStreaming && isComplete && thinkStartRef.current !== null && durationMs === null) {
+      const end = performance.now()
+      setDurationMs(end - thinkStartRef.current)
+    }
+  }, [isStreaming, isComplete, durationMs])
+  
+  const handleToggle = () => {
+    setUserToggled(true)
+    setIsExpanded(!isExpanded)
+  }
+  
+  if (!content) return null
+  
+  let title: React.ReactNode
+  if (isStreaming) {
+    title = <span className="status-text">Thinking</span>
+  } else if (durationMs !== null) {
+    const seconds = Math.max(0.1, durationMs / 1000)
+    title = `Thought for ${seconds.toFixed(1)}s`
+  } else {
+    title = 'Thought'
+  }
+  
+  return (
+    <div className={`inline-expandable ${isExpanded ? 'expanded' : ''}`}>
+      <span className="inline-expandable-toggle" onClick={handleToggle}>
+        {title}
+        <span className="inline-chevron">›</span>
+      </span>
+      <div className="inline-expandable-content think-text">
+        {content}
+      </div>
+    </div>
+  )
+}
+
+// 5. 消息气泡
 const MessageItem: React.FC<{ message: DisplayMessage }> = ({ message }) => {
   const isUser = message.role === 'user'
+  
+  // 解析思考内容
+  const { thinkContent, mainContent } = isUser 
+    ? { thinkContent: null, mainContent: message.content }
+    : parseThinkContent(message.content)
+  
+  // 判断 think 标签是否已完成（闭合）
+  const isThinkComplete = !isUser && message.content.includes('</think>')
+  // 判断是否正在流式输出思考内容
+  const isThinkStreaming = !isUser && !!thinkContent && !isThinkComplete
+  // 初始思考状态：正在思考但还没有任何内容
+  const isInitialThinking = !isUser && message.isThinking && !thinkContent && !message.toolCalls?.length && !mainContent
+
+  // 构造工具调用列表：每个调用一个折叠面板
+  const toolCalls = message.toolCalls || []
+  const toolRows: { name: string; isActive: boolean }[] = toolCalls.map(tc => ({
+    name: tc.name,
+    isActive: false,
+  }))
+
+  if (!isUser && message.currentToolName) {
+    const idx = toolRows.findIndex(r => r.name === message.currentToolName)
+    if (idx >= 0) {
+      toolRows[idx] = { ...toolRows[idx], isActive: true }
+    } else {
+      toolRows.push({ name: message.currentToolName, isActive: true })
+    }
+  }
+  
+  // 工具已结束但正文尚未输出：用于显示“正文加载中”的省略号动画
+  const hasFinishedTools = !isUser && toolRows.length > 0 && !message.currentToolName
+  const isWaitingMainAfterTools = hasFinishedTools && !mainContent && !!message.isThinking
   
   return (
     <div className={`message-item ${message.role}`}>
@@ -170,13 +261,29 @@ const MessageItem: React.FC<{ message: DisplayMessage }> = ({ message }) => {
       )}
       
       <div className="message-bubble">
-        {/* 工具调用展示 (仅对 Assistant) */}
-        {!isUser && (
-          <ToolProcess 
-            toolCalls={message.toolCalls || []} 
-            isThinking={!!message.isThinking}
-            currentToolName={message.currentToolName}
+        {/* 初始思考状态 */}
+        {isInitialThinking && (
+          <div className="inline-expandable">
+            <span className="status-text">Thinking</span>
+          </div>
+        )}
+        
+        {/* 思考过程展示 (仅对 Assistant) */}
+        {!isUser && thinkContent && (
+          <ThinkBlock 
+            content={thinkContent} 
+            isStreaming={isThinkStreaming}
+            isComplete={isThinkComplete}
           />
+        )}
+        
+        {/* 工具调用展示 (仅对 Assistant，每个调用一个面板) */}
+        {!isUser && toolRows.length > 0 && (
+          <>
+            {toolRows.map((row, idx) => (
+              <ToolProcess key={`${row.name}-${idx}`} name={row.name} isActive={row.isActive} />
+            ))}
+          </>
         )}
         
         <div className="markdown-body">
@@ -184,20 +291,16 @@ const MessageItem: React.FC<{ message: DisplayMessage }> = ({ message }) => {
              message.content
            ) : (
              <>
-               {message.content ? (
+               {mainContent && (
                  <MarkdownPreview 
-                   source={message.content} 
+                   source={mainContent} 
                    style={{ background: 'transparent', fontSize: 16 }}
                    wrapperElement={{ "data-color-mode": "light" }}
                  />
-               ) : (
-                 !message.toolCalls?.length && !message.isThinking && <span className="thinking-dots">
-                   <span className="thinking-dot"></span>
-                   <span className="thinking-dot"></span>
-                   <span className="thinking-dot"></span>
-                 </span>
                )}
-               {/* 光标效果已经在 useTypewriter 中处理，或者可以通过 CSS 添加在末尾 */}
+               {!mainContent && isWaitingMainAfterTools && (
+                 <span className="status-text">Answering</span>
+               )}
              </>
            )}
         </div>
@@ -407,7 +510,10 @@ const ChatPage: React.FC = () => {
     fullContentRef.current = ''
     currentToolCallsRef.current = []
     setCurrentTool(null)
-    userScrolledUpRef.current = false // 发送新消息时重置滚动状态
+    userScrolledUpRef.current = false
+    
+    // 发送消息后强制滚动到底部
+    setTimeout(() => scrollToBottom(true), 50)
 
     // 3. 启动 WebSocket
     const client = createChatClient()
@@ -641,10 +747,10 @@ const ChatPage: React.FC = () => {
               setActiveTab('chat')
               handleClear() // 点击聊天通常意味着新对话
             }}
-            title="聊天"
+            title="新建聊天"
           >
             <EditOutlined className="menu-icon" />
-            {!isSidebarCollapsed && <span className="menu-text">聊天</span>}
+            {!isSidebarCollapsed && <span className="menu-text">新建聊天</span>}
           </div>
         </div>
 
@@ -750,9 +856,7 @@ const ChatPage: React.FC = () => {
             
             <div className="action-buttons">
               {isLoading ? (
-                <button className="stop-btn" onClick={handleStop}>
-                  <StopOutlined style={{ fontSize: 16 }} />
-                </button>
+                <button className="stop-btn" onClick={handleStop} aria-label="停止生成" />
               ) : (
                 <button 
                   className="send-btn" 

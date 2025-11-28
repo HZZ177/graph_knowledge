@@ -18,6 +18,7 @@ import litellm
 from backend.app.db.sqlite import SessionLocal
 from backend.app.models.resource_graph import (
     Business,
+    Step,
     Implementation,
     DataResource,
 )
@@ -25,6 +26,7 @@ from backend.app.services.graph_service import (
     get_business_context as _get_business_context,
     get_implementation_context as _get_implementation_context,
     get_resource_context as _get_resource_context,
+    get_resource_usages as _get_resource_usages,
     get_neighborhood,
 )
 from backend.app.llm.base import get_litellm_config
@@ -328,6 +330,74 @@ def search_data_resources(query: str, system: Optional[str] = None, limit: int =
         db.close()
 
 
+class SearchStepsInput(BaseModel):
+    """search_steps 工具输入参数"""
+    query: str = Field(..., description="对业务步骤的自然语言描述，如：'风控审核步骤'、'支付成功后的回调处理'")
+    limit: int = Field(default=5, description="最多返回的候选数量", ge=1, le=20)
+
+
+@tool(args_schema=SearchStepsInput)
+def search_steps(query: str, limit: int = 5) -> str:
+    """根据自然语言描述查找业务步骤。
+    用于当用户提到某个步骤但没有给出 step_id 时。
+    返回最匹配的候选列表，包含 step_id、名称等信息。
+    """
+    db = SessionLocal()
+    try:
+        steps = db.query(Step).all()
+        
+        if not steps:
+            return json.dumps({
+                "candidates": [],
+                "message": "暂无步骤数据"
+            }, ensure_ascii=False)
+        
+        # 构造候选列表文本
+        lines = []
+        for s in steps:
+            desc = s.description[:80] + "..." if s.description and len(s.description) > 80 else (s.description or "无描述")
+            type_info = f"[{s.step_type}]" if s.step_type else ""
+            lines.append(f"- ID: {s.step_id} | 名称: {s.name} {type_info} | 描述: {desc}")
+        candidates_text = "\n".join(lines)
+        
+        # 调用小 LLM 进行筛选
+        selected_ids = _call_selector_llm(query, candidates_text, limit)
+        logger.info(f"[search_steps] 小LLM选中: {selected_ids}")
+        
+        # 根据选中的 ID 构造结果
+        id_to_step = {s.step_id: s for s in steps}
+        candidates = []
+        for sid in selected_ids:
+            if sid in id_to_step:
+                s = id_to_step[sid]
+                candidates.append({
+                    "step_id": s.step_id,
+                    "name": s.name,
+                    "description": s.description or "",
+                    "step_type": s.step_type or "",
+                })
+        
+        if not candidates:
+            return json.dumps({
+                "candidates": [],
+                "message": f"在 {len(steps)} 个步骤中未找到与 '{query}' 相关的结果",
+                "total_count": len(steps),
+            }, ensure_ascii=False)
+        
+        return json.dumps({
+            "query": query,
+            "total_count": len(steps),
+            "matched_count": len(candidates),
+            "candidates": candidates,
+        }, ensure_ascii=False)
+        
+    except Exception as e:
+        logger.error(f"[search_steps] 查询失败: {e}", exc_info=True)
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+    finally:
+        db.close()
+
+
 # ============================================================
 # 上下文类工具
 # ============================================================
@@ -378,6 +448,56 @@ def get_implementation_context(impl_id: str) -> str:
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 
+class GetImplementationBusinessUsagesInput(BaseModel):
+    """get_implementation_business_usages 工具输入参数"""
+    impl_id: str = Field(..., description="实现/接口的唯一标识 (impl_id)")
+
+
+@tool(args_schema=GetImplementationBusinessUsagesInput)
+def get_implementation_business_usages(impl_id: str) -> str:
+    """查询指定实现/接口在各业务流程中的使用情况。
+    返回该实现被哪些业务流程、哪些步骤使用的汇总信息。
+    """
+    try:
+        context = _get_implementation_context(impl_id)
+        if not context:
+            return json.dumps({
+                "error": f"未找到 impl_id={impl_id} 的实现/接口"
+            }, ensure_ascii=False)
+
+        process_usages = context.get("process_usages", []) or []
+        process_map = {}
+
+        for usage in process_usages:
+            process = usage.get("process") or {}
+            step = usage.get("step") or {}
+            process_id = process.get("process_id")
+            if not process_id:
+                continue
+
+            entry = process_map.setdefault(process_id, {
+                "process": process,
+                "steps": [],
+            })
+
+            step_id = step.get("step_id")
+            if step_id and all(s.get("step_id") != step_id for s in entry["steps"]):
+                entry["steps"].append(step)
+
+        result = {
+            "impl_id": impl_id,
+            "implementation": context.get("implementation"),
+            "business_usages": list(process_map.values()),
+            "total_businesses": len(process_map),
+        }
+
+        return json.dumps(result, ensure_ascii=False, default=str)
+
+    except Exception as e:
+        logger.error(f"[get_implementation_business_usages] 查询失败: {e}", exc_info=True)
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
 class GetResourceContextInput(BaseModel):
     """get_resource_context 工具输入参数"""
     resource_id: str = Field(..., description="数据资源的唯一标识 (resource_id)")
@@ -398,6 +518,64 @@ def get_resource_context(resource_id: str) -> str:
         return json.dumps(context, ensure_ascii=False, default=str)
     except Exception as e:
         logger.error(f"[get_resource_context] 查询失败: {e}", exc_info=True)
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+class GetResourceBusinessUsagesInput(BaseModel):
+    """get_resource_business_usages 工具输入参数"""
+    resource_id: str = Field(..., description="数据资源的唯一标识 (resource_id)")
+
+
+@tool(args_schema=GetResourceBusinessUsagesInput)
+def get_resource_business_usages(resource_id: str) -> str:
+    """查询指定数据资源在各业务流程中的使用情况。
+    返回该数据资源被哪些业务流程、哪些步骤和实现使用的汇总信息。
+    """
+    try:
+        data = _get_resource_usages(resource_id)
+        if not data:
+            return json.dumps({
+                "error": f"未找到 resource_id={resource_id} 的数据资源使用信息"
+            }, ensure_ascii=False)
+
+        usages = data.get("usages", []) or []
+        process_map = {}
+
+        for usage in usages:
+            process = usage.get("process") or {}
+            step = usage.get("step") or {}
+            implementation = usage.get("implementation") or {}
+            access = usage.get("access") or {}
+
+            process_id = process.get("process_id") or access.get("process_id")
+            if not process_id:
+                continue
+
+            entry = process_map.setdefault(process_id, {
+                "process": process,
+                "steps": [],
+                "implementations": [],
+            })
+
+            step_id = step.get("step_id")
+            if step_id and all(s.get("step_id") != step_id for s in entry["steps"]):
+                entry["steps"].append(step)
+
+            impl_id = implementation.get("impl_id")
+            if impl_id and all(i.get("impl_id") != impl_id for i in entry["implementations"]):
+                entry["implementations"].append(implementation)
+
+        result = {
+            "resource_id": resource_id,
+            "resource": data.get("resource"),
+            "business_usages": list(process_map.values()),
+            "total_businesses": len(process_map),
+        }
+
+        return json.dumps(result, ensure_ascii=False, default=str)
+
+    except Exception as e:
+        logger.error(f"[get_resource_business_usages] 查询失败: {e}", exc_info=True)
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 
@@ -499,9 +677,12 @@ def get_all_chat_tools():
         search_businesses,
         search_implementations,
         search_data_resources,
+        search_steps,
         get_business_context,
         get_implementation_context,
+        get_implementation_business_usages,
         get_resource_context,
+        get_resource_business_usages,
         get_neighbors,
         get_path_between_entities,
     ]
