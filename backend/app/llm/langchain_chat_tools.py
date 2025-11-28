@@ -9,6 +9,7 @@
 """
 
 import json
+import os
 from typing import Optional, List
 
 from langchain_core.tools import tool
@@ -31,6 +32,7 @@ from backend.app.services.graph_service import (
 )
 from backend.app.llm.base import get_litellm_config
 from backend.app.core.logger import logger
+from backend.mcp.ace_code_engine import get_ace_mcp_client
 
 
 # ============================================================
@@ -104,6 +106,66 @@ def _call_selector_llm(query: str, candidates_text: str, limit: int = 5) -> List
         return []
     finally:
         db.close()
+
+
+class SearchCodeContextInput(BaseModel):
+    query: str = Field(..., description="用于代码上下文检索的自然语言查询")
+    project_root_path: Optional[str] = Field(default=None, description="可选，项目根目录绝对路径；为空时从 ACE_MCP_PROJECT_ROOT 环境变量读取")
+
+
+@tool(args_schema=SearchCodeContextInput)
+def search_code_context(query: str, project_root_path: Optional[str] = None) -> str:
+    """使用代码索引 MCP 在指定项目中检索与查询相关的代码上下文。"""
+    root = project_root_path or os.getenv("ACE_MCP_PROJECT_ROOT", "")
+    if not root:
+        return json.dumps({"error": "project_root_path is required; 请设置 ACE_MCP_PROJECT_ROOT 环境变量或在调用时显式传入"}, ensure_ascii=False)
+    try:
+        client = get_ace_mcp_client()
+        result = client.search_context(root, query)
+        if isinstance(result, dict):
+            def _normalize_item(item: dict) -> Optional[dict]:
+                if not isinstance(item, dict) or not isinstance(item.get("text"), str):
+                    return None
+                raw = item["text"]
+                new_type = item.get("type", "text")
+                new_text = raw
+                # 如果 text 本身是 JSON（如 {"type": "text", "text": "..."}），先解析一层
+                try:
+                    inner = json.loads(raw)
+                    if isinstance(inner, dict) and isinstance(inner.get("text"), str):
+                        new_text = inner["text"]
+                        new_type = inner.get("type", new_type)
+                except Exception:
+                    # 否则尝试按 unicode_escape 处理 \uXXXX
+                    try:
+                        if "\\u" in raw or "\\n" in raw or "\\t" in raw:
+                            new_text = bytes(raw, "utf-8").decode("unicode_escape")
+                    except Exception:
+                        new_text = raw
+                return {"type": new_type, "text": new_text}
+
+            # 优先处理标准 MCP 结构: {"content": [{"type": "text", "text": "..."}, ...]}
+            contents = result.get("content")
+            if isinstance(contents, list) and contents:
+                normalized = []
+                for item in contents:
+                    norm = _normalize_item(item)
+                    if norm is not None:
+                        normalized.append(norm)
+                if normalized:
+                    return json.dumps({"content": normalized}, ensure_ascii=False)
+
+            # 兼容直接带 text 字段的情况
+            if isinstance(result.get("text"), str):
+                norm = _normalize_item({"type": result.get("type", "text"), "text": result["text"]})
+                if norm is not None:
+                    return json.dumps(norm, ensure_ascii=False)
+
+        # 兜底：直接返回 JSON 字符串（包含 ensure_ascii=False，以便中文正常显示）
+        return json.dumps(result, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"[search_code_context] 查询失败: {e}", exc_info=True)
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 
 # ============================================================
@@ -685,4 +747,13 @@ def get_all_chat_tools():
         get_resource_business_usages,
         get_neighbors,
         get_path_between_entities,
+        search_code_context,
     ]
+
+
+if __name__ == "__main__":
+    # 测试工具
+    print(search_code_context.invoke({
+        "query": "月卡开卡流程相关的接口实现",
+        "project_root_path": "E:/Vivaldi下载/test"  # 如果不想用 ACE_MCP_PROJECT_ROOT，可显式传
+    }))

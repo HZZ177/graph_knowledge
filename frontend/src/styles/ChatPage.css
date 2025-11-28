@@ -587,10 +587,12 @@
 
 .inline-expandable.expanded .inline-expandable-content {
   /* 展开状态 */
-  max-height: 500px;
+  max-height: none;          /* 不再限制高度，完整展示内容 */
+  overflow: visible;         /* 展开时允许内容自然撑开 */
   opacity: 1;
   margin-top: 8px;
-  transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
+  /* 仅对透明度和外边距做过渡，避免 max-height 与 none 之间的突兀 */
+  transition: opacity 0.3s ease, margin-top 0.3s ease;
 }
 
 .inline-expandable-item {
@@ -600,7 +602,7 @@
 }
 
 .think-text {
-  white-space: pre-wrap;
+  white-space: normal;
 }
 
 /* 状态文字动效 - 省略号加载 */

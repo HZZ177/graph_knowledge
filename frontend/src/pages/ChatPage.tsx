@@ -135,17 +135,26 @@ interface ParsedContent {
 }
 
 const parseThinkContent = (content: string): ParsedContent => {
-  // 匹配 <think>...</think> 标签（支持流式输出时的不完整标签）
-  const thinkMatch = content.match(/<think>([\s\S]*?)(<\/think>|$)/)
+  const trimmed = content.trim()
+
+  // 优先匹配标准的 <think>...</think> 块（支持未闭合的结尾）
+  const thinkMatch = trimmed.match(/<think>([\s\S]*?)(<\/think>|$)/)
   
   if (thinkMatch) {
     const thinkContent = thinkMatch[1].trim()
     // 移除 think 标签，获取正式回答
-    const mainContent = content
+    const mainContent = trimmed
       .replace(/<think>[\s\S]*?<\/think>/g, '')  // 移除完整的 think 块
       .replace(/<think>[\s\S]*$/g, '')            // 移除未闭合的 think 块
       .trim()
     return { thinkContent, mainContent }
+  }
+
+  // 流式输出时，模型可能还在逐字输出 "<think>"，例如 "<", "<t", "<thi" 等
+  // 为避免这些片段短暂出现在正文区域，如果内容以 "<" 开头且尚未包含 </think>，
+  // 则将其视为思考内容，只展示在 Thought 面板中，不渲染到正文。
+  if (trimmed.startsWith('<') && !trimmed.includes('</think>')) {
+    return { thinkContent: trimmed, mainContent: '' }
   }
   
   return { thinkContent: null, mainContent: content }
@@ -206,8 +215,12 @@ const ThinkBlock: React.FC<ThinkBlockProps> = ({ content, isStreaming, isComplet
         {title}
         <span className="inline-chevron">›</span>
       </span>
-      <div className="inline-expandable-content think-text">
-        {content}
+      <div className="inline-expandable-content think-text markdown-body">
+        <MarkdownPreview 
+          source={content} 
+          style={{ background: 'transparent', fontSize: 14 }}
+          wrapperElement={{ 'data-color-mode': 'light' }}
+        />
       </div>
     </div>
   )
