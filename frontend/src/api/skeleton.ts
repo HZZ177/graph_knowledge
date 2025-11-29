@@ -3,6 +3,7 @@
  */
 
 import http from './http'
+import { WS_ENDPOINTS } from './config'
 
 // ==================== 类型定义 ====================
 
@@ -110,8 +111,8 @@ export function createSkeletonWebSocket(
   request: SkeletonGenerateRequest,
   options: SkeletonWebSocketOptions
 ): WebSocket {
-  // 构建WebSocket URL - 使用后端地址
-  const wsUrl = 'ws://localhost:8000/api/v1/llm/skeleton/ws/generate'
+  // 构建WebSocket URL - 动态获取，支持代理
+  const wsUrl = WS_ENDPOINTS.skeletonGenerate()
   
   const ws = new WebSocket(wsUrl)
   

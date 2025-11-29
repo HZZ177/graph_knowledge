@@ -1,9 +1,9 @@
 import axios, { type AxiosResponse, type AxiosError } from 'axios'
 import { message } from 'antd'
 
-// 简单的 axios 实例，指向本地 FastAPI 后端
+// 简单的 axios 实例，使用相对路径走 Vite 代理
 const http = axios.create({
-  baseURL: 'http://localhost:8000/api/v1',
+  baseURL: '/api/v1',
 })
 
 // 统一处理后端约定的 { code, message, data } 响应格式

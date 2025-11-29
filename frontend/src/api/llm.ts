@@ -5,6 +5,8 @@
  * 支持多轮对话，通过 thread_id 管理会话历史
  */
 
+import { getWebSocketUrl, API_BASE_PATH } from './config'
+
 // ==================== 类型定义 ====================
 
 export interface ChatMessage {
@@ -61,12 +63,11 @@ export interface ChatCallbacks {
 
 // ==================== URL ====================
 
-// WebSocket 基础地址（开发环境）
-const WS_BASE_URL = 'ws://localhost:8000/api/v1'
-export const CHAT_WS_URL = `${WS_BASE_URL}/llm/chat/ws`
+// WebSocket URL（动态获取，支持代理）
+export const getChatWsUrl = () => getWebSocketUrl('/api/v1/llm/chat/ws')
 
 // HTTP 基础路径，使用相对路径以便通过 dev proxy 或同域部署
-const HTTP_BASE_PATH = '/api/v1/llm'
+const HTTP_BASE_PATH = `${API_BASE_PATH}/llm`
 
 // ==================== Chat WebSocket 客户端 ====================
 
@@ -84,7 +85,7 @@ export class ChatClient {
     this.stop()
     
     // 创建新连接
-    this.ws = new WebSocket(CHAT_WS_URL)
+    this.ws = new WebSocket(getChatWsUrl())
     
     this.ws.onopen = () => {
       this.ws?.send(JSON.stringify(request))

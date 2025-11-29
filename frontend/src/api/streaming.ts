@@ -4,6 +4,8 @@
  * 提供WebSocket流式接口的统一封装
  */
 
+import { WS_ENDPOINTS as WS_CONFIG } from './config'
+
 // ==================== 类型定义 ====================
 
 export interface StreamMessage {
@@ -28,11 +30,10 @@ export interface StreamCallbacks {
 
 // ==================== WebSocket URL ====================
 
-const WS_BASE_URL = 'ws://localhost:8000/api/v1'
-
+// 重新导出以保持兼容性
 export const WS_ENDPOINTS = {
-  chatStream: `${WS_BASE_URL}/llm/chat/ws/stream`,
-  skeletonGenerate: `${WS_BASE_URL}/llm/skeleton/ws/generate`,
+  get chatStream() { return WS_CONFIG.chatStream() },
+  get skeletonGenerate() { return WS_CONFIG.skeletonGenerate() },
 }
 
 // ==================== 通用WebSocket流式客户端 ====================

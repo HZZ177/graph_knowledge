@@ -9,6 +9,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { getWebSocketUrl } from '../api/config'
 
 // ==================== 类型定义 ====================
 
@@ -205,7 +206,7 @@ export interface ChatStreamPayload {
 }
 
 export function useChatStream(options: UseChatStreamOptions = {}) {
-  const wsUrl = 'ws://localhost:8000/api/v1/llm/chat/ws/stream'
+  const wsUrl = getWebSocketUrl('/api/v1/llm/chat/ws/stream')
   
   const stream = useWebSocketStream({
     url: wsUrl,
