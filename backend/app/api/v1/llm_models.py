@@ -70,10 +70,23 @@ async def activate_llm_model(
     payload: ActivateAIModelRequest = Body(...),
     db: Session = Depends(get_db),
 ) -> dict:
+    """激活主力模型（用于主对话流程）"""
     obj = AIModelService.set_active_model(db, payload.id)
     if not obj:
         return error_response(message="Not found")
-    return success_response(message="激活模型成功")
+    return success_response(message="激活主力模型成功")
+
+
+@router.post("/activate-task")
+async def activate_task_model(
+    payload: ActivateAIModelRequest = Body(...),
+    db: Session = Depends(get_db),
+) -> dict:
+    """激活小任务模型（用于工具内部轻量调用）"""
+    obj = AIModelService.set_task_active_model(db, payload.id)
+    if not obj:
+        return error_response(message="Not found")
+    return success_response(message="激活小任务模型成功")
 
 
 @router.post("/test")

@@ -30,6 +30,7 @@
   margin: -24px -24px; /* 负边距抵消 Layout 的 padding */
   background-color: var(--bg-color);
   font-family: var(--font-family);
+  overflow-x: hidden;
 }
 
 .chat-main {
@@ -37,6 +38,7 @@
   flex: 1;
   display: flex;
   flex-direction: column;
+  overflow-x: hidden;
 }
 
 /* 侧边栏布局 */
@@ -369,6 +371,7 @@
   overflow-y: auto;
   padding: 40px 20px 24px; /* 底部只留出与输入框的间距 */
   scroll-behavior: smooth;
+  overflow-x: hidden;
   /* Firefox 自定义滚动条 */
   scrollbar-width: thin;
   scrollbar-color: rgba(0, 0, 0, 0.18) transparent;
@@ -483,6 +486,8 @@
 
 .message-item.assistant {
   align-items: flex-start;
+  max-width: 100%;
+  min-width: 0;
 }
 
 .message-header {
@@ -529,6 +534,7 @@
   color: var(--user-text);
   border-bottom-right-radius: 4px;
   max-width: 80%;
+  min-width: 220px; /* 适度拉宽短消息，避免 6~8 个字就换行，可按需要再调整 */
 }
 
 .message-item.assistant .message-bubble {
@@ -536,6 +542,8 @@
   color: var(--ai-text);
   padding: 0;
   width: 100%;
+  min-width: 0; /* 允许 flex 子元素收缩，防止代码块撑破容器 */
+  border-radius: 0; /* 透明背景不需要圆角，避免裁剪文字 */
 }
 
 /* ==========================================
@@ -573,7 +581,8 @@
 
 .inline-expandable-content {
   overflow: hidden;
-  padding-left: 12px;
+  margin-left: 4px;
+  padding-left: 10px !important;
   border-left: 2px solid var(--border-color);
   color: var(--text-secondary);
   font-size: 14px;
@@ -582,17 +591,23 @@
   max-height: 0;
   opacity: 0;
   margin-top: 0;
-  transition: max-height 0.15s ease, opacity 0.15s ease, margin-top 0.15s ease;
+  /* 收起动画：稍快一些（约 0.2s） */
+  transition: max-height 0.2s ease, opacity 0.2s ease, margin-top 0.2s ease;
 }
 
 .inline-expandable.expanded .inline-expandable-content {
-  /* 展开状态 */
-  max-height: none;          /* 不再限制高度，完整展示内容 */
-  overflow: visible;         /* 展开时允许内容自然撑开 */
+  /* 展开状态：用较大的 max-height 做过渡，保留展开动画 */
+  max-height: 9999px;        /* 极大值，避免长内容被截断 */
+  overflow: hidden;          /* 展开时仍然通过高度控制容器 */
   opacity: 1;
   margin-top: 8px;
-  /* 仅对透明度和外边距做过渡，避免 max-height 与 none 之间的突兀 */
-  transition: opacity 0.3s ease, margin-top 0.3s ease;
+  /* 展开动画：稍慢一些（约 0.3s） */
+  transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
+}
+
+/* Thought 思考内容：顶部稍微增加一点间距，避免紧贴标题行 */
+.inline-expandable.expanded .inline-expandable-content.think-text {
+  margin-top: 12px;
 }
 
 .inline-expandable-item {
@@ -603,6 +618,48 @@
 
 .think-text {
   white-space: normal;
+}
+
+/* think 展开内容的 markdown 区域样式 - 参考 Windsurf 效果 */
+.inline-expandable-content.think-text.markdown-body,
+.inline-expandable-content.think-text .wmde-markdown {
+  padding-left: 5px !important;
+  padding-top: 5px !important;   /* 顶部多留一点空间，避免文字紧贴顶部 */
+  color: #8b8b8b !important;  /* 柔和的灰色 */
+  font-size: 13px !important;
+  font-style: italic;
+  opacity: 0.9;
+}
+
+.inline-expandable-content.think-text .wmde-markdown p {
+  color: #8b8b8b !important;
+  margin-bottom: 8px !important;
+}
+
+.inline-expandable-content.think-text .wmde-markdown code {
+  background: rgba(0, 0, 0, 0.06);
+  color: #666;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-style: normal;
+}
+
+.inline-expandable-content.think-text .wmde-markdown strong {
+  color: #666;
+  font-weight: 600;
+}
+
+/* 工具摘要样式 */
+.tool-summary-item {
+  padding: 4px 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.tool-summary-label {
+  color: var(--text-tertiary);
+  margin-right: 4px;
 }
 
 /* 状态文字动效 - 省略号加载 */
@@ -644,6 +701,13 @@
   line-height: 1.7 !important;
   color: var(--text-primary) !important;
   background: transparent !important;
+  /* 关键：不要让 GitHub markdown 默认的 max-width: 980px 和 padding 撑爆布局 */
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow-x: hidden;
 }
 
 .markdown-body p {
@@ -654,6 +718,73 @@
   border-radius: 12px !important;
   background: #f6f8fa !important;
   border: 1px solid #eaeaea !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  overflow-x: auto !important;
+  overflow-y: auto;
+}
+
+/* 代码块滚动条样式：保证横向滚动条可见（提升优先级覆盖库样式） */
+.markdown-body pre {
+  scrollbar-width: auto !important; /* Firefox 使用默认可见滚动条 */
+}
+
+.markdown-body pre::-webkit-scrollbar {
+  width: 8px !important;   /* 纵向滚动条宽度（如果有） */
+  height: 8px !important;  /* 横向滚动条高度 */
+}
+
+.markdown-body pre::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.25) !important;
+  border-radius: 999px !important;
+}
+
+.markdown-body code {
+  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, monospace;
+  font-size: 13px;
+  word-break: break-all; /* 长代码行允许换行 */
+}
+
+/* 覆盖块级代码（pre code），禁止自动换行，强制使用横向滚动 */
+.markdown-body pre code {
+  white-space: pre;            /* 保留原始换行和空格 */
+  word-break: normal !important; /* 不在单词中间强制断行，以触发横向滚动 */
+}
+
+/* 代码块容器 - 确保不超出父容器 */
+.markdown-body .wmde-markdown,
+.markdown-body [data-color-mode] {
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  overflow-y: visible !important; /* 垂直方向由外层消息列表控制，不在此处滚动 */
+  scrollbar-width: none;          /* 隐藏该容器本身的滚动条（Firefox） */
+}
+
+.markdown-body [data-color-mode]::-webkit-scrollbar {
+  width: 0;   /* 隐藏该容器本身的滚动条（Chrome 等 WebKit） */
+  height: 0;
+}
+
+.markdown-body pre code {
+  word-break: normal; /* pre 内的 code 保持正常断词，由 pre 的滚动条处理 */
+  white-space: pre;
+}
+
+.markdown-body table {
+  width: 100%;
+  max-width: 100%;
+  display: block;
+  overflow-x: auto;
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+.markdown-body th,
+.markdown-body td {
+  padding: 6px 10px;
+  border: 1px solid #e5e5e5;
+  font-size: 14px;
 }
 
 /* 输入区域 - 固定在 chat-main 底部，不参与滚动 */
@@ -847,6 +978,8 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  max-width: 100%;
+  min-width: 0; /* 防止 flex 子元素撑破容器 */
 }
 
 .message-item.user .message-bubble-wrapper {
@@ -899,6 +1032,7 @@
   opacity: 0;
   transition: opacity 0.2s ease;
 }
+
 
 .message-bubble-wrapper:hover .message-actions-external {
   opacity: 1;

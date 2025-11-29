@@ -92,9 +92,11 @@ const WelcomeScreen: React.FC<{ onSuggestionClick: (q: string) => void }> = ({ o
 interface ToolProcessProps {
   name: string
   isActive: boolean
+  inputSummary?: string   // 输入摘要，如 "关键词: 开卡"
+  outputSummary?: string  // 输出摘要，如 "找到 3 个结果"
 }
 
-const ToolProcess: React.FC<ToolProcessProps> = ({ name, isActive }) => {
+const ToolProcess: React.FC<ToolProcessProps> = ({ name, isActive, inputSummary, outputSummary }) => {
   const [isExpanded, setIsExpanded] = useState(isActive)
   const [userToggled, setUserToggled] = useState(false)
   
@@ -106,9 +108,16 @@ const ToolProcess: React.FC<ToolProcessProps> = ({ name, isActive }) => {
   
   if (!name) return null
   const prettyName = name.replace(/_/g, ' ')
-  const label = isActive
-    ? <span className="status-text">Searching {prettyName}</span>
-    : `Searched ${prettyName}`
+  
+  // 构建标签：进行中显示动画，完成后显示结果摘要
+  let label: React.ReactNode
+  if (isActive) {
+    label = <span className="status-text">Searching {prettyName}</span>
+  } else if (outputSummary) {
+    label = `${prettyName} · ${outputSummary}`
+  } else {
+    label = `Searched ${prettyName}`
+  }
 
   const handleToggle = () => {
     setUserToggled(true)
@@ -122,44 +131,218 @@ const ToolProcess: React.FC<ToolProcessProps> = ({ name, isActive }) => {
         <span className="inline-chevron">›</span>
       </span>
       <div className="inline-expandable-content">
-        <div className={`inline-expandable-item${isActive ? ' active' : ''}`}>
-          {prettyName}
-        </div>
+        {/* 输入摘要 */}
+        {inputSummary && (
+          <div className="tool-summary-item">
+            <span className="tool-summary-label">查询:</span> {inputSummary}
+          </div>
+        )}
+        {/* 输出摘要 */}
+        {outputSummary && !isActive && (
+          <div className="tool-summary-item">
+            <span className="tool-summary-label">结果:</span> {outputSummary}
+          </div>
+        )}
+        {/* 进行中状态 */}
+        {isActive && (
+          <div className={`inline-expandable-item active`}>
+            正在执行...
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
-// 3. 解析思考内容
-interface ParsedContent {
-  thinkContent: string | null  // <think>...</think> 中的内容
-  mainContent: string          // 正式回答内容
+// 3. 内容段落类型定义
+// 工具占位符格式: <!--TOOL:toolName--> 或 <!--TOOL:toolName|inputSummary|outputSummary-->
+
+interface ContentSegment {
+  type: 'think' | 'text' | 'tool'
+  content: string  // think/text 的内容，或 tool 的名称
+  startPos: number
+  endPos: number
+  isComplete?: boolean  // 仅 think 类型：标签是否已闭合
+  isToolActive?: boolean  // 仅 tool 类型：是否正在执行
+  inputSummary?: string   // 仅 tool 类型：输入摘要
+  outputSummary?: string  // 仅 tool 类型：输出摘要
 }
 
-const parseThinkContent = (content: string): ParsedContent => {
-  const trimmed = content.trim()
+/**
+ * 解析内容为有序的段落列表
+ * 支持 <think> 块、工具占位符 <!--TOOL:name:id--> 和正文交错
+ */
+const parseContentSegments = (
+  content: string, 
+  currentToolName?: string,
+  toolSummaries?: Map<string, {input: string, output: string}>
+): ContentSegment[] => {
+  const segments: ContentSegment[] = []
+  const str = content || ''
+  const len = str.length
 
-  // 优先匹配标准的 <think>...</think> 块（支持未闭合的结尾）
-  const thinkMatch = trimmed.match(/<think>([\s\S]*?)(<\/think>|$)/)
-  
-  if (thinkMatch) {
-    const thinkContent = thinkMatch[1].trim()
-    // 移除 think 标签，获取正式回答
-    const mainContent = trimmed
-      .replace(/<think>[\s\S]*?<\/think>/g, '')  // 移除完整的 think 块
-      .replace(/<think>[\s\S]*$/g, '')            // 移除未闭合的 think 块
-      .trim()
-    return { thinkContent, mainContent }
+  let i = 0
+  let buffer = ''
+  let bufferStart = 0
+  let inThink = false
+  let thinkStartPos = -1
+
+  const flushTextBuffer = (endPos: number) => {
+    if (!buffer) return
+    const text = buffer.trim()
+    if (text) {
+      segments.push({
+        type: 'text',
+        content: text,
+        startPos: bufferStart,
+        endPos,
+      })
+    }
+    buffer = ''
   }
 
-  // 流式输出时，模型可能还在逐字输出 "<think>"，例如 "<", "<t", "<thi" 等
-  // 为避免这些片段短暂出现在正文区域，如果内容以 "<" 开头且尚未包含 </think>，
-  // 则将其视为思考内容，只展示在 Thought 面板中，不渲染到正文。
-  if (trimmed.startsWith('<') && !trimmed.includes('</think>')) {
-    return { thinkContent: trimmed, mainContent: '' }
+  while (i < len) {
+    // 工具占位符：无论是否在 think 块内，都将其视为一个硬边界
+    if (str.startsWith('<!--TOOL:', i)) {
+      // 如果当前在 think 中，先结束未闭合的 think 段（认为是不完整的思考块）
+      if (inThink) {
+        const raw = buffer
+        const trimmed = raw.trim()
+        if (trimmed) {
+          segments.push({
+            type: 'think',
+            content: trimmed,
+            startPos: thinkStartPos >= 0 ? thinkStartPos : bufferStart,
+            endPos: i,
+            isComplete: false,
+          })
+        }
+        inThink = false
+        buffer = ''
+      } else {
+        // 不在 think 中则先 flush 之前累积的正文
+        flushTextBuffer(i)
+      }
+
+      const end = str.indexOf('-->', i)
+      if (end === -1) {
+        // 工具标签尚未完整输出，作为普通文本暂存，等待后续内容
+        bufferStart = i
+        buffer += str.slice(i)
+        break
+      }
+
+      const markerStart = i
+      const markerEnd = end + 3
+      const inner = str.slice(i + '<!--TOOL:'.length, end)
+
+      let toolName = ''
+      let toolId = ''
+      const firstColon = inner.indexOf(':')
+      if (firstColon === -1) {
+        toolName = inner.trim()
+      } else {
+        toolName = inner.slice(0, firstColon).trim()
+        toolId = inner.slice(firstColon + 1).trim()
+      }
+
+      const toolKey = toolName && toolId ? `${toolName}:${toolId}` : undefined
+      const summary = toolKey ? toolSummaries?.get(toolKey) : undefined
+
+      segments.push({
+        type: 'tool',
+        content: toolName,
+        startPos: markerStart,
+        endPos: markerEnd,
+        isToolActive: false, // 稍后根据 currentToolName 单独标记
+        inputSummary: summary?.input,
+        outputSummary: summary?.output,
+      })
+
+      i = markerEnd
+      bufferStart = i
+      buffer = ''
+      continue
+    }
+
+    // 解析 <think> 开始标签
+    if (!inThink && str.startsWith('<think>', i)) {
+      // 先 flush 之前的正文
+      flushTextBuffer(i)
+
+      inThink = true
+      thinkStartPos = i
+      i += '<think>'.length
+      bufferStart = i
+      buffer = ''
+      continue
+    }
+
+    // 解析 </think> 结束标签
+    if (inThink && str.startsWith('</think>', i)) {
+      const raw = buffer
+      const trimmed = raw.trim()
+      if (trimmed) {
+        segments.push({
+          type: 'think',
+          content: trimmed,
+          startPos: thinkStartPos,
+          endPos: i + '</think>'.length,
+          isComplete: true,
+        })
+      }
+
+      inThink = false
+      i += '</think>'.length
+      bufferStart = i
+      buffer = ''
+      continue
+    }
+
+    // 普通字符累积到 buffer
+    if (!buffer) {
+      bufferStart = i
+    }
+    buffer += str[i]
+    i += 1
   }
-  
-  return { thinkContent: null, mainContent: content }
+
+  // 处理剩余缓冲区内容
+  if (buffer) {
+    if (inThink) {
+      const trimmed = buffer.trim()
+      if (trimmed) {
+        segments.push({
+          type: 'think',
+          content: trimmed,
+          startPos: thinkStartPos >= 0 ? thinkStartPos : bufferStart,
+          endPos: len,
+          isComplete: false,
+        })
+      }
+    } else {
+      flushTextBuffer(len)
+    }
+  }
+
+  // 第二遍：根据 currentToolName 标记当前正在执行的工具
+  if (currentToolName) {
+    let activeIndex = -1
+    for (let idx = 0; idx < segments.length; idx++) {
+      const seg = segments[idx]
+      if (seg.type === 'tool' && seg.content === currentToolName) {
+        const hasSummary = !!(seg.inputSummary || seg.outputSummary)
+        if (!hasSummary) {
+          activeIndex = idx
+        }
+      }
+    }
+    if (activeIndex !== -1) {
+      segments[activeIndex].isToolActive = true
+    }
+  }
+
+  return segments
 }
 
 // 4. 思考过程展示组件（Cursor 风格：Thought for Xs）
@@ -235,53 +418,116 @@ interface MessageItemProps {
   canRegenerate?: boolean  // 是否可以重新生成（非最后一条正在生成的消息）
   onRegenerate?: () => void
   onRollback?: () => void
+  toolSummaries?: Map<string, {input: string, output: string}>  // 工具摘要
 }
 
-const MessageItem: React.FC<MessageItemProps> = ({ message, isLoading, canRegenerate, onRegenerate, onRollback }) => {
+// 渲染项类型：用于交错排列思考、工具、正文
+interface RenderItem {
+  type: 'think' | 'tool' | 'text'
+  key: string
+  // think 类型
+  thinkContent?: string
+  isThinkStreaming?: boolean
+  isThinkComplete?: boolean
+  // tool 类型
+  toolName?: string
+  toolIsActive?: boolean
+  toolInputSummary?: string
+  toolOutputSummary?: string
+  // text 类型
+  textContent?: string
+}
+
+/**
+ * 构建交错渲染列表
+ * 直接从 parseContentSegments 的结果构建，工具占位符已嵌入 content
+ */
+const buildRenderItems = (
+  content: string,
+  currentToolName?: string,
+  toolSummaries?: Map<string, {input: string, output: string}>
+): RenderItem[] => {
+  const segments = parseContentSegments(content, currentToolName, toolSummaries)
+  
+  // DEBUG: 打印解析结果
+  console.log('[buildRenderItems] segments:', segments.map(s => ({
+    type: s.type,
+    content: s.content.slice(0, 50) + (s.content.length > 50 ? '...' : ''),
+    isComplete: s.isComplete
+  })))
+  
+  return segments.map((seg, idx) => {
+    if (seg.type === 'think') {
+      return {
+        type: 'think' as const,
+        key: `think-${idx}-${seg.startPos}`,
+        thinkContent: seg.content,
+        isThinkStreaming: !seg.isComplete,
+        isThinkComplete: seg.isComplete
+      }
+    } else if (seg.type === 'tool') {
+      return {
+        type: 'tool' as const,
+        key: `tool-${idx}-${seg.content}`,
+        toolName: seg.content,
+        toolIsActive: seg.isToolActive,
+        toolInputSummary: seg.inputSummary,
+        toolOutputSummary: seg.outputSummary,
+      }
+    } else {
+      return {
+        type: 'text' as const,
+        key: `text-${idx}-${seg.startPos}`,
+        textContent: seg.content
+      }
+    }
+  })
+}
+
+const MessageItem: React.FC<MessageItemProps> = ({ message, isLoading, canRegenerate, onRegenerate, onRollback, toolSummaries }) => {
   const isUser = message.role === 'user'
   
-  // 解析思考内容
-  const { thinkContent, mainContent } = isUser 
-    ? { thinkContent: null, mainContent: message.content }
-    : parseThinkContent(message.content)
-  
-  // 判断 think 标签是否已完成（闭合）
-  const isThinkComplete = !isUser && message.content.includes('</think>')
-  // 判断是否正在流式输出思考内容
-  const isThinkStreaming = !isUser && !!thinkContent && !isThinkComplete
-  // 初始思考状态：正在思考但还没有任何内容
-  const isInitialThinking = !isUser && message.isThinking && !thinkContent && !message.toolCalls?.length && !mainContent
-
-  // 构造工具调用列表：每个调用一个折叠面板
-  const toolCalls = message.toolCalls || []
-  const toolRows: { name: string; isActive: boolean }[] = toolCalls.map(tc => ({
-    name: tc.name,
-    isActive: false,
-  }))
-
-  if (!isUser && message.currentToolName) {
-    const idx = toolRows.findIndex(r => r.name === message.currentToolName)
-    if (idx >= 0) {
-      toolRows[idx] = { ...toolRows[idx], isActive: true }
-    } else {
-      toolRows.push({ name: message.currentToolName, isActive: true })
-    }
+  // 用户消息直接渲染
+  if (isUser) {
+    return (
+      <div className={`message-item user`}>
+        <div className="message-bubble-wrapper">
+          <div className="message-bubble">
+            <div className="markdown-body">{message.content}</div>
+          </div>
+          {onRollback && !isLoading && (
+            <div className="message-actions-external">
+              <button className="action-btn" onClick={onRollback} title="回溯到此处，重新开始对话">
+                <RollbackOutlined /> 回溯
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    )
   }
   
-  // 工具已结束但正文尚未输出：用于显示“正文加载中”的省略号动画
-  const hasFinishedTools = !isUser && toolRows.length > 0 && !message.currentToolName
-  const isWaitingMainAfterTools = hasFinishedTools && !mainContent && !!message.isThinking
+  // Assistant 消息：构建交错渲染列表（工具占位符已嵌入 content）
+  const renderItems = buildRenderItems(message.content, message.currentToolName, toolSummaries)
+  
+  // 初始思考状态：正在思考但还没有任何内容
+  const isInitialThinking = message.isThinking && renderItems.length === 0
+  
+  // 检查是否有正文内容
+  const hasTextContent = renderItems.some(item => item.type === 'text' && item.textContent)
+  
+  // 工具已结束但正文尚未输出
+  const hasFinishedTools = renderItems.some(item => item.type === 'tool') && !message.currentToolName
+  const isWaitingMainAfterTools = hasFinishedTools && !hasTextContent && !!message.isThinking
   
   return (
-    <div className={`message-item ${message.role}`}>
-      {!isUser && (
-        <div className="message-header">
-          <div className="avatar assistant">
-            <RobotOutlined />
-          </div>
-          <span className="role-name">Graph AI</span>
+    <div className={`message-item assistant`}>
+      <div className="message-header">
+        <div className="avatar assistant">
+          <RobotOutlined />
         </div>
-      )}
+        <span className="role-name">Graph AI</span>
+      </div>
       
       <div className="message-bubble-wrapper">
         <div className="message-bubble">
@@ -292,45 +538,52 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isLoading, canRegene
             </div>
           )}
           
-          {/* 思考过程展示 (仅对 Assistant) */}
-          {!isUser && thinkContent && (
-            <ThinkBlock 
-              content={thinkContent} 
-              isStreaming={isThinkStreaming}
-              isComplete={isThinkComplete}
-            />
+          {/* 按顺序渲染所有内容 */}
+          {renderItems.map(item => {
+            if (item.type === 'think') {
+              return (
+                <ThinkBlock
+                  key={item.key}
+                  content={item.thinkContent || ''}
+                  isStreaming={item.isThinkStreaming}
+                  isComplete={item.isThinkComplete}
+                />
+              )
+            }
+            if (item.type === 'tool') {
+              return (
+                <ToolProcess
+                  key={item.key}
+                  name={item.toolName || ''}
+                  isActive={item.toolIsActive || false}
+                  inputSummary={item.toolInputSummary}
+                  outputSummary={item.toolOutputSummary}
+                />
+              )
+            }
+            if (item.type === 'text') {
+              return (
+                <div key={item.key} className="markdown-body">
+                  <MarkdownPreview
+                    source={item.textContent || ''}
+                    style={{ background: 'transparent', fontSize: 16 }}
+                    wrapperElement={{ "data-color-mode": "light" }}
+                  />
+                </div>
+              )
+            }
+            return null
+          })}
+          
+          {/* 等待正文输出状态 */}
+          {isWaitingMainAfterTools && (
+            <div className="markdown-body">
+              <span className="status-text">Answering</span>
+            </div>
           )}
           
-          {/* 工具调用展示 (仅对 Assistant，每个调用一个面板) */}
-          {!isUser && toolRows.length > 0 && (
-            <>
-              {toolRows.map((row, idx) => (
-                <ToolProcess key={`${row.name}-${idx}`} name={row.name} isActive={row.isActive} />
-              ))}
-            </>
-          )}
-          
-          <div className="markdown-body">
-             {isUser ? (
-               message.content
-             ) : (
-               <>
-                 {mainContent && (
-                   <MarkdownPreview 
-                     source={mainContent} 
-                     style={{ background: 'transparent', fontSize: 16 }}
-                     wrapperElement={{ "data-color-mode": "light" }}
-                   />
-                 )}
-                 {!mainContent && isWaitingMainAfterTools && (
-                   <span className="status-text">Answering</span>
-                 )}
-               </>
-             )}
-          </div>
-          
-          {/* AI消息底部：重新回答按钮（非加载中且有内容时显示） */}
-          {!isUser && canRegenerate && !isLoading && mainContent && (
+          {/* AI消息底部：重新回答按钮 */}
+          {canRegenerate && !isLoading && hasTextContent && (
             <div className="message-actions">
               <button className="action-btn" onClick={onRegenerate} title="重新生成此回答">
                 <ReloadOutlined /> 重新回答
@@ -338,15 +591,6 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isLoading, canRegene
             </div>
           )}
         </div>
-        
-        {/* 用户消息：回溯按钮（气泡下一行右下角） */}
-        {isUser && onRollback && !isLoading && (
-          <div className="message-actions-external">
-            <button className="action-btn" onClick={onRollback} title="回溯到此处，重新开始对话">
-              <RollbackOutlined /> 回溯
-            </button>
-          </div>
-        )}
       </div>
     </div>
   )
@@ -428,6 +672,10 @@ const ChatPage: React.FC = () => {
   const [currentTool, setCurrentTool] = useState<string | null>(null)
   const fullContentRef = useRef('') 
   const currentToolCallsRef = useRef<ToolCallInfo[]>([])
+  const toolCallIdRef = useRef(0)  // 工具调用唯一 ID 计数器
+  const currentToolIdRef = useRef(0)  // 当前正在执行的工具 ID
+  // 工具摘要存储：key = "toolName:id", value = {input, output}
+  const [toolSummaries, setToolSummaries] = useState<Map<string, {input: string, output: string}>>(new Map())
   
   const chatClientRef = useRef<ChatClient | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -552,6 +800,8 @@ const ChatPage: React.FC = () => {
     resetTypewriter()
     fullContentRef.current = ''
     currentToolCallsRef.current = []
+    toolCallIdRef.current = 0  // 重置工具调用 ID 计数器
+    setToolSummaries(new Map())  // 清空工具摘要
     setCurrentTool(null)
     userScrolledUpRef.current = false
     
@@ -586,9 +836,22 @@ const ChatPage: React.FC = () => {
           })
         },
         
-        onToolStart: (name, _input) => {
-          console.log('Tool Start:', name)
+        onToolStart: (name, _input, toolId) => {
+          // 不再插入占位符（后端已经通过 stream 发送了）
+          // 只更新工具状态
+          console.log('Tool Start:', name, 'id:', toolId)
+          
+          // 记录当前工具 ID（用于 onToolEnd 时关联摘要）
+          if (toolId) {
+            currentToolIdRef.current = toolId
+          } else {
+            // 如果后端没有发 toolId，退化为计数器（兼容旧版本）
+            toolCallIdRef.current += 1
+            currentToolIdRef.current = toolCallIdRef.current
+          }
+          
           setCurrentTool(name)
+          
           // 更新消息状态：显示正在调用工具
           setMessages(prev => {
              const newPrev = [...prev]
@@ -601,11 +864,20 @@ const ChatPage: React.FC = () => {
           })
         },
         
-        onToolEnd: (name) => {
-          console.log('Tool End:', name)
+        onToolEnd: (name, inputSummary, outputSummary, _elapsed) => {
+          const toolId = currentToolIdRef.current
+          console.log('Tool End:', name, 'id:', toolId, inputSummary, outputSummary)
           setCurrentTool(null)
           // 记录工具调用
           currentToolCallsRef.current.push({ name, output_length: 0 })
+          
+          // 把摘要存入 state（不再替换内容）
+          const toolKey = `${name}:${toolId}`
+          setToolSummaries(prev => {
+            const newMap = new Map(prev)
+            newMap.set(toolKey, { input: inputSummary, output: outputSummary })
+            return newMap
+          })
           
           setMessages(prev => {
              const newPrev = [...prev]
@@ -662,14 +934,15 @@ const ChatPage: React.FC = () => {
         onError: (err) => {
           console.error(err)
           finishTypewriter()
-          // 更新最后一条 assistant 消息为错误状态，而不是新增一条
+          // 更新最后一条 assistant 消息为错误状态，保留已有内容
           setMessages(prev => {
             const newPrev = [...prev]
             const lastIdx = newPrev.findIndex(m => m.id === assistantMessageId)
             if (lastIdx !== -1) {
+              const existingContent = newPrev[lastIdx].content || ''
               newPrev[lastIdx] = {
                 ...newPrev[lastIdx],
-                content: `⚠️ 发生错误: ${err}`,
+                content: existingContent + `\n\n⚠️ 发生错误: ${err}`,
                 isThinking: false,
                 currentToolName: undefined,
               }
@@ -740,6 +1013,8 @@ const ChatPage: React.FC = () => {
     resetTypewriter()
     fullContentRef.current = ''
     currentToolCallsRef.current = []
+    toolCallIdRef.current = 0  // 重置工具调用 ID 计数器
+    setToolSummaries(new Map())  // 清空工具摘要
     
     // 使用 RegenerateClient 调用后端
     const client = createRegenerateClient()
@@ -756,7 +1031,19 @@ const ChatPage: React.FC = () => {
               : msg
           ))
         },
-        onToolStart: (name) => {
+        onToolStart: (name, _input, toolId) => {
+          // 不再插入占位符（后端已经通过 stream 发送了）
+          // 只更新工具状态
+          console.log('Regenerate Tool Start:', name, 'id:', toolId)
+          
+          // 记录当前工具 ID（用于 onToolEnd 时关联摘要）
+          if (toolId) {
+            currentToolIdRef.current = toolId
+          } else {
+            toolCallIdRef.current += 1
+            currentToolIdRef.current = toolCallIdRef.current
+          }
+          
           setCurrentTool(name)
           setMessages(prev => prev.map((msg, idx) => 
             idx === targetAssistantIdx 
@@ -764,12 +1051,27 @@ const ChatPage: React.FC = () => {
               : msg
           ))
         },
-        onToolEnd: (name) => {
+        onToolEnd: (name, inputSummary, outputSummary, _elapsed) => {
+          const toolId = currentToolIdRef.current
           setCurrentTool(null)
           currentToolCallsRef.current.push({ name, output_length: 0 })
+          
+          // 把摘要存入 state（不再替换内容）
+          const toolKey = `${name}:${toolId}`
+          setToolSummaries(prev => {
+            const newMap = new Map(prev)
+            newMap.set(toolKey, { input: inputSummary, output: outputSummary })
+            return newMap
+          })
+          
           setMessages(prev => prev.map((msg, idx) => 
             idx === targetAssistantIdx 
-              ? { ...msg, toolCalls: [...currentToolCallsRef.current], isThinking: true, currentToolName: undefined }
+              ? { 
+                  ...msg, 
+                  toolCalls: [...currentToolCallsRef.current], 
+                  isThinking: true, 
+                  currentToolName: undefined 
+                }
               : msg
           ))
         },
@@ -793,9 +1095,10 @@ const ChatPage: React.FC = () => {
         onError: (err) => {
           console.error(err)
           finishTypewriter()
+          // 保留已有内容，追加错误信息
           setMessages(prev => prev.map((msg, idx) => 
             idx === targetAssistantIdx 
-              ? { ...msg, content: `⚠️ 重新生成失败: ${err}`, isThinking: false, currentToolName: undefined }
+              ? { ...msg, content: (msg.content || '') + `\n\n⚠️ 重新生成失败: ${err}`, isThinking: false, currentToolName: undefined }
               : msg
           ))
           setIsLoading(false)
@@ -844,13 +1147,16 @@ const ChatPage: React.FC = () => {
     setActiveConversationId(conv.threadId)
     setThreadId(conv.threadId)
     setIsLoading(true)
-    
+    resetTypewriter()
+
     try {
       const msgs = await fetchConversationHistory(conv.threadId)
-      
+
       const display: DisplayMessage[] = []
-      let pendingToolCalls: ToolCallInfo[] = []
-      
+      let pendingToolCalls: Array<{ name: string; output_length: number; args?: Record<string, unknown> }> = []
+      let globalToolId = 0  // 全局工具调用 ID 计数器
+      const historySummaries = new Map<string, { input: string; output: string }>()  // 历史工具摘要
+
       msgs.forEach((m, i) => {
         if (m.role === 'user') {
           display.push({
@@ -860,32 +1166,73 @@ const ChatPage: React.FC = () => {
           })
         } else if (m.role === 'assistant') {
           if (m.tool_calls && m.tool_calls.length > 0) {
-            // assistant 发起工具调用
-            pendingToolCalls = m.tool_calls.map(tc => ({ name: tc.name, output_length: 0 }))
+            // assistant 发起工具调用，记录待插入的工具（累积当前轮所有调用）
+            const newCalls = m.tool_calls.map(tc => ({ 
+              name: tc.name, 
+              output_length: 0,
+              args: tc.args  // 保存参数用于生成摘要
+            }))
+            pendingToolCalls.push(...newCalls)
           } else if (m.content) {
-            // assistant 内容
+            // assistant 内容：在 think 块之后插入工具占位符
+            let contentWithTools = m.content
+            if (pendingToolCalls.length > 0) {
+              // 找到 </think> 的位置，在其后插入工具占位符（带唯一 ID）
+              const thinkEndIdx = contentWithTools.indexOf('</think>')
+              const toolMarkers = pendingToolCalls.map(tc => {
+                globalToolId++
+                // 生成简单的输入摘要
+                let inputSummary = ''
+                if (tc.args) {
+                  const firstKey = Object.keys(tc.args)[0]
+                  if (firstKey) {
+                    const val = String(tc.args[firstKey])
+                    inputSummary = val.length > 30 ? val.slice(0, 30) + '...' : val
+                  }
+                }
+                // 存入摘要 Map
+                historySummaries.set(`${tc.name}:${globalToolId}`, {
+                  input: inputSummary,
+                  output: tc.output_length > 0 ? `返回 ${tc.output_length} 字符` : '已完成'
+                })
+                return `<!--TOOL:${tc.name}:${globalToolId}-->`
+              }).join('')
+              if (thinkEndIdx !== -1) {
+                // 在 </think> 之后插入
+                const insertPos = thinkEndIdx + 8
+                contentWithTools =
+                  contentWithTools.slice(0, insertPos) +
+                  toolMarkers +
+                  contentWithTools.slice(insertPos)
+              } else {
+                // 没有 think 块，在开头插入
+                contentWithTools = toolMarkers + contentWithTools
+              }
+            }
             display.push({
               id: `assistant-${i}-${conv.threadId}`,
               role: 'assistant',
-              content: m.content,
-              toolCalls: pendingToolCalls.length > 0 ? [...pendingToolCalls] : undefined,
+              content: contentWithTools,
+              toolCalls: pendingToolCalls.length > 0 ? pendingToolCalls.map(tc => ({ name: tc.name, output_length: tc.output_length })) : undefined,
             })
             pendingToolCalls = []
           }
         } else if (m.role === 'tool') {
-          // tool 返回
+          // tool 返回，更新对应工具的 output_length
           const toolIdx = pendingToolCalls.findIndex(tc => tc.name === m.tool_name)
           if (toolIdx !== -1) {
             pendingToolCalls[toolIdx].output_length = m.content.length
           }
         }
       })
-      
+
+      // 设置历史工具摘要
+      setToolSummaries(historySummaries)
       setMessages(display)
     } catch (e) {
       console.error('加载会话历史失败', e)
     } finally {
-        setIsLoading(false)
+      setIsLoading(false)
     }
   }, [resetTypewriter])
 
@@ -1030,6 +1377,7 @@ const ChatPage: React.FC = () => {
                       canRegenerate={canRegenerate}
                       onRegenerate={() => userMsgIndex >= 0 && handleRegenerate(userMsgIndex)}
                       onRollback={() => handleRollback(msg.id)}
+                      toolSummaries={toolSummaries}
                     />
                   )
                 })}

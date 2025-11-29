@@ -136,3 +136,52 @@ class AIModelService:
             max_tokens=obj.max_tokens,
             timeout=obj.timeout,
         )
+
+    @staticmethod
+    def set_task_active_model(db: Session, model_id: int) -> Optional[AIModel]:
+        """将指定模型设为小任务激活模型，并取消其他模型的小任务激活标记。"""
+
+        obj = db.query(AIModel).filter(AIModel.id == model_id).first()
+        if not obj:
+            return None
+
+        # 先取消所有当前小任务激活模型
+        db.query(AIModel).filter(AIModel.is_task_active.is_(True)).update(
+            {AIModel.is_task_active: False}
+        )
+
+        obj.is_task_active = True
+        db.commit()
+        db.refresh(obj)
+        return obj
+
+    @staticmethod
+    def get_task_active_model(db: Session) -> Optional[AIModel]:
+        """返回当前小任务激活的 AIModel（若无则返回 None）。"""
+
+        return db.query(AIModel).filter(AIModel.is_task_active.is_(True)).first()
+
+    @staticmethod
+    def get_task_llm_config(db: Session) -> LLMConfig:
+        """获取小任务模型配置。
+        
+        如果未设置小任务模型，则 fallback 到主力模型。
+        """
+        obj = AIModelService.get_task_active_model(db)
+        if not obj:
+            # Fallback 到主力模型
+            obj = AIModelService.get_active_model(db)
+        if not obj:
+            raise RuntimeError("No active LLM model configured. Please configure one in ai_models.")
+
+        return LLMConfig(
+            provider_type=obj.provider_type,
+            provider=obj.provider,
+            model_name=obj.model_name,
+            base_url=obj.base_url,
+            gateway_endpoint=obj.gateway_endpoint,
+            api_key=obj.api_key,
+            temperature=obj.temperature,
+            max_tokens=obj.max_tokens,
+            timeout=obj.timeout,
+        )

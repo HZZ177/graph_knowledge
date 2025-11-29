@@ -1,6 +1,8 @@
 from enum import Enum
 from typing import Literal, Optional
 
+import os
+
 from pydantic import BaseModel
 
 
@@ -78,3 +80,26 @@ class LLMConfig(BaseModel):
     
     # 请求超时（秒）
     timeout: int = 120
+
+
+class CodeWorkspaceConfig(BaseModel):
+    """代码工作区配置
+    
+    为代码相关工具提供统一的项目根目录配置，限制工具只读访问该目录内的文件。
+    使用在此处硬编码配置的项目根目录，用于访问外部代码库。
+    """
+
+    project_root: str
+
+    @classmethod
+    def load(cls) -> "CodeWorkspaceConfig":
+        """从固定配置的字符串路径加载项目根目录。"""
+        # 注意：这里的路径需要根据实际外部代码库位置进行配置
+        # 当前默认与 AceCodeEngineMcp._default_project_root 保持一致
+        fixed_root = os.path.abspath(r"E:/Vivaldi下载/test")
+        return cls(project_root=fixed_root)
+
+    @classmethod
+    def get_project_root(cls) -> str:
+        """获取项目根目录的绝对路径。"""
+        return cls.load().project_root

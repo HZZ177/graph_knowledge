@@ -57,6 +57,7 @@ class AIModelUpdate(BaseModel):
 class AIModelOut(AIModelBase):
     id: int
     is_active: bool
+    is_task_active: bool
     updated_at: datetime
 
     class Config:

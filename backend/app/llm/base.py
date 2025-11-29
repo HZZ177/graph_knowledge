@@ -28,13 +28,15 @@ def get_litellm_config(db: Session) -> LiteLLMConfig:
     用于工具内部直接调用 litellm（如小 LLM 实体选择器），
     不经过 CrewAI Agent，避免提示词干扰。
     
+    优先使用小任务模型配置，未设置则 fallback 到主力模型。
+    
     Args:
         db: 数据库会话
         
     Returns:
         LiteLLMConfig: 包含 model, api_key, api_base 等配置
     """
-    config = AIModelService.get_active_llm_config(db)
+    config = AIModelService.get_task_llm_config(db)
     
     # 自定义网关模式：使用 openai/ 前缀 + gateway_endpoint
     # 告诉 litellm 走 OpenAI 兼容路径，避免模型名被误识别（如 gemini 被当作 Vertex AI）

@@ -25,6 +25,7 @@ export interface AIModelUpdate extends Partial<AIModelBase> {
 export interface AIModelOut extends AIModelBase {
   id: number
   is_active: boolean
+  is_task_active: boolean
   updated_at: string
 }
 
@@ -69,6 +70,10 @@ export async function deleteLLMModel(modelId: number): Promise<void> {
 
 export async function activateLLMModel(modelId: number): Promise<void> {
   await http.post('/llm-models/activate', { id: modelId })
+}
+
+export async function activateTaskModel(modelId: number): Promise<void> {
+  await http.post('/llm-models/activate-task', { id: modelId })
 }
 
 export async function testLLMModel(payload: AIModelCreate): Promise<TestLLMResult> {

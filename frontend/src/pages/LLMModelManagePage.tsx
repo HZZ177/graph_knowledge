@@ -429,11 +429,13 @@ const LLMModelManagePage: React.FC = () => {
                     breakInside: 'avoid',
                     marginBottom: 16,
                     borderRadius: 12,
-                    border: m.is_active ? '1px solid #1677ff' : '1px solid #f0f0f0',
-                    boxShadow: m.is_active
+                    border: (m.is_active || m.is_task_active)
+                      ? '1px solid #1677ff'
+                      : '1px solid #f0f0f0',
+                    boxShadow: (m.is_active || m.is_task_active)
                       ? '0 0 0 1px rgba(22,119,255,0.15), 0 6px 16px rgba(15,23,42,0.08)'
                       : '0 2px 8px rgba(15,23,42,0.04)',
-                    background: m.is_active
+                    background: (m.is_active || m.is_task_active)
                       ? 'linear-gradient(135deg, #f0f5ff, #ffffff)'
                       : '#ffffff',
                     transition: 'all 0.2s ease',
@@ -464,18 +466,15 @@ const LLMModelManagePage: React.FC = () => {
                       {m.model_name}
                     </div>
                     <Space size={6} style={{ flexWrap: 'wrap' }}>
-                      <Tag color={m.is_active ? 'blue' : 'default'} style={{ borderRadius: 999 }}>
-                        {m.is_active ? '已启用' : '未启用'}
-                      </Tag>
+                      {m.is_active && (
+                        <Tag color="blue" style={{ borderRadius: 999 }}>主力</Tag>
+                      )}
+                      {m.is_task_active && (
+                        <Tag color="green" style={{ borderRadius: 999 }}>快速</Tag>
+                      )}
                       <Tag color={isCustomGateway ? 'purple' : 'default'}>{typeLabel}</Tag>
                       {m.temperature !== undefined && (
                         <Tag color="geekblue">temp {m.temperature}</Tag>
-                      )}
-                      {m.max_tokens && (
-                        <Tag color="gold">max {m.max_tokens}</Tag>
-                      )}
-                      {m.timeout && (
-                        <Tag color="default">timeout {m.timeout}s</Tag>
                       )}
                     </Space>
                   </div>

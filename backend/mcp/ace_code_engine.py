@@ -4,6 +4,7 @@ import urllib.request
 import urllib.error
 
 from backend.mcp.base import McpStdioClient, McpError
+from backend.app.llm.config import CodeWorkspaceConfig
 
 
 class AceCodeEngineMcp:
@@ -29,7 +30,7 @@ class AceCodeEngineMcp:
         # acemcp Web 管理地址
         self._http_base_url = f"http://127.0.0.1:{self._web_port}"
         # 默认代码项目根目录（AI 调用时无需传入）
-        self._default_project_root = "E:/Vivaldi下载/test"
+        self._default_project_root = CodeWorkspaceConfig.get_project_root()
 
         # stdio MCP 客户端，仅在 HTTP 不可用或显式关闭时使用
         self._client: Optional[McpStdioClient] = None

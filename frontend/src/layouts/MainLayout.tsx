@@ -10,7 +10,7 @@ import {
   MessageOutlined,
 } from '@ant-design/icons'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { listLLMModels, activateLLMModel, type AIModelOut } from '../api/llmModels'
+import { listLLMModels, activateLLMModel, activateTaskModel, type AIModelOut } from '../api/llmModels'
 import { showError, showSuccess } from '../utils/message'
 
 const { Header, Sider, Content } = Layout
@@ -21,8 +21,10 @@ const MainLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(true)
   const [models, setModels] = useState<AIModelOut[]>([])
   const [activeModelId, setActiveModelId] = useState<number | null>(null)
+  const [taskModelId, setTaskModelId] = useState<number | null>(null)
   const [modelLoading, setModelLoading] = useState(false)
   const [activating, setActivating] = useState(false)
+  const [activatingTask, setActivatingTask] = useState(false)
 
   const location = useLocation()
   const navigate = useNavigate()
@@ -33,7 +35,9 @@ const MainLayout: React.FC = () => {
       const data = await listLLMModels()
       setModels(data)
       const active = data.find((m) => m.is_active)
+      const taskActive = data.find((m) => m.is_task_active)
       setActiveModelId(active ? active.id : null)
+      setTaskModelId(taskActive ? taskActive.id : null)
     } catch (e) {
       showError('加载模型列表失败')
     } finally {
@@ -49,12 +53,25 @@ const MainLayout: React.FC = () => {
     try {
       setActivating(true)
       await activateLLMModel(value)
-      showSuccess('已设置为当前模型')
+      showSuccess('已设置为主力模型')
       fetchModels()
     } catch (e) {
       showError('激活模型失败')
     } finally {
       setActivating(false)
+    }
+  }
+
+  const handleChangeTaskModel = async (value: number) => {
+    try {
+      setActivatingTask(true)
+      await activateTaskModel(value)
+      showSuccess('已设置为小任务模型')
+      fetchModels()
+    } catch (e) {
+      showError('激活模型失败')
+    } finally {
+      setActivatingTask(false)
     }
   }
 
@@ -171,18 +188,42 @@ const MainLayout: React.FC = () => {
             />
             <span style={{ fontSize: 16, fontWeight: 500 }}>智能问答</span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', paddingRight: 16 }}>
+          <div style={{ display: 'flex', alignItems: 'center', paddingRight: 16, gap: 24 }}>
             <Space size={8} align="center">
               <Text type="secondary" style={{ fontSize: 12 }}>
-                当前模型
+                主力模型
               </Text>
               <Select
-                style={{ minWidth: 260 }}
+                style={{ minWidth: 200 }}
                 placeholder="选择模型"
                 size="middle"
                 value={activeModelId ?? undefined}
                 loading={modelLoading || activating}
                 onChange={handleChangeActiveModel}
+              >
+                {models.map((m) => {
+                  const label = m.provider ? `${m.provider}/${m.model_name}` : m.model_name
+                  return (
+                    <Option key={m.id} value={m.id}>
+                      {m.name}（{label}）
+                    </Option>
+                  )
+                })}
+              </Select>
+            </Space>
+            <Space size={8} align="center">
+              <Text type="secondary" style={{ fontSize: 12 }}>
+                快速模型
+              </Text>
+              <Select
+                style={{ minWidth: 200 }}
+                placeholder="选择模型"
+                size="middle"
+                value={taskModelId ?? undefined}
+                loading={modelLoading || activatingTask}
+                onChange={handleChangeTaskModel}
+                allowClear
+                onClear={() => setTaskModelId(null)}
               >
                 {models.map((m) => {
                   const label = m.provider ? `${m.provider}/${m.model_name}` : m.model_name
