@@ -9,8 +9,10 @@ from backend.app.schemas.canvas import SaveProcessCanvasRequest
 from backend.app.models.conversation import Conversation
 from backend.app.services.llm_chat_service import (
     streaming_chat,
+    streaming_regenerate,
     get_conversation_history,
     clear_conversation,
+    truncate_conversation,
 )
 from backend.app.llm.langchain_chat_agent import generate_conversation_title
 from backend.app.services.llm_skeleton_service import generate_skeleton
@@ -129,6 +131,77 @@ async def generate_title(thread_id: str, db: Session = Depends(get_db)):
     """生成会话标题"""
     title = await generate_conversation_title(db, thread_id)
     return {"thread_id": thread_id, "title": title}
+
+
+@router.post("/conversation/{thread_id}/truncate")
+async def truncate_history(thread_id: str, keep_pairs: int = Body(..., embed=True)):
+    """截断会话历史，只保留前 N 对对话
+    
+    Args:
+        thread_id: 会话 ID
+        keep_pairs: 保留的对话对数（一对 = 一个 user + 对应的 assistant 回复）
+    """
+    success = await truncate_conversation(thread_id, keep_pairs)
+    if success:
+        return success_response(message=f"已截断到前 {keep_pairs} 对对话")
+    else:
+        return error_response(message="截断失败")
+
+
+@router.websocket("/chat/regenerate/ws")
+async def websocket_regenerate(websocket: WebSocket):
+    """精准重新生成指定 AI 回复的 WebSocket 接口
+    
+    协议：
+    1. 客户端发送: {"thread_id": "...", "user_msg_index": N}
+       - user_msg_index: 第几个用户消息（从0开始）
+    2. 服务端流式推送与 chat/ws 相同格式的消息
+    """
+    await websocket.accept()
+    logger.info("WebSocket 连接已建立 - 重新生成")
+    
+    db: Session = SessionLocal()
+    
+    try:
+        data = await websocket.receive_text()
+        logger.info(f"收到重新生成请求: {data}")
+        
+        import json
+        request = json.loads(data)
+        thread_id = request.get("thread_id")
+        user_msg_index = request.get("user_msg_index", 0)
+        
+        if not thread_id:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "error": "thread_id 是必需的",
+            }, ensure_ascii=False))
+            return
+        
+        await streaming_regenerate(
+            db=db,
+            thread_id=thread_id,
+            user_msg_index=user_msg_index,
+            websocket=websocket,
+        )
+        
+    except WebSocketDisconnect:
+        logger.info("WebSocket 连接断开 - 重新生成")
+    except Exception as e:
+        logger.error(f"重新生成异常: {e}")
+        try:
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "error": str(e),
+            }, ensure_ascii=False))
+        except:
+            pass
+    finally:
+        db.close()
+        try:
+            await websocket.close()
+        except:
+            pass
 
 
 @router.websocket("/skeleton/ws/generate")

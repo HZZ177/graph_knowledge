@@ -21,8 +21,10 @@ import {
   GlobalOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
+  ReloadOutlined,
+  RollbackOutlined,
 } from '@ant-design/icons'
-import { createChatClient, ChatClient, ToolCallInfo, fetchConversationHistory, generateConversationTitle, listConversations, deleteConversation, ChatMessage } from '../api/llm'
+import { createChatClient, ChatClient, ToolCallInfo, fetchConversationHistory, generateConversationTitle, listConversations, deleteConversation, truncateConversation, createRegenerateClient, RegenerateClient, ChatMessage } from '../api/llm'
 import { useTypewriter } from '../hooks/useTypewriter'
 import '../styles/ChatPage.css'
 import { showConfirm } from '../utils/confirm'
@@ -227,7 +229,15 @@ const ThinkBlock: React.FC<ThinkBlockProps> = ({ content, isStreaming, isComplet
 }
 
 // 5. 消息气泡
-const MessageItem: React.FC<{ message: DisplayMessage }> = ({ message }) => {
+interface MessageItemProps {
+  message: DisplayMessage
+  isLoading?: boolean
+  canRegenerate?: boolean  // 是否可以重新生成（非最后一条正在生成的消息）
+  onRegenerate?: () => void
+  onRollback?: () => void
+}
+
+const MessageItem: React.FC<MessageItemProps> = ({ message, isLoading, canRegenerate, onRegenerate, onRollback }) => {
   const isUser = message.role === 'user'
   
   // 解析思考内容
@@ -273,50 +283,70 @@ const MessageItem: React.FC<{ message: DisplayMessage }> = ({ message }) => {
         </div>
       )}
       
-      <div className="message-bubble">
-        {/* 初始思考状态 */}
-        {isInitialThinking && (
-          <div className="inline-expandable">
-            <span className="status-text">Thinking</span>
+      <div className="message-bubble-wrapper">
+        <div className="message-bubble">
+          {/* 初始思考状态 */}
+          {isInitialThinking && (
+            <div className="inline-expandable">
+              <span className="status-text">Thinking</span>
+            </div>
+          )}
+          
+          {/* 思考过程展示 (仅对 Assistant) */}
+          {!isUser && thinkContent && (
+            <ThinkBlock 
+              content={thinkContent} 
+              isStreaming={isThinkStreaming}
+              isComplete={isThinkComplete}
+            />
+          )}
+          
+          {/* 工具调用展示 (仅对 Assistant，每个调用一个面板) */}
+          {!isUser && toolRows.length > 0 && (
+            <>
+              {toolRows.map((row, idx) => (
+                <ToolProcess key={`${row.name}-${idx}`} name={row.name} isActive={row.isActive} />
+              ))}
+            </>
+          )}
+          
+          <div className="markdown-body">
+             {isUser ? (
+               message.content
+             ) : (
+               <>
+                 {mainContent && (
+                   <MarkdownPreview 
+                     source={mainContent} 
+                     style={{ background: 'transparent', fontSize: 16 }}
+                     wrapperElement={{ "data-color-mode": "light" }}
+                   />
+                 )}
+                 {!mainContent && isWaitingMainAfterTools && (
+                   <span className="status-text">Answering</span>
+                 )}
+               </>
+             )}
+          </div>
+          
+          {/* AI消息底部：重新回答按钮（非加载中且有内容时显示） */}
+          {!isUser && canRegenerate && !isLoading && mainContent && (
+            <div className="message-actions">
+              <button className="action-btn" onClick={onRegenerate} title="重新生成此回答">
+                <ReloadOutlined /> 重新回答
+              </button>
+            </div>
+          )}
+        </div>
+        
+        {/* 用户消息：回溯按钮（气泡下一行右下角） */}
+        {isUser && onRollback && !isLoading && (
+          <div className="message-actions-external">
+            <button className="action-btn" onClick={onRollback} title="回溯到此处，重新开始对话">
+              <RollbackOutlined /> 回溯
+            </button>
           </div>
         )}
-        
-        {/* 思考过程展示 (仅对 Assistant) */}
-        {!isUser && thinkContent && (
-          <ThinkBlock 
-            content={thinkContent} 
-            isStreaming={isThinkStreaming}
-            isComplete={isThinkComplete}
-          />
-        )}
-        
-        {/* 工具调用展示 (仅对 Assistant，每个调用一个面板) */}
-        {!isUser && toolRows.length > 0 && (
-          <>
-            {toolRows.map((row, idx) => (
-              <ToolProcess key={`${row.name}-${idx}`} name={row.name} isActive={row.isActive} />
-            ))}
-          </>
-        )}
-        
-        <div className="markdown-body">
-           {isUser ? (
-             message.content
-           ) : (
-             <>
-               {mainContent && (
-                 <MarkdownPreview 
-                   source={mainContent} 
-                   style={{ background: 'transparent', fontSize: 16 }}
-                   wrapperElement={{ "data-color-mode": "light" }}
-                 />
-               )}
-               {!mainContent && isWaitingMainAfterTools && (
-                 <span className="status-text">Answering</span>
-               )}
-             </>
-           )}
-        </div>
       </div>
     </div>
   )
@@ -631,15 +661,23 @@ const ChatPage: React.FC = () => {
         
         onError: (err) => {
           console.error(err)
-          setMessages(prev => [
-            ...prev,
-            {
-              id: `error-${Date.now()}`,
-              role: 'assistant',
-              content: `⚠️ 发生错误: ${err}`,
+          finishTypewriter()
+          // 更新最后一条 assistant 消息为错误状态，而不是新增一条
+          setMessages(prev => {
+            const newPrev = [...prev]
+            const lastIdx = newPrev.findIndex(m => m.id === assistantMessageId)
+            if (lastIdx !== -1) {
+              newPrev[lastIdx] = {
+                ...newPrev[lastIdx],
+                content: `⚠️ 发生错误: ${err}`,
+                isThinking: false,
+                currentToolName: undefined,
+              }
             }
-          ])
+            return newPrev
+          })
           setIsLoading(false)
+          setCurrentTool(null)
           chatClientRef.current = null
         }
       }
@@ -673,6 +711,133 @@ const ChatPage: React.FC = () => {
     resetTypewriter()
     setInputValue('')
   }
+
+  // 精准重新生成指定 AI 回复（通过对应的用户消息索引）
+  const handleRegenerate = useCallback((userMsgIndex: number) => {
+    if (isLoading || !threadId) return
+    
+    // 找到对应的 assistant 消息位置（用于更新 UI）
+    let userCount = 0
+    let targetAssistantIdx = -1
+    for (let i = 0; i < messages.length; i++) {
+      if (messages[i].role === 'user') {
+        if (userCount === userMsgIndex && i + 1 < messages.length && messages[i + 1].role === 'assistant') {
+          targetAssistantIdx = i + 1
+          break
+        }
+        userCount++
+      }
+    }
+    if (targetAssistantIdx === -1) return
+    
+    // 设置目标 assistant 消息为加载状态
+    setMessages(prev => prev.map((msg, idx) => 
+      idx === targetAssistantIdx 
+        ? { ...msg, content: '', isThinking: true, toolCalls: [], currentToolName: undefined }
+        : msg
+    ))
+    setIsLoading(true)
+    resetTypewriter()
+    fullContentRef.current = ''
+    currentToolCallsRef.current = []
+    
+    // 使用 RegenerateClient 调用后端
+    const client = createRegenerateClient()
+    
+    client.start(
+      { thread_id: threadId, user_msg_index: userMsgIndex },
+      {
+        onStream: (chunk) => {
+          fullContentRef.current += chunk
+          appendToTypewriter(chunk)
+          setMessages(prev => prev.map((msg, idx) => 
+            idx === targetAssistantIdx 
+              ? { ...msg, content: fullContentRef.current, isThinking: false }
+              : msg
+          ))
+        },
+        onToolStart: (name) => {
+          setCurrentTool(name)
+          setMessages(prev => prev.map((msg, idx) => 
+            idx === targetAssistantIdx 
+              ? { ...msg, isThinking: true, currentToolName: name }
+              : msg
+          ))
+        },
+        onToolEnd: (name) => {
+          setCurrentTool(null)
+          currentToolCallsRef.current.push({ name, output_length: 0 })
+          setMessages(prev => prev.map((msg, idx) => 
+            idx === targetAssistantIdx 
+              ? { ...msg, toolCalls: [...currentToolCallsRef.current], isThinking: true, currentToolName: undefined }
+              : msg
+          ))
+        },
+        onResult: (content, _threadId, toolCalls) => {
+          finishTypewriter()
+          setTimeout(() => {
+            setMessages(prev => prev.map((msg, idx) => 
+              idx === targetAssistantIdx 
+                ? { 
+                    ...msg, 
+                    content: fullContentRef.current || content,
+                    toolCalls: toolCalls.length > 0 ? toolCalls : currentToolCallsRef.current,
+                    isThinking: false,
+                    currentToolName: undefined,
+                  }
+                : msg
+            ))
+            setIsLoading(false)
+          }, 200)
+        },
+        onError: (err) => {
+          console.error(err)
+          finishTypewriter()
+          setMessages(prev => prev.map((msg, idx) => 
+            idx === targetAssistantIdx 
+              ? { ...msg, content: `⚠️ 重新生成失败: ${err}`, isThinking: false, currentToolName: undefined }
+              : msg
+          ))
+          setIsLoading(false)
+          setCurrentTool(null)
+        }
+      }
+    )
+  }, [messages, isLoading, threadId, appendToTypewriter, finishTypewriter, resetTypewriter])
+
+  // 回溯到某条用户消息（删除该消息及之后所有消息，将内容填充到输入框）
+  const handleRollback = useCallback(async (messageId: string) => {
+    if (isLoading) return
+    
+    const idx = messages.findIndex(m => m.id === messageId)
+    if (idx === -1 || messages[idx].role !== 'user') return
+    
+    const userContent = messages[idx].content
+    
+    // 计算要保留的对话对数（该用户消息之前有多少个用户消息）
+    let keepPairs = 0
+    for (let i = 0; i < idx; i++) {
+      if (messages[i].role === 'user') {
+        keepPairs++
+      }
+    }
+    
+    // 调用后端 API 截断持久化的对话历史
+    if (threadId) {
+      try {
+        await truncateConversation(threadId, keepPairs)
+      } catch (e) {
+        console.error('截断对话历史失败', e)
+      }
+    }
+    
+    // 删除该消息及之后的所有消息
+    setMessages(prev => prev.slice(0, idx))
+    // 将内容填充到输入框，让用户可以修改后发送
+    setInputValue(userContent)
+    // 聚焦输入框
+    setTimeout(() => inputRef.current?.focus(), 50)
+  }, [messages, isLoading, threadId])
 
   const handleSelectConversation = useCallback(async (conv: ConversationSummary) => {
     if (!conv.threadId) return
@@ -839,9 +1004,35 @@ const ChatPage: React.FC = () => {
               <WelcomeScreen onSuggestionClick={(q) => sendMessage(q)} />
             ) : (
               <>
-                {messages.map(msg => (
-                  <MessageItem key={msg.id} message={msg} />
-                ))}
+                {messages.map((msg, idx) => {
+                  // 计算该 assistant 消息对应的用户消息索引
+                  let userMsgIndex = -1
+                  if (msg.role === 'assistant') {
+                    let count = 0
+                    for (let i = 0; i < idx; i++) {
+                      if (messages[i].role === 'user') {
+                        userMsgIndex = count
+                        count++
+                      }
+                    }
+                  }
+                  
+                  // 判断是否可以重新生成（非正在生成的消息）
+                  const isCurrentlyGenerating = msg.role === 'assistant' && 
+                    idx === messages.length - 1 && isLoading
+                  const canRegenerate = msg.role === 'assistant' && !isCurrentlyGenerating
+                  
+                  return (
+                    <MessageItem 
+                      key={msg.id} 
+                      message={msg}
+                      isLoading={isLoading}
+                      canRegenerate={canRegenerate}
+                      onRegenerate={() => userMsgIndex >= 0 && handleRegenerate(userMsgIndex)}
+                      onRollback={() => handleRollback(msg.id)}
+                    />
+                  )
+                })}
                 {/* 占位符，用于滚动 */}
                 <div ref={messagesEndRef} style={{ height: 1 }} />
               </>

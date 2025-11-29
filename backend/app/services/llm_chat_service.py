@@ -23,6 +23,9 @@ from backend.app.llm.langchain_chat_agent import (
     get_agent_config,
     get_thread_history,
     clear_thread_history,
+    truncate_thread_history,
+    get_raw_messages,
+    replace_assistant_response,
 )
 from backend.app.core.logger import logger
 
@@ -196,3 +199,154 @@ async def clear_conversation(thread_id: str) -> bool:
         是否成功
     """
     return await clear_thread_history(thread_id)
+
+
+async def truncate_conversation(thread_id: str, keep_pairs: int) -> bool:
+    """截断会话历史，只保留前 N 对对话
+    
+    Args:
+        thread_id: 会话 ID
+        keep_pairs: 保留的对话对数
+        
+    Returns:
+        是否成功
+    """
+    return await truncate_thread_history(thread_id, keep_pairs)
+
+
+async def streaming_regenerate(
+    db: Session,
+    thread_id: str,
+    user_msg_index: int,
+    websocket: WebSocket,
+) -> str:
+    """精准重新生成指定用户消息对应的 AI 回复
+    
+    Args:
+        db: 数据库会话
+        thread_id: 会话 ID
+        user_msg_index: 用户消息索引（第几个用户消息，从0开始）
+        websocket: WebSocket 连接
+        
+    Returns:
+        新生成的回答文本
+    """
+    request_id = str(uuid.uuid4())
+    logger.info(f"[Regenerate] 开始重新生成: thread_id={thread_id}, user_msg_index={user_msg_index}")
+    
+    try:
+        # 1. 获取原始消息列表
+        raw_messages = await get_raw_messages(thread_id)
+        if not raw_messages:
+            raise Exception("会话不存在或消息为空")
+        
+        # 2. 找到目标用户消息
+        human_count = 0
+        target_human_idx = -1
+        target_question = ""
+        for i, msg in enumerate(raw_messages):
+            if getattr(msg, "type", None) == "human":
+                if human_count == user_msg_index:
+                    target_human_idx = i
+                    target_question = getattr(msg, "content", "")
+                    break
+                human_count += 1
+        
+        if target_human_idx == -1:
+            raise Exception(f"找不到用户消息 index={user_msg_index}")
+        
+        # 3. 发送开始消息
+        await websocket.send_text(json.dumps({
+            "type": "start",
+            "request_id": request_id,
+            "thread_id": thread_id,
+        }, ensure_ascii=False))
+        
+        # 4. 使用临时会话生成新回复
+        temp_thread_id = f"regen_{thread_id}_{uuid.uuid4().hex[:8]}"
+        
+        async with AsyncSqliteSaver.from_conn_string("llm_checkpoints.db") as checkpointer:
+            # 创建 Agent
+            agent = create_chat_agent(db, checkpointer=checkpointer)
+            temp_config = get_agent_config(temp_thread_id)
+            
+            # 构造输入：截断到目标用户消息之前的历史 + 目标用户消息
+            history_messages = list(raw_messages[:target_human_idx])  # 不包含目标用户消息
+            inputs = {
+                "messages": history_messages + [HumanMessage(content=target_question)]
+            }
+            
+            # 流式执行并收集新生成的消息
+            full_response = ""
+            tool_calls_info: List[Dict[str, Any]] = []
+            
+            async for event in agent.astream_events(inputs, temp_config, version="v2"):
+                event_type = event.get("event")
+                
+                if event_type == "on_chat_model_stream":
+                    chunk = event.get("data", {}).get("chunk")
+                    if chunk and hasattr(chunk, "content") and chunk.content:
+                        content = chunk.content
+                        full_response += content
+                        await websocket.send_text(json.dumps({
+                            "type": "stream",
+                            "content": content,
+                        }, ensure_ascii=False))
+                        
+                elif event_type == "on_tool_start":
+                    tool_name = event.get("name", "unknown")
+                    tool_input = event.get("data", {}).get("input", {})
+                    await websocket.send_text(json.dumps({
+                        "type": "tool_start",
+                        "tool_name": tool_name,
+                        "tool_input": tool_input,
+                    }, ensure_ascii=False))
+                    
+                elif event_type == "on_tool_end":
+                    tool_name = event.get("name", "unknown")
+                    tool_output = event.get("data", {}).get("output", "")
+                    tool_calls_info.append({
+                        "name": tool_name,
+                        "output_length": len(str(tool_output)),
+                    })
+                    await websocket.send_text(json.dumps({
+                        "type": "tool_end",
+                        "tool_name": tool_name,
+                    }, ensure_ascii=False))
+            
+            # 5. 获取临时会话生成的新消息
+            temp_checkpoint = await checkpointer.aget(temp_config)
+            if temp_checkpoint and "channel_values" in temp_checkpoint:
+                temp_messages = temp_checkpoint["channel_values"].get("messages", [])
+                # 提取新生成的 AI 回复（跳过历史和用户消息）
+                new_ai_messages = temp_messages[len(history_messages) + 1:]  # +1 跳过用户消息
+                
+                # 6. 更新原会话的检查点
+                success = await replace_assistant_response(thread_id, user_msg_index, new_ai_messages)
+                if not success:
+                    logger.warning(f"[Regenerate] 更新检查点失败")
+        
+        # 7. 发送最终结果
+        await websocket.send_text(json.dumps({
+            "type": "result",
+            "request_id": request_id,
+            "thread_id": thread_id,
+            "content": full_response,
+            "tool_calls": tool_calls_info,
+            "user_msg_index": user_msg_index,
+        }, ensure_ascii=False))
+        
+        logger.info(f"[Regenerate] 重新生成完成: thread_id={thread_id}, 输出长度={len(full_response)}")
+        return full_response
+        
+    except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        logger.error(f"[Regenerate] 失败: {e}\n{error_traceback}")
+        await websocket.send_text(json.dumps({
+            "type": "error",
+            "request_id": request_id,
+            "thread_id": thread_id,
+            "error": str(e),
+        }, ensure_ascii=False))
+        raise

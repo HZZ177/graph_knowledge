@@ -9,7 +9,6 @@
 """
 
 import json
-import os
 from typing import Optional, List
 
 from langchain_core.tools import tool
@@ -78,9 +77,10 @@ def _call_selector_llm(query: str, candidates_text: str, limit: int = 5) -> List
             api_base=config.api_base,
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
-            max_tokens=200,
+            max_tokens=2000,
         )
-        
+
+        logger.debug(f"[EntitySelector] 模型响应: {response}")
         result_text = response.choices[0].message.content.strip()
         logger.debug(f"[EntitySelector] LLM 返回: {result_text}")
         
@@ -109,19 +109,15 @@ def _call_selector_llm(query: str, candidates_text: str, limit: int = 5) -> List
 
 
 class SearchCodeContextInput(BaseModel):
-    query: str = Field(..., description="用于代码上下文检索的自然语言查询")
-    project_root_path: Optional[str] = Field(default=None, description="可选，项目根目录绝对路径；为空时从 ACE_MCP_PROJECT_ROOT 环境变量读取")
+    query: str = Field(..., description="用于代码上下文检索的自然语言查询，如'开卡接口的校验逻辑'、'支付回调处理流程'")
 
 
 @tool(args_schema=SearchCodeContextInput)
-def search_code_context(query: str, project_root_path: Optional[str] = None) -> str:
-    """使用代码索引 MCP 在指定项目中检索与查询相关的代码上下文。"""
-    root = project_root_path or os.getenv("ACE_MCP_PROJECT_ROOT", "")
-    if not root:
-        return json.dumps({"error": "project_root_path is required; 请设置 ACE_MCP_PROJECT_ROOT 环境变量或在调用时显式传入"}, ensure_ascii=False)
+def search_code_context(query: str) -> str:
+    """在代码仓库中检索与查询相关的代码上下文，用于深入了解接口、服务或业务流程的实现细节。"""
     try:
         client = get_ace_mcp_client()
-        result = client.search_context(root, query)
+        result = client.search_context(query)
         if isinstance(result, dict):
             def _normalize_item(item: dict) -> Optional[dict]:
                 if not isinstance(item, dict) or not isinstance(item.get("text"), str):
@@ -752,8 +748,7 @@ def get_all_chat_tools():
 
 
 if __name__ == "__main__":
-    # 测试工具
+    # 测试工具（项目路径已在 AceCodeEngineMcp 中配置）
     print(search_code_context.invoke({
         "query": "月卡开卡流程相关的接口实现",
-        "project_root_path": "E:/Vivaldi下载/test"  # 如果不想用 ACE_MCP_PROJECT_ROOT，可显式传
     }))

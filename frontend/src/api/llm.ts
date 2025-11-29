@@ -65,9 +65,16 @@ export interface ChatCallbacks {
 
 // WebSocket URL（动态获取，支持代理）
 export const getChatWsUrl = () => getWebSocketUrl('/api/v1/llm/chat/ws')
+export const getRegenerateWsUrl = () => getWebSocketUrl('/api/v1/llm/chat/regenerate/ws')
 
 // HTTP 基础路径，使用相对路径以便通过 dev proxy 或同域部署
 const HTTP_BASE_PATH = `${API_BASE_PATH}/llm`
+
+// 重新生成请求
+export interface RegenerateRequest {
+  thread_id: string
+  user_msg_index: number  // 第几个用户消息（从0开始）
+}
 
 // ==================== Chat WebSocket 客户端 ====================
 
@@ -181,6 +188,82 @@ export function createChatClient(): ChatClient {
 }
 
 
+// ==================== Regenerate WebSocket 客户端 ====================
+
+export class RegenerateClient {
+  private ws: WebSocket | null = null
+  private callbacks: ChatCallbacks = {}
+  
+  /**
+   * 开始重新生成
+   */
+  start(request: RegenerateRequest, callbacks: ChatCallbacks): void {
+    this.callbacks = callbacks
+    this.stop()
+    
+    this.ws = new WebSocket(getRegenerateWsUrl())
+    
+    this.ws.onopen = () => {
+      this.ws?.send(JSON.stringify(request))
+    }
+    
+    this.ws.onmessage = (event) => {
+      try {
+        const message: ChatStreamMessage = JSON.parse(event.data)
+        this.handleMessage(message)
+      } catch (e) {
+        console.error('解析 WebSocket 消息失败:', e)
+        this.callbacks.onError?.('消息解析失败')
+      }
+    }
+    
+    this.ws.onerror = (event) => {
+      console.error('WebSocket 错误:', event)
+      this.callbacks.onError?.('WebSocket 连接错误')
+    }
+    
+    this.ws.onclose = () => {
+      this.ws = null
+      this.callbacks.onClose?.()
+    }
+  }
+  
+  stop(): void {
+    if (this.ws) {
+      this.ws.close()
+      this.ws = null
+    }
+  }
+  
+  private handleMessage(message: ChatStreamMessage): void {
+    switch (message.type) {
+      case 'start':
+        this.callbacks.onStart?.(message.request_id || '', message.thread_id || '')
+        break
+      case 'stream':
+        this.callbacks.onStream?.(message.content || '')
+        break
+      case 'tool_start':
+        this.callbacks.onToolStart?.(message.tool_name || '', message.tool_input || {})
+        break
+      case 'tool_end':
+        this.callbacks.onToolEnd?.(message.tool_name || '')
+        break
+      case 'result':
+        this.callbacks.onResult?.(message.content || '', message.thread_id || '', message.tool_calls || [])
+        break
+      case 'error':
+        this.callbacks.onError?.(message.error || '未知错误')
+        break
+    }
+  }
+}
+
+export function createRegenerateClient(): RegenerateClient {
+  return new RegenerateClient()
+}
+
+
 // ==================== HTTP 辅助函数 ====================
 
 export interface ConversationMetadata {
@@ -221,4 +304,15 @@ export async function generateConversationTitle(threadId: string): Promise<strin
   }
   const data = await resp.json() as { thread_id: string; title: string }
   return data.title
+}
+
+export async function truncateConversation(threadId: string, keepPairs: number): Promise<void> {
+  const resp = await fetch(`${HTTP_BASE_PATH}/conversation/${encodeURIComponent(threadId)}/truncate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ keep_pairs: keepPairs }),
+  })
+  if (!resp.ok) {
+    throw new Error(`截断对话失败: ${resp.status}`)
+  }
 }

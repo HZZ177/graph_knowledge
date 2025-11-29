@@ -28,6 +28,8 @@ class AceCodeEngineMcp:
         self._use_http = True
         # acemcp Web 管理地址
         self._http_base_url = f"http://127.0.0.1:{self._web_port}"
+        # 默认代码项目根目录（AI 调用时无需传入）
+        self._default_project_root = "E:/Vivaldi下载/test"
 
         # stdio MCP 客户端，仅在 HTTP 不可用或显式关闭时使用
         self._client: Optional[McpStdioClient] = None
@@ -93,8 +95,18 @@ class AceCodeEngineMcp:
 
     # -------------------- 对外能力：search_context --------------------
 
-    def search_context(self, project_root_path: str, query: str, timeout: float = 300.0) -> Dict[str, Any]:
-        normalized_root = project_root_path.replace("\\", "/")
+    def search_context(self, query: str, project_root_path: Optional[str] = None, timeout: float = 300.0) -> Dict[str, Any]:
+        """检索代码上下文。
+        
+        Args:
+            query: 自然语言查询
+            project_root_path: 项目根目录，为空时使用内部默认配置
+            timeout: 超时时间
+        """
+        root = project_root_path or self._default_project_root
+        if not root:
+            raise McpError("未配置项目根目录，请在 AceCodeEngineMcp 中设置 _default_project_root")
+        normalized_root = root.replace("\\", "/")
 
         # 优先尝试通过 HTTP 接口调用
         if self._use_http:

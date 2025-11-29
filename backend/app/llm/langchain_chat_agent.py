@@ -287,6 +287,72 @@ async def clear_thread_history(thread_id: str) -> bool:
         return False
 
 
+async def truncate_thread_history(thread_id: str, keep_pairs: int) -> bool:
+    """截断会话历史，只保留前 N 对对话
+    
+    Args:
+        thread_id: 会话 ID
+        keep_pairs: 保留的对话对数（一对 = 一个 user + 对应的 assistant/tool 消息）
+        
+    Returns:
+        是否成功截断
+    """
+    try:
+        async with AsyncSqliteSaver.from_conn_string("llm_checkpoints.db") as memory:
+            config = get_agent_config(thread_id)
+            
+            # 使用 aget_tuple 获取完整的检查点信息（包含 metadata）
+            checkpoint_tuple = await memory.aget_tuple(config)
+            
+            if not checkpoint_tuple or not checkpoint_tuple.checkpoint:
+                logger.warning(f"[ChatAgent] 会话不存在: thread_id={thread_id}")
+                return False
+            
+            checkpoint = checkpoint_tuple.checkpoint
+            if "channel_values" not in checkpoint:
+                logger.warning(f"[ChatAgent] 检查点格式异常: thread_id={thread_id}")
+                return False
+            
+            messages = checkpoint["channel_values"].get("messages", [])
+            if not messages:
+                return True
+            
+            # 统计对话对数，找到截断位置
+            # 每遇到一个 human 消息算一对的开始
+            pair_count = 0
+            cut_index = 0
+            
+            for i, msg in enumerate(messages):
+                msg_type = getattr(msg, "type", None)
+                if msg_type == "human":
+                    pair_count += 1
+                    if pair_count > keep_pairs:
+                        cut_index = i
+                        break
+            else:
+                # 没有超出，无需截断
+                return True
+            
+            # 截断消息列表
+            truncated_messages = messages[:cut_index]
+            checkpoint["channel_values"]["messages"] = truncated_messages
+            
+            # 使用原 checkpoint_tuple 的 config 和 metadata 来更新
+            await memory.aput(
+                checkpoint_tuple.config,
+                checkpoint,
+                checkpoint_tuple.metadata,
+                {}  # new_versions
+            )
+            
+            logger.info(f"[ChatAgent] 截断会话历史: thread_id={thread_id}, 保留 {keep_pairs} 对, 原消息数 {len(messages)}, 截断后 {len(truncated_messages)}")
+            return True
+            
+    except Exception as e:
+        logger.error(f"[ChatAgent] 截断会话历史失败: {e}")
+        return False
+
+
 async def get_thread_history(thread_id: str) -> list:
     """获取指定会话的对话历史
     
@@ -346,3 +412,96 @@ async def get_thread_history(thread_id: str) -> list:
     except Exception as e:
         logger.error(f"[ChatAgent] 获取会话历史失败: {e}")
         return []
+
+
+async def get_raw_messages(thread_id: str) -> list:
+    """获取原始的 LangChain 消息对象列表
+    
+    Args:
+        thread_id: 会话 ID
+        
+    Returns:
+        原始消息对象列表
+    """
+    try:
+        async with AsyncSqliteSaver.from_conn_string("llm_checkpoints.db") as memory:
+            config = get_agent_config(thread_id)
+            checkpoint_tuple = await memory.aget_tuple(config)
+            
+            if not checkpoint_tuple or not checkpoint_tuple.checkpoint:
+                return []
+            
+            return checkpoint_tuple.checkpoint.get("channel_values", {}).get("messages", [])
+    except Exception as e:
+        logger.error(f"[ChatAgent] 获取原始消息失败: {e}")
+        return []
+
+
+async def replace_assistant_response(thread_id: str, user_msg_index: int, new_messages: list) -> bool:
+    """替换指定用户消息对应的 AI 回复
+    
+    Args:
+        thread_id: 会话 ID
+        user_msg_index: 用户消息在"用户消息列表"中的索引（从0开始）
+        new_messages: 新的 AI 回复消息列表（LangChain 消息对象）
+        
+    Returns:
+        是否成功
+    """
+    try:
+        async with AsyncSqliteSaver.from_conn_string("llm_checkpoints.db") as memory:
+            config = get_agent_config(thread_id)
+            checkpoint_tuple = await memory.aget_tuple(config)
+            
+            if not checkpoint_tuple or not checkpoint_tuple.checkpoint:
+                logger.warning(f"[ChatAgent] 会话不存在: thread_id={thread_id}")
+                return False
+            
+            checkpoint = checkpoint_tuple.checkpoint
+            messages = checkpoint.get("channel_values", {}).get("messages", [])
+            if not messages:
+                return False
+            
+            # 找到第 N 个 human 消息的实际位置
+            human_count = 0
+            target_human_idx = -1
+            for i, msg in enumerate(messages):
+                if getattr(msg, "type", None) == "human":
+                    if human_count == user_msg_index:
+                        target_human_idx = i
+                        break
+                    human_count += 1
+            
+            if target_human_idx == -1:
+                logger.warning(f"[ChatAgent] 找不到用户消息 index={user_msg_index}")
+                return False
+            
+            # 找到下一个 human 消息的位置（或消息末尾）
+            next_human_idx = len(messages)
+            for i in range(target_human_idx + 1, len(messages)):
+                if getattr(messages[i], "type", None) == "human":
+                    next_human_idx = i
+                    break
+            
+            # 构建新的消息列表：前面 + 目标用户消息 + 新回复 + 后续消息
+            new_message_list = (
+                messages[:target_human_idx + 1] +  # 包含目标用户消息
+                new_messages +                      # 新的 AI 回复
+                messages[next_human_idx:]           # 后续消息（从下一个用户消息开始）
+            )
+            
+            checkpoint["channel_values"]["messages"] = new_message_list
+            
+            await memory.aput(
+                checkpoint_tuple.config,
+                checkpoint,
+                checkpoint_tuple.metadata,
+                {}
+            )
+            
+            logger.info(f"[ChatAgent] 替换 AI 回复成功: thread_id={thread_id}, user_msg_index={user_msg_index}, 原消息数={len(messages)}, 新消息数={len(new_message_list)}")
+            return True
+            
+    except Exception as e:
+        logger.error(f"[ChatAgent] 替换 AI 回复失败: {e}")
+        return False

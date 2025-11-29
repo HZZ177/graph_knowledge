@@ -841,3 +841,66 @@
   40% { transform: scale(1); }
 }
 
+/* 消息气泡包装器 */
+.message-bubble-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.message-item.user .message-bubble-wrapper {
+  align-items: flex-end;
+}
+
+/* 消息操作按钮区域 (AI消息用) */
+.message-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 8px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.message-bubble:hover .message-actions {
+  opacity: 1;
+}
+
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  background: transparent;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.action-btn:hover {
+  color: var(--text-primary);
+  background: var(--bg-secondary);
+  border-color: var(--text-tertiary);
+}
+
+.action-btn:active {
+  transform: scale(0.96);
+}
+
+/* 用户消息的回溯按钮（气泡下一行右下角） */
+.message-actions-external {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.message-bubble-wrapper:hover .message-actions-external {
+  opacity: 1;
+}
+
