@@ -984,6 +984,7 @@
 
 .message-item.user .message-bubble-wrapper {
   align-items: flex-end;
+  width: 100%;
 }
 
 /* 消息操作按钮区域 (AI消息用) */
