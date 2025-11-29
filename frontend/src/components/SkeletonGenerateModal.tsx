@@ -125,7 +125,7 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
     answerContent: agent.status === 'completed' ? agent.answerContent : (answerTypewriter.texts[idx] || ''),
   }))
   
-  // 重置状态
+  // 重置状态（只依赖稳定的 reset 函数引用，避免无限循环）
   const resetState = useCallback(() => {
     thoughtTypewriter.reset()
     answerTypewriter.reset()
@@ -137,11 +137,12 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
       wsRef.current.close()
       wsRef.current = null
     }
-  }, [thoughtTypewriter, answerTypewriter])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [thoughtTypewriter.reset, answerTypewriter.reset])
   
-  // 关闭弹窗时重置
+  // 打开弹窗时重置状态（避免在关闭时操作已销毁的 Form）
   useEffect(() => {
-    if (!open) {
+    if (open) {
       resetState()
       form.resetFields()
       autoScrollRef.current = true
@@ -283,7 +284,8 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
         ))
         break
     }
-  }, [scrollToBottom, thoughtTypewriter, answerTypewriter])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollToBottom, thoughtTypewriter.append, thoughtTypewriter.finish, answerTypewriter.append, answerTypewriter.finish])
   
   // 开始生成
   const handleGenerate = useCallback(async () => {
@@ -325,7 +327,8 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
       if (e?.errorFields) return
       setError('表单验证失败')
     }
-  }, [form, handleChunk, thoughtTypewriter, answerTypewriter])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form, handleChunk, thoughtTypewriter.reset, answerTypewriter.reset])
   
   // 确认创建
   const handleConfirm = useCallback(async () => {
@@ -434,7 +437,7 @@ const SkeletonGenerateModal: React.FC<SkeletonGenerateModalProps> = ({
       width={step === 'preview' ? 1100 : 900}
       footer={renderFooter()}
       maskClosable={false}
-      destroyOnClose
+      destroyOnHidden
       styles={{ body: { padding: 0 } }}
     >
       <style>{scrollbarStyles}</style>

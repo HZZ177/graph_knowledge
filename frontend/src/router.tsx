@@ -7,33 +7,41 @@ import BusinessLibraryPage from './pages/BusinessLibraryPage'
 import LLMModelManagePage from './pages/LLMModelManagePage'
 import ChatPage from './pages/ChatPage'
 
-const router = createBrowserRouter([
+const router = createBrowserRouter(
+  [
+    {
+      path: '/',
+      element: <MainLayout />,
+      children: [
+        {
+          index: true,
+          element: <HomePage />,
+        },
+        {
+          path: '/chat',
+          element: <ChatPage />,
+        },
+        {
+          path: '/resources',
+          element: <ResourceLibraryPage />,
+        },
+        {
+          path: '/business',
+          element: <BusinessLibraryPage />,
+        },
+        {
+          path: '/llm-models',
+          element: <LLMModelManagePage />,
+        },
+      ],
+    },
+  ],
   {
-    path: '/',
-    element: <MainLayout />,
-    children: [
-      {
-        index: true,
-        element: <HomePage />,
-      },
-      {
-        path: '/chat',
-        element: <ChatPage />,
-      },
-      {
-        path: '/resources',
-        element: <ResourceLibraryPage />,
-      },
-      {
-        path: '/business',
-        element: <BusinessLibraryPage />,
-      },
-      {
-        path: '/llm-models',
-        element: <LLMModelManagePage />,
-      },
-    ],
-  },
-])
+    future: {
+      v7_startTransition: true,
+      v7_relativeSplatPath: true,
+    } as any,  // React Router v7 future flags
+  }
+)
 
 export default router

@@ -2058,8 +2058,8 @@ const BusinessLibraryPage: React.FC = () => {
                                   transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                   background: isSelected ? '#f0f7ff' : '#ffffff',
                                 }}
-                                bodyStyle={{
-                                  padding: '16px',
+                                styles={{
+                                  body: { padding: '16px' },
                                 }}
                               >
                                 <Space direction="vertical" size={8} style={{ width: '100%' }}>
@@ -2203,7 +2203,7 @@ const BusinessLibraryPage: React.FC = () => {
         <Card
           size="small"
           style={{ height: '100%' }}
-          bodyStyle={{ height: '100%', padding: 0 }}
+          styles={{ body: { height: '100%', padding: 0 } }}
         >
           {loadingCanvas ? (
             <div

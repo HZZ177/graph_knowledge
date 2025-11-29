@@ -177,7 +177,7 @@ const ModelModal: React.FC<ModelModalProps> = ({ open, mode, initial, onOk, onCa
       okText={mode === 'create' ? '创建' : '保存'}
       cancelText="取消"
       maskClosable={false}
-      destroyOnClose
+      destroyOnHidden
       width={560}
     >
       <Form<ModelFormValues> layout="vertical" form={form} size="middle">
@@ -416,12 +416,14 @@ const LLMModelManagePage: React.FC = () => {
                 <Card
                   key={m.id}
                   hoverable
-                  bodyStyle={{
-                    padding: '16px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 16,
-                    height: 160,
+                  styles={{
+                    body: {
+                      padding: '16px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 16,
+                      height: 160,
+                    },
                   }}
                   style={{
                     breakInside: 'avoid',
