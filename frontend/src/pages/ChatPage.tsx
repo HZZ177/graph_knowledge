@@ -113,11 +113,11 @@ const ToolProcess: React.FC<ToolProcessProps> = ({ name, isActive, inputSummary,
   // 构建标签：进行中显示动画，完成后显示结果摘要和耗时
   let label: React.ReactNode
   if (isActive) {
-    label = <span className="status-text">Searching {prettyName}</span>
+    label = <span className="status-text">Calling {prettyName}</span>
   } else {
     const elapsedStr = formatElapsed(elapsed)
     const suffix = [outputSummary, elapsedStr].filter(Boolean).join(' · ')
-    label = suffix ? `${prettyName} · ${suffix}` : `Searched ${prettyName}`
+    label = suffix ? `${prettyName} · ${suffix}` : `Called ${prettyName}`
   }
 
   // 只有完成后有摘要时才能展开
@@ -185,18 +185,18 @@ const BatchToolProcess: React.FC<BatchToolProcessProps> = ({ tools }) => {
   // 构建标签：和单个工具一样的格式
   let label: React.ReactNode
   if (isActive) {
-    label = <span className="status-text">Searching {totalCount} tools ({completedCount}/{totalCount})</span>
+    label = <span className="status-text">Calling {totalCount} tools ({completedCount}/{totalCount})</span>
   } else {
     const elapsedStr = formatElapsed(maxElapsed)
     const suffix = [`${completedCount}/${totalCount} 完成`, elapsedStr].filter(Boolean).join(' · ')
-    label = `Searched ${totalCount} tools · ${suffix}`
+    label = `Called ${totalCount} tools · ${suffix}`
   }
 
-  // 只有完成后才能展开查看详情
-  const canExpand = !isActive && tools.some(t => t.inputSummary || t.outputSummary)
+  // 批量工具调用时始终可以展开（执行中也可以查看各工具状态）
+  const canExpand = totalCount > 1
 
   return (
-    <div className={`inline-expandable ${isExpanded ? 'expanded' : ''}`}>
+    <div className={`inline-expandable ${isExpanded ? 'expanded' : ''} ${isActive ? 'active' : ''}`}>
       <span 
         className="inline-expandable-toggle" 
         onClick={() => canExpand && setIsExpanded(!isExpanded)}
@@ -205,18 +205,18 @@ const BatchToolProcess: React.FC<BatchToolProcessProps> = ({ tools }) => {
         {label}
         {canExpand && <span className="inline-chevron">›</span>}
       </span>
-      {canExpand && (
+      {canExpand && isExpanded && (
         <div className="inline-expandable-content">
           {tools.map((tool, idx) => {
             const prettyName = tool.name.replace(/_/g, ' ')
+            const elapsedStr = tool.elapsed ? (tool.elapsed < 1 ? `${Math.round(tool.elapsed * 1000)}ms` : `${tool.elapsed.toFixed(1)}s`) : ''
             return (
-              <div key={`${tool.toolId}-${idx}`} className="tool-summary-item" style={{ marginBottom: 8 }}>
-                <div style={{ fontWeight: 500, marginBottom: 2 }}>{prettyName}</div>
-                {tool.inputSummary && (
-                  <div><span className="tool-summary-label">查询:</span> {tool.inputSummary}</div>
-                )}
-                {tool.outputSummary && (
-                  <div><span className="tool-summary-label">结果:</span> {tool.outputSummary}</div>
+              <div key={`${tool.toolId}-${idx}`} className="tool-summary-item">
+                <span className="tool-summary-label">{prettyName}:</span>
+                {tool.isActive ? (
+                  <span className="loading-dots"> 执行中</span>
+                ) : (
+                  <span> {tool.outputSummary || '已完成'}{elapsedStr && ` · ${elapsedStr}`}</span>
                 )}
               </div>
             )
@@ -593,12 +593,15 @@ const buildRenderItems = (
           // 如果不是同一批次，停止收集
           if (thisBatchId !== batchId) break
           
+          // 判断是否活跃：activeTools 中存在则为活跃，或者 toolSummaries 中无 output 也视为活跃
+          const isToolActive = ai !== undefined || (!!toolSeg.isToolActive && !ts?.output)
+          
           batchTools.push({
             toolId: toolSeg.toolId || 0,
             name: toolSeg.content,
-            isActive: toolSeg.isToolActive || false,
-            inputSummary: toolSeg.inputSummary,
-            outputSummary: toolSeg.outputSummary,
+            isActive: isToolActive,
+            inputSummary: ts?.input || toolSeg.inputSummary,
+            outputSummary: ts?.output || toolSeg.outputSummary,
             elapsed: ts?.elapsed,
           })
           i++
@@ -611,15 +614,17 @@ const buildRenderItems = (
           batchTools,
         })
       } else {
-        // 单个工具调用
+        // 单个工具调用 - 使用与批量工具相同的活跃状态判断逻辑
+        const singleToolActive = activeInfo !== undefined || (!!seg.isToolActive && !summary?.output)
+        
         result.push({
           type: 'tool' as const,
           key: `tool-${i}-${seg.content}-${seg.toolId}`,
           toolName: seg.content,
           toolId: seg.toolId,
-          toolIsActive: seg.isToolActive,
-          toolInputSummary: seg.inputSummary,
-          toolOutputSummary: seg.outputSummary,
+          toolIsActive: singleToolActive,
+          toolInputSummary: summary?.input || seg.inputSummary,
+          toolOutputSummary: summary?.output || seg.outputSummary,
           toolElapsed: summary?.elapsed,
         })
         i++
@@ -669,9 +674,17 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isLoading, canRegene
   // 检查是否有正文内容
   const hasTextContent = renderItems.some(item => item.type === 'text' && item.textContent)
   
-  // 工具已结束但正文尚未输出（包括单个工具和批量工具）
-  const hasFinishedTools = renderItems.some(item => item.type === 'tool' || item.type === 'batch_tool') && !message.currentToolName
-  const isWaitingMainAfterTools = hasFinishedTools && !hasTextContent && !!message.isThinking
+  // 检查是否有工具调用
+  const hasTools = renderItems.some(item => item.type === 'tool' || item.type === 'batch_tool')
+  
+  // 检查是否有任何工具正在执行（通过 renderItems 中的 isActive 状态判断）
+  const hasActiveTools = renderItems.some(item => 
+    (item.type === 'tool' && item.toolIsActive) ||
+    (item.type === 'batch_tool' && item.batchTools?.some(t => t.isActive))
+  )
+  
+  // 工具全部结束但正文尚未输出：有工具、无活跃工具、无当前工具名、无正文、isThinking
+  const isWaitingMainAfterTools = hasTools && !hasActiveTools && !message.currentToolName && !hasTextContent && !!message.isThinking
   
   return (
     <div className={`message-item assistant`}>

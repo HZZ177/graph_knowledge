@@ -14,16 +14,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from backend.app.llm.factory import get_langchain_llm
 from backend.app.models.conversation import Conversation
 from backend.app.core.logger import logger
-
-
-def _get_agent_config(thread_id: str) -> Dict[str, Any]:
-    """获取 Agent 执行配置"""
-    return {
-        "configurable": {
-            "thread_id": thread_id,
-        },
-        "recursion_limit": 80,
-    }
+from backend.app.llm.langchain.agent import get_agent_config
 
 
 async def get_conversation_history(thread_id: str) -> List[Dict[str, str]]:
@@ -94,7 +85,7 @@ async def truncate_thread_history(thread_id: str, keep_pairs: int) -> bool:
     """
     try:
         async with AsyncSqliteSaver.from_conn_string("llm_checkpoints.db") as memory:
-            config = _get_agent_config(thread_id)
+            config = get_agent_config(thread_id)
             
             # 使用 aget_tuple 获取完整的检查点信息（包含 metadata）
             checkpoint_tuple = await memory.aget_tuple(config)
@@ -164,7 +155,7 @@ async def get_thread_history(thread_id: str) -> list:
     try:
         # 为每次查询单独打开 AsyncSqliteSaver 上下文
         async with AsyncSqliteSaver.from_conn_string("llm_checkpoints.db") as memory:
-            config = _get_agent_config(thread_id)
+            config = get_agent_config(thread_id)
             
             # 尝试获取检查点（异步）
             checkpoint = await memory.aget(config)
@@ -220,7 +211,7 @@ async def get_raw_messages(thread_id: str) -> list:
     """
     try:
         async with AsyncSqliteSaver.from_conn_string("llm_checkpoints.db") as memory:
-            config = _get_agent_config(thread_id)
+            config = get_agent_config(thread_id)
             checkpoint_tuple = await memory.aget_tuple(config)
             
             if not checkpoint_tuple or not checkpoint_tuple.checkpoint:
@@ -245,7 +236,7 @@ async def replace_assistant_response(thread_id: str, user_msg_index: int, new_me
     """
     try:
         async with AsyncSqliteSaver.from_conn_string("llm_checkpoints.db") as memory:
-            config = _get_agent_config(thread_id)
+            config = get_agent_config(thread_id)
             checkpoint_tuple = await memory.aget_tuple(config)
             
             if not checkpoint_tuple or not checkpoint_tuple.checkpoint:

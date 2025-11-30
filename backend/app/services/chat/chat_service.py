@@ -349,145 +349,174 @@ async def streaming_chat(
             
             logger.info(f"[Chat] 开始流式执行, thread_id={thread_id}, recursion_limit={config.get('recursion_limit', 25)}")
             
-            async for event in agent.astream(inputs, config, stream_mode="updates"):
-                # stream_mode="updates" 返回节点状态更新，格式: {node_name: state_update}
-                # 例如: {"model": {"messages": [AIMessage(...)]}}
-                #       {"tools": {"messages": [ToolMessage(...)]}}
-                #       {"MiddlewareName.hook": {...}}
+            # 使用 astream_events 获取 token 级流式响应
+            async for event in agent.astream_events(inputs, config, version="v2"):
+                event_type = event.get("event")
+                event_name = event.get("name", "")
                 
-                logger.debug(f"[Chat] 收到事件: {list(event.keys())}")
-                
-                # ========== 模型输出事件 ==========
-                if "model" in event:
-                    model_output = event["model"]
-                    messages = model_output.get("messages", [])
+                # ========== LLM 开始事件 ==========
+                if event_type == "on_chat_model_start":
                     llm_call_count += 1
+                    input_data = event.get("data", {}).get("input", {})
+                    messages = input_data.get("messages", [[]])
+                    msg_count = len(messages[0]) if messages else 0
+                    logger.info(f"[Chat] LLM调用 round-{llm_call_count} 开始: model={event_name}, 历史消息数={msg_count}")
+                
+                # ========== LLM 流式输出事件（token 级）==========
+                elif event_type == "on_chat_model_stream":
+                    chunk = event.get("data", {}).get("chunk")
+                    if chunk and hasattr(chunk, "content") and chunk.content:
+                        content = chunk.content
+                        full_response += content
+                        # 发送流式内容（逐 token）
+                        await websocket.send_text(json.dumps({
+                            "type": "stream",
+                            "content": content,
+                        }, ensure_ascii=False))
+                
+                # ========== LLM 结束事件（可能包含工具调用）==========
+                elif event_type == "on_chat_model_end":
+                    output = event.get("data", {}).get("output")
+                    output_len = len(output.content) if output and hasattr(output, "content") else 0
                     
-                    for msg in messages:
-                        # 处理 AIMessage
-                        if hasattr(msg, "content") and msg.content:
-                            content = msg.content
-                            full_response += content
-                            content_preview = content.replace('\n', '\\n')[:200]
-                            logger.info(f"[Chat] LLM输出 round-{llm_call_count}: len={len(content)}, content={content_preview}...")
-                            # 发送流式内容
+                    # 检查是否有工具调用
+                    tool_calls = getattr(output, "tool_calls", []) if output else []
+                    if tool_calls:
+                        tool_names = [tc.get("name", "unknown") for tc in tool_calls]
+                        batch_size = len(tool_calls)
+                        is_batch = batch_size > 1
+                        
+                        if is_batch:
+                            logger.info(f"[Chat] LLM调用 round-{llm_call_count} 工具批量调用({batch_size}个): {tool_names}")
+                        else:
+                            logger.info(f"[Chat] LLM调用 round-{llm_call_count} 请求工具调用: {tool_names}")
+                        logger.debug(f"[Chat] LLM调用工具原始参数: {tool_calls}")
+                        
+                        # 为这一批工具调用分配批次 ID
+                        tool_batch_id += 1
+                        current_batch_id = tool_batch_id
+                        
+                        # 发送工具占位符和 tool_start 消息
+                        for idx, tc in enumerate(tool_calls):
+                            tool_name = tc.get("name", "unknown")
+                            tool_call_id = tc.get("id", "")
+                            tool_args = tc.get("args", {})
+                            tool_placeholder_id += 1
+                            placeholder = f"<!--TOOL:{tool_name}:{tool_placeholder_id}-->"
+                            full_response += placeholder
+                            # 记录映射关系（包含批次信息）
+                            tool_call_to_placeholder[tool_call_id] = {
+                                "placeholder_id": tool_placeholder_id,
+                                "tool_name": tool_name,
+                                "tool_args": tool_args,
+                                "start_time": time.time(),
+                                "batch_id": current_batch_id,
+                                "batch_size": batch_size,
+                                "batch_index": idx,
+                            }
+                            logger.debug(f"[Chat] 发送工具占位符: {placeholder}, tool_call_id={tool_call_id}, batch={current_batch_id}/{batch_size}")
+                            # 先发送占位符到前端（通过 stream 消息）
                             await websocket.send_text(json.dumps({
                                 "type": "stream",
-                                "content": content,
+                                "content": placeholder,
                             }, ensure_ascii=False))
-                        
-                        # 检查是否有工具调用
-                        tool_calls = getattr(msg, "tool_calls", []) or []
-                        if tool_calls:
-                            tool_names = [tc.get("name", "unknown") for tc in tool_calls]
-                            batch_size = len(tool_calls)
-                            is_batch = batch_size > 1
-                            
-                            if is_batch:
-                                logger.info(f"[Chat] LLM调用 round-{llm_call_count} 工具批量调用({batch_size}个): {tool_names}")
-                                logger.debug(f"[Chat] LLM调用工具原始参数: {tool_calls}")
-                            else:
-                                logger.info(f"[Chat] LLM调用 round-{llm_call_count} 请求工具调用: {tool_names}")
-                                logger.debug(f"[Chat] LLM调用工具原始参数: {tool_calls}")
-                            
-                            # 为这一批工具调用分配批次 ID
-                            tool_batch_id += 1
-                            current_batch_id = tool_batch_id
-                            
-                            # 发送工具占位符和 tool_start 消息
-                            for idx, tc in enumerate(tool_calls):
-                                tool_name = tc.get("name", "unknown")
-                                tool_call_id = tc.get("id", "")
-                                tool_args = tc.get("args", {})
-                                tool_placeholder_id += 1
-                                placeholder = f"<!--TOOL:{tool_name}:{tool_placeholder_id}-->"
-                                full_response += placeholder
-                                # 记录映射关系（包含批次信息）
-                                tool_call_to_placeholder[tool_call_id] = {
-                                    "placeholder_id": tool_placeholder_id,
-                                    "tool_name": tool_name,
-                                    "tool_args": tool_args,
-                                    "start_time": time.time(),
-                                    "batch_id": current_batch_id,
-                                    "batch_size": batch_size,
-                                    "batch_index": idx,
-                                }
-                                logger.debug(f"[Chat] 发送工具占位符: {placeholder}, tool_call_id={tool_call_id}, batch={current_batch_id}/{batch_size}")
-                                # 先发送占位符到前端（通过 stream 消息）
-                                await websocket.send_text(json.dumps({
-                                    "type": "stream",
-                                    "content": placeholder,
-                                }, ensure_ascii=False))
-                                # 再发送 tool_start 消息（包含批次信息）
-                                await websocket.send_text(json.dumps({
-                                    "type": "tool_start",
-                                    "tool_name": tool_name,
-                                    "tool_id": tool_placeholder_id,
-                                    "tool_input": tool_args,
-                                    "batch_id": current_batch_id,
-                                    "batch_size": batch_size,
-                                    "batch_index": idx,
-                                }, ensure_ascii=False))
-                
-                # ========== 工具输出事件 ==========
-                elif "tools" in event:
-                    tools_output = event["tools"]
-                    messages = tools_output.get("messages", [])
-                    
-                    for msg in messages:
-                        # 处理 ToolMessage
-                        if hasattr(msg, "tool_call_id"):
-                            tool_call_id = msg.tool_call_id
-                            tool_name = getattr(msg, "name", "unknown")
-                            tool_content = msg.content if hasattr(msg, "content") else str(msg)
-                            
-                            # 获取之前保存的信息（包含批次信息）
-                            call_info = tool_call_to_placeholder.pop(tool_call_id, {})
-                            placeholder_id = call_info.get("placeholder_id")
-                            tool_args = call_info.get("tool_args", {})
-                            start_time = call_info.get("start_time", time.time())
-                            elapsed = time.time() - start_time
-                            batch_id = call_info.get("batch_id")
-                            batch_size = call_info.get("batch_size", 1)
-                            batch_index = call_info.get("batch_index", 0)
-                            
-                            output_str = str(tool_content)
-                            output_len = len(output_str)
-                            output_preview = output_str[:200] + "..." if len(output_str) > 200 else output_str
-                            
-                            logger.info(f"[Chat] 工具调用结束: {tool_name}, placeholder_id={placeholder_id}, batch={batch_id}/{batch_size}, 耗时={elapsed:.2f}s, 输出长度={output_len}")
-                            logger.debug(f"[Chat] 工具输出预览: {output_preview}")
-                            
-                            # 生成摘要
-                            input_summary, output_summary = _generate_tool_summaries(tool_name, tool_args, output_str)
-                            
-                            tool_calls_info.append({
-                                "name": tool_name,
-                                "output_length": output_len,
-                                "elapsed": round(elapsed, 2),
-                                "input_summary": input_summary,
-                                "output_summary": output_summary,
-                            })
+                            # 再发送 tool_start 消息（包含批次信息）
                             await websocket.send_text(json.dumps({
-                                "type": "tool_end",
+                                "type": "tool_start",
                                 "tool_name": tool_name,
-                                "tool_id": placeholder_id,
-                                "input_summary": input_summary,
-                                "output_summary": output_summary,
-                                "elapsed": round(elapsed, 2),
-                                "batch_id": batch_id,
+                                "tool_id": tool_placeholder_id,
+                                "tool_input": tool_args,
+                                "batch_id": current_batch_id,
                                 "batch_size": batch_size,
-                                "batch_index": batch_index,
+                                "batch_index": idx,
                             }, ensure_ascii=False))
+                    else:
+                        content_preview = (output.content[:200] if output and output.content else "").replace('\n', '\\n')
+                        logger.info(f"[Chat] LLM调用 round-{llm_call_count} 结束: 输出长度={output_len}, preview={content_preview}...")
                 
-                # ========== 中间件/其他事件 ==========
-                else:
-                    # 中间件事件格式: {"MiddlewareName.hook": {...}}
-                    for key in event.keys():
-                        if "." in key:
-                            logger.debug(f"[Chat] 中间件事件: {key}")
-                        else:
-                            logger.debug(f"[Chat] 其他节点事件: {key}")
+                # ========== 工具开始事件 ==========
+                elif event_type == "on_tool_start":
+                    tool_name = event.get("name", "unknown")
+                    tool_input = event.get("data", {}).get("input", {})
+                    run_id = event.get("run_id", "")
+                    
+                    # 记录开始时间和输入参数（用于 on_tool_end 时计算耗时和生成摘要）
+                    tool_call_to_placeholder[f"run_{run_id}"] = {
+                        "tool_name": tool_name,
+                        "tool_input": tool_input,
+                        "start_time": time.time(),
+                    }
+                    
+                    input_str = json.dumps(tool_input, ensure_ascii=False) if isinstance(tool_input, dict) else str(tool_input)
+                    input_preview = input_str[:300] + "..." if len(input_str) > 300 else input_str
+                    logger.info(f"[Chat] 工具执行开始: {tool_name}, run_id={run_id}, 输入: {input_preview}")
+                
+                # ========== 工具结束事件 ==========
+                elif event_type == "on_tool_end":
+                    tool_name = event.get("name", "unknown")
+                    tool_output = event.get("data", {}).get("output", "")
+                    run_id = event.get("run_id", "")
+                    
+                    # 获取之前保存的运行时信息
+                    run_info = tool_call_to_placeholder.pop(f"run_{run_id}", {})
+                    tool_input = run_info.get("tool_input", {})
+                    start_time = run_info.get("start_time", time.time())
+                    elapsed = time.time() - start_time
+                    
+                    # 通过工具名查找对应的 placeholder 信息（包含批次信息）
+                    placeholder_id = None
+                    batch_id = None
+                    batch_size = 1
+                    batch_index = 0
+                    tool_args = tool_input
+                    
+                    # 查找匹配的 tool_call 记录
+                    for tc_id, info in list(tool_call_to_placeholder.items()):
+                        if not tc_id.startswith("run_") and info.get("tool_name") == tool_name:
+                            placeholder_id = info.get("placeholder_id")
+                            tool_args = info.get("tool_args", tool_input)
+                            batch_id = info.get("batch_id")
+                            batch_size = info.get("batch_size", 1)
+                            batch_index = info.get("batch_index", 0)
+                            start_time = info.get("start_time", start_time)
+                            elapsed = time.time() - start_time
+                            del tool_call_to_placeholder[tc_id]
+                            break
+                    
+                    output_str = str(tool_output.content) if hasattr(tool_output, "content") else str(tool_output)
+                    output_len = len(output_str)
+                    output_preview = output_str[:200] + "..." if len(output_str) > 200 else output_str
+                    
+                    logger.info(f"[Chat] 工具调用结束: {tool_name}, placeholder_id={placeholder_id}, batch={batch_id}/{batch_size}, 耗时={elapsed:.2f}s, 输出长度={output_len}")
+                    logger.debug(f"[Chat] 工具输出预览: {output_preview}")
+                    
+                    # 生成摘要
+                    input_summary, output_summary = _generate_tool_summaries(tool_name, tool_args, output_str)
+                    
+                    tool_calls_info.append({
+                        "name": tool_name,
+                        "output_length": output_len,
+                        "elapsed": round(elapsed, 2),
+                        "input_summary": input_summary,
+                        "output_summary": output_summary,
+                    })
+                    await websocket.send_text(json.dumps({
+                        "type": "tool_end",
+                        "tool_name": tool_name,
+                        "tool_id": placeholder_id,
+                        "input_summary": input_summary,
+                        "output_summary": output_summary,
+                        "elapsed": round(elapsed, 2),
+                        "batch_id": batch_id,
+                        "batch_size": batch_size,
+                        "batch_index": batch_index,
+                    }, ensure_ascii=False))
+                
+                # ========== 错误事件 ==========
+                elif event_type == "on_chain_error":
+                    error_data = event.get("data", {})
+                    logger.error(f"[Chat] Chain错误: name={event_name}, error={error_data}")
+                    # 不立即抛出，让流程继续尝试完成
         
         # 发送最终结果消息
         await websocket.send_text(json.dumps({
@@ -598,7 +627,7 @@ async def streaming_regenerate(
                     input_data = event.get("data", {}).get("input", {})
                     messages = input_data.get("messages", [[]])
                     msg_count = len(messages[0]) if messages else 0
-                    logger.info(f"[Regenerate] LLM调用#{llm_call_count} 开始: model={event_name}, 输入消息数={msg_count}")
+                    logger.info(f"[Regenerate] LLM调用#{llm_call_count} 开始: model={event_name}, 历史消息数={msg_count}")
                 
                 elif event_type == "on_chat_model_stream":
                     chunk = event.get("data", {}).get("chunk")

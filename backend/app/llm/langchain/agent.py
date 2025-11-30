@@ -156,7 +156,7 @@ def create_chat_agent(db: Session, checkpointer: Optional[AsyncSqliteSaver] = No
         ),
         # 限制工具调用次数（防止 agent 陷入循环）
         ToolCallLimitMiddleware(
-            run_limit=10,  # 单次请求最多 10 次工具调用
+            run_limit=25,  # 单次请求最多 10 次工具调用
             exit_behavior="continue"  # 超出后阻止调用但模型继续
         ),
     ]
@@ -189,5 +189,5 @@ def get_agent_config(thread_id: str) -> Dict[str, Any]:
         "configurable": {
             "thread_id": thread_id,
         },
-        "recursion_limit": 80,
+        "recursion_limit": 150,
     }
