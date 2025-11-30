@@ -497,6 +497,7 @@ interface MessageItemProps {
   onRollback?: () => void
   toolSummaries?: Map<string, ToolSummaryInfo>  // 工具摘要（包含批次信息）
   activeTools?: Map<number, ActiveToolInfo>     // 活跃工具信息（用于批次分组）
+  activeToolsRef?: React.MutableRefObject<Map<number, ActiveToolInfo>>  // ref版本，用于同步获取
 }
 
 // 工具摘要扩展类型（包含批次信息和耗时）
@@ -548,7 +549,8 @@ const buildRenderItems = (
   content: string,
   currentToolName?: string,
   toolSummaries?: Map<string, ToolSummaryInfo>,
-  activeTools?: Map<number, ActiveToolInfo>  // toolId -> 活跃工具信息
+  activeTools?: Map<number, ActiveToolInfo>,  // toolId -> 活跃工具信息
+  activeToolsRef?: React.MutableRefObject<Map<number, ActiveToolInfo>>  // ref版本，用于同步获取最新值
 ): RenderItem[] => {
   const segments = parseContentSegments(content, currentToolName, toolSummaries)
   
@@ -568,13 +570,23 @@ const buildRenderItems = (
       })
       i++
     } else if (seg.type === 'tool') {
-      // 获取该工具的批次信息
+      // 获取该工具的批次信息（优先从ref获取，确保最新）
       const toolKey = seg.toolId ? `${seg.content}:${seg.toolId}` : undefined
       const summary = toolKey ? toolSummaries?.get(toolKey) : undefined
-      const activeInfo = seg.toolId ? activeTools?.get(seg.toolId) : undefined
+      const activeInfo = seg.toolId ? (activeToolsRef?.current.get(seg.toolId) || activeTools?.get(seg.toolId)) : undefined
       
       const batchId = summary?.batchId ?? activeInfo?.batchId
       const batchSize = summary?.batchSize ?? activeInfo?.batchSize ?? 1
+      
+      console.log('[BatchDebug] buildRenderItems - 工具批次信息:', {
+        toolName: seg.content,
+        toolId: seg.toolId,
+        toolKey,
+        batchId,
+        batchSize,
+        summary,
+        activeInfo
+      })
       
       // 如果是批量调用（batchSize > 1），收集同一批次的所有工具
       if (batchSize > 1 && batchId !== undefined) {
@@ -642,7 +654,7 @@ const buildRenderItems = (
   return result
 }
 
-const MessageItem: React.FC<MessageItemProps> = ({ message, isLoading, canRegenerate, onRegenerate, onRollback, toolSummaries, activeTools }) => {
+const MessageItem: React.FC<MessageItemProps> = ({ message, isLoading, canRegenerate, onRegenerate, onRollback, toolSummaries, activeTools, activeToolsRef }) => {
   const isUser = message.role === 'user'
   
   // 用户消息直接渲染
@@ -666,7 +678,7 @@ const MessageItem: React.FC<MessageItemProps> = ({ message, isLoading, canRegene
   }
   
   // Assistant 消息：构建交错渲染列表（工具占位符已嵌入 content）
-  const renderItems = buildRenderItems(message.content, message.currentToolName, toolSummaries, activeTools)
+  const renderItems = buildRenderItems(message.content, message.currentToolName, toolSummaries, activeTools, activeToolsRef)
   
   // 初始思考状态：正在思考但还没有任何内容
   const isInitialThinking = message.isThinking && renderItems.length === 0
@@ -854,6 +866,7 @@ const ChatPage: React.FC = () => {
   const [toolSummaries, setToolSummaries] = useState<Map<string, ToolSummaryInfo>>(new Map())
   // 活跃工具存储：toolId -> {batchId, batchSize, batchIndex}（用于渲染时判断批次）
   const [activeTools, setActiveTools] = useState<Map<number, ActiveToolInfo>>(new Map())
+  const activeToolsRef = useRef<Map<number, ActiveToolInfo>>(new Map()) // 同步ref，避免异步setState问题
   
   const chatClientRef = useRef<ChatClient | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -934,24 +947,41 @@ const ChatPage: React.FC = () => {
     })
   }, [])
 
-  // 监听流式内容变化，更新最后一条消息
+  // 监听流式内容变化，更新消息
   useEffect(() => {
-    if (messages.length === 0) return
+    if (messages.length === 0 || (!isLoading && !isTyping)) return
     
-    const lastMsg = messages[messages.length - 1]
-    if (lastMsg.role === 'assistant' && isLoading) {
-      setMessages(prev => {
-        const newPrev = [...prev]
-        newPrev[newPrev.length - 1] = {
-          ...newPrev[newPrev.length - 1],
-          content: streamingContent,
-          // 如果正在打字，说明还在输出
-          // 如果 currentTool 不为空，说明正在思考
+    // 查找正在加载的assistant消息（可能不是最后一条，比如regenerate时）
+    setMessages(prev => {
+      const newPrev = [...prev]
+      let updated = false
+      
+      // 从后往前找第一个isThinking=true的assistant消息
+      for (let i = newPrev.length - 1; i >= 0; i--) {
+        if (newPrev[i].role === 'assistant' && newPrev[i].isThinking) {
+          newPrev[i] = {
+            ...newPrev[i],
+            content: streamingContent,
+          }
+          updated = true
+          break
         }
-        return newPrev
-      })
-    }
-  }, [streamingContent, isLoading])
+      }
+      
+      // 如果没找到isThinking的，更新最后一条assistant消息（兼容旧逻辑）
+      if (!updated && isLoading) {
+        const lastIdx = newPrev.length - 1
+        if (lastIdx >= 0 && newPrev[lastIdx].role === 'assistant') {
+          newPrev[lastIdx] = {
+            ...newPrev[lastIdx],
+            content: streamingContent,
+          }
+        }
+      }
+      
+      return newPrev
+    })
+  }, [streamingContent, isLoading, isTyping, messages.length])
 
   // 自动高度 textarea
   useEffect(() => {
@@ -1011,19 +1041,26 @@ const ChatPage: React.FC = () => {
         },
         
         onStream: (chunk) => {
-          // 收到文本流，说明不再是纯思考状态，开始输出了
+          // 收到文本流
           fullContentRef.current += chunk
           appendToTypewriter(chunk)
           
-          // 更新状态：不再仅仅是思考，而是有内容了
-          setMessages(prev => {
-             const newPrev = [...prev]
-             const lastIdx = newPrev.length - 1
-             if (lastIdx >= 0 && newPrev[lastIdx].id === assistantMessageId) {
-               newPrev[lastIdx].isThinking = false // 开始输出文本，停止纯思考动画
-             }
-             return newPrev
-          })
+          // 判断是否是真正的正文内容（不是think标签、不是工具占位符）
+          const isRealContent = !chunk.includes('<think>') && 
+                               !chunk.includes('</think>') && 
+                               !chunk.includes('<!--TOOL:')
+          
+          // 只有在收到真正的正文时，才关闭thinking状态
+          if (isRealContent && chunk.trim()) {
+            setMessages(prev => {
+               const newPrev = [...prev]
+               const lastIdx = newPrev.length - 1
+               if (lastIdx >= 0 && newPrev[lastIdx].id === assistantMessageId) {
+                 newPrev[lastIdx].isThinking = false // 开始输出正文，停止纯思考动画
+               }
+               return newPrev
+            })
+          }
         },
         
         onToolStart: (name, _input, toolId, batch) => {
@@ -1042,16 +1079,33 @@ const ChatPage: React.FC = () => {
           
           // 记录活跃工具的批次信息
           if (toolId && batch) {
+            console.log('[BatchDebug] onToolStart - 保存活跃工具批次信息:', {
+              toolId,
+              name,
+              batchId: batch.batchId,
+              batchSize: batch.batchSize,
+              batchIndex: batch.batchIndex
+            })
+            
+            const toolInfo = {
+              toolId,
+              batchId: batch.batchId,
+              batchSize: batch.batchSize,
+              batchIndex: batch.batchIndex,
+            }
+            
+            // 立即保存到ref（同步）
+            activeToolsRef.current.set(toolId, toolInfo)
+            
+            // 也保存到state（异步）
             setActiveTools(prev => {
               const newMap = new Map(prev)
-              newMap.set(toolId, {
-                toolId,
-                batchId: batch.batchId,
-                batchSize: batch.batchSize,
-                batchIndex: batch.batchIndex,
-              })
+              newMap.set(toolId, toolInfo)
+              console.log('[BatchDebug] activeTools updated:', Array.from(newMap.entries()))
               return newMap
             })
+          } else {
+            console.log('[BatchDebug] onToolStart - 未保存批次信息:', { toolId, batch })
           }
           
           setCurrentTool(name)
@@ -1077,6 +1131,12 @@ const ChatPage: React.FC = () => {
           
           // 把摘要存入 state（包含批次信息和耗时）
           const toolKey = `${name}:${finalToolId}`
+          console.log('[BatchDebug] onToolEnd - 保存工具摘要:', {
+            toolKey,
+            batchId: batch?.batchId,
+            batchSize: batch?.batchSize,
+            batchIndex: batch?.batchIndex
+          })
           setToolSummaries(prev => {
             const newMap = new Map(prev)
             newMap.set(toolKey, { 
@@ -1087,11 +1147,13 @@ const ChatPage: React.FC = () => {
               batchSize: batch?.batchSize,
               batchIndex: batch?.batchIndex,
             })
+            console.log('[BatchDebug] toolSummaries updated:', Array.from(newMap.entries()))
             return newMap
           })
           
           // 从活跃工具中移除
           if (finalToolId) {
+            activeToolsRef.current.delete(finalToolId)
             setActiveTools(prev => {
               const newMap = new Map(prev)
               newMap.delete(finalToolId)
@@ -1112,26 +1174,47 @@ const ChatPage: React.FC = () => {
         },
         
         onResult: (content, resultThreadId, toolCalls) => {
-          // 最终结果
+          // 最终结果 - 触发打字机加速清空缓冲区
           finishTypewriter()
           
-          // 更新最终状态
+          // 更新元数据和状态（但不替换content，让打字机继续播放）
+          setMessages(prev => {
+            const newPrev = [...prev]
+            const lastIdx = newPrev.findIndex(m => m.id === assistantMessageId)
+            if (lastIdx !== -1) {
+              newPrev[lastIdx] = {
+                ...newPrev[lastIdx],
+                toolCalls: toolCalls.length > 0 ? toolCalls : currentToolCallsRef.current,
+                isThinking: false,
+              }
+            }
+            return newPrev
+          })
+          
+          setIsLoading(false)
+          chatClientRef.current = null
+          
+          // 兜底：打字机播放完后，确保内容完整（等待2秒后检查）
           setTimeout(() => {
             setMessages(prev => {
               const newPrev = [...prev]
               const lastIdx = newPrev.findIndex(m => m.id === assistantMessageId)
               if (lastIdx !== -1) {
-                newPrev[lastIdx] = {
-                  ...newPrev[lastIdx],
-                  content: fullContentRef.current || content,
-                  toolCalls: toolCalls.length > 0 ? toolCalls : currentToolCallsRef.current,
-                  isThinking: false,
+                const finalContent = fullContentRef.current || content
+                // 只在内容不一致时更新（避免不必要的重渲染）
+                if (newPrev[lastIdx].content !== finalContent) {
+                  newPrev[lastIdx] = {
+                    ...newPrev[lastIdx],
+                    content: finalContent,
+                  }
                 }
               }
               return newPrev
             })
-            setIsLoading(false)
-            chatClientRef.current = null
+          }, 2000)
+          
+          // 延迟处理会话元数据
+          setTimeout(() => {
             const finalThreadId = resultThreadId || threadId
             if (finalThreadId) {
               const isNewConversation = !threadId
@@ -1245,11 +1328,20 @@ const ChatPage: React.FC = () => {
         onStream: (chunk) => {
           fullContentRef.current += chunk
           appendToTypewriter(chunk)
-          setMessages(prev => prev.map((msg, idx) => 
-            idx === targetAssistantIdx 
-              ? { ...msg, content: fullContentRef.current, isThinking: false }
-              : msg
-          ))
+          
+          // 判断是否是真正的正文内容（不是think标签、不是工具占位符）
+          const isRealContent = !chunk.includes('<think>') && 
+                               !chunk.includes('</think>') && 
+                               !chunk.includes('<!--TOOL:')
+          
+          // 只有在收到真正的正文时，才关闭thinking状态
+          if (isRealContent && chunk.trim()) {
+            setMessages(prev => prev.map((msg, idx) => 
+              idx === targetAssistantIdx 
+                ? { ...msg, isThinking: false }
+                : msg
+            ))
+          }
         },
         onToolStart: (name, _input, toolId) => {
           // 不再插入占位符（后端已经通过 stream 发送了）
@@ -1296,21 +1388,35 @@ const ChatPage: React.FC = () => {
           ))
         },
         onResult: (content, _threadId, toolCalls) => {
+          // 触发打字机加速清空缓冲区
           finishTypewriter()
+          
+          // 更新元数据（但不替换content，让打字机继续播放）
+          setMessages(prev => prev.map((msg, idx) => 
+            idx === targetAssistantIdx 
+              ? { 
+                  ...msg, 
+                  toolCalls: toolCalls.length > 0 ? toolCalls : currentToolCallsRef.current,
+                  isThinking: false,
+                  currentToolName: undefined,
+                }
+              : msg
+          ))
+          
+          setIsLoading(false)
+          
+          // 兜底：打字机播放完后，确保内容完整（等待2秒后检查）
           setTimeout(() => {
-            setMessages(prev => prev.map((msg, idx) => 
-              idx === targetAssistantIdx 
-                ? { 
-                    ...msg, 
-                    content: fullContentRef.current || content,
-                    toolCalls: toolCalls.length > 0 ? toolCalls : currentToolCallsRef.current,
-                    isThinking: false,
-                    currentToolName: undefined,
-                  }
-                : msg
-            ))
-            setIsLoading(false)
-          }, 200)
+            setMessages(prev => prev.map((msg, idx) => {
+              if (idx !== targetAssistantIdx) return msg
+              const finalContent = fullContentRef.current || content
+              // 只在内容不一致时更新
+              if (msg.content !== finalContent) {
+                return { ...msg, content: finalContent }
+              }
+              return msg
+            }))
+          }, 2000)
         },
         onError: (err) => {
           console.error(err)
@@ -1373,87 +1479,109 @@ const ChatPage: React.FC = () => {
       const msgs = await fetchConversationHistory(conv.threadId)
 
       const display: DisplayMessage[] = []
-      let pendingToolCalls: Array<{ name: string; output_length: number; args?: Record<string, unknown>; batchId?: number; batchSize?: number; batchIndex?: number }> = []
       let globalToolId = 0  // 全局工具调用 ID 计数器
       let globalBatchId = 0 // 批次 ID 计数器
       const historySummaries = new Map<string, ToolSummaryInfo>()  // 历史工具摘要（包含批次信息）
+      
+      // 累积器：用于合并连续的 AI 消息
+      let accumulatedContent = ''
+      let accumulatedToolCalls: Array<{name: string, args?: Record<string, unknown>, batchId?: number, batchSize?: number, batchIndex?: number}> = []
+      let aiMessageStartIndex = -1
+
+      const flushAIMessage = () => {
+        if (aiMessageStartIndex === -1) return
+        
+        display.push({
+          id: `assistant-${aiMessageStartIndex}-${conv.threadId}`,
+          role: 'assistant',
+          content: accumulatedContent,
+          toolCalls: accumulatedToolCalls.length > 0 
+            ? accumulatedToolCalls.map(tc => ({ name: tc.name, output_length: 0 })) 
+            : undefined,
+        })
+        
+        accumulatedContent = ''
+        accumulatedToolCalls = []
+        aiMessageStartIndex = -1
+      }
 
       msgs.forEach((m, i) => {
         if (m.role === 'user') {
+          flushAIMessage()
+          
           display.push({
             id: `user-${i}-${conv.threadId}`,
             role: 'user',
             content: m.content,
           })
         } else if (m.role === 'assistant') {
+          if (aiMessageStartIndex === -1) {
+            aiMessageStartIndex = i
+          }
+          
+          // 添加content
+          if (m.content) {
+            accumulatedContent += m.content
+          }
+          
+          // 如果有工具调用，生成占位符并追加到当前累积内容后
           if (m.tool_calls && m.tool_calls.length > 0) {
-            // assistant 发起工具调用，同一消息内的多个 tool_calls 是同一批次
             globalBatchId++
             const batchSize = m.tool_calls.length
-            const newCalls = m.tool_calls.map((tc, idx) => ({ 
-              name: tc.name, 
-              output_length: 0,
-              args: tc.args,  // 保存参数用于生成摘要
-              batchId: batchSize > 1 ? globalBatchId : undefined,
-              batchSize: batchSize > 1 ? batchSize : undefined,
-              batchIndex: batchSize > 1 ? idx : undefined,
-            }))
-            pendingToolCalls.push(...newCalls)
-          } else if (m.content) {
-            // assistant 内容：在 think 块之后插入工具占位符
-            let contentWithTools = m.content
-            if (pendingToolCalls.length > 0) {
-              // 找到 </think> 的位置，在其后插入工具占位符（带唯一 ID）
-              const thinkEndIdx = contentWithTools.indexOf('</think>')
-              const toolMarkers = pendingToolCalls.map(tc => {
-                globalToolId++
-                // 生成简单的输入摘要
-                let inputSummary = ''
-                if (tc.args) {
-                  const firstKey = Object.keys(tc.args)[0]
-                  if (firstKey) {
-                    const val = String(tc.args[firstKey])
-                    inputSummary = val.length > 30 ? val.slice(0, 30) + '...' : val
-                  }
+            let toolMarkers = ''
+            
+            for (let idx = 0; idx < m.tool_calls.length; idx++) {
+              const tc = m.tool_calls[idx]
+              globalToolId++
+              
+              // 生成输入摘要
+              let inputSummary = ''
+              if (tc.args) {
+                const firstKey = Object.keys(tc.args)[0]
+                if (firstKey) {
+                  const val = String(tc.args[firstKey])
+                  inputSummary = val.length > 30 ? val.slice(0, 30) + '...' : val
                 }
-                // 存入摘要 Map（包含批次信息）
-                historySummaries.set(`${tc.name}:${globalToolId}`, {
-                  input: inputSummary,
-                  output: tc.output_length > 0 ? `返回 ${tc.output_length} 字符` : '已完成',
-                  batchId: tc.batchId,
-                  batchSize: tc.batchSize,
-                  batchIndex: tc.batchIndex,
-                })
-                return `<!--TOOL:${tc.name}:${globalToolId}-->`
-              }).join('')
-              if (thinkEndIdx !== -1) {
-                // 在 </think> 之后插入
-                const insertPos = thinkEndIdx + 8
-                contentWithTools =
-                  contentWithTools.slice(0, insertPos) +
-                  toolMarkers +
-                  contentWithTools.slice(insertPos)
-              } else {
-                // 没有 think 块，在开头插入
-                contentWithTools = toolMarkers + contentWithTools
               }
+              
+              // 查找对应的tool返回消息，获取output_length
+              let outputLength = 0
+              for (let j = i + 1; j < msgs.length; j++) {
+                if (msgs[j].role === 'tool' && msgs[j].tool_name === tc.name) {
+                  outputLength = msgs[j].content.length
+                  break
+                }
+              }
+              
+              // 存入摘要 Map
+              historySummaries.set(`${tc.name}:${globalToolId}`, {
+                input: inputSummary,
+                output: outputLength > 0 ? `返回 ${outputLength} 字符` : '已完成',
+                batchId: batchSize > 1 ? globalBatchId : undefined,
+                batchSize: batchSize > 1 ? batchSize : undefined,
+                batchIndex: batchSize > 1 ? idx : undefined,
+              })
+              
+              toolMarkers += `<!--TOOL:${tc.name}:${globalToolId}-->`
+              
+              // 记录到累积器
+              accumulatedToolCalls.push({
+                name: tc.name,
+                args: tc.args,
+                batchId: batchSize > 1 ? globalBatchId : undefined,
+                batchSize: batchSize > 1 ? batchSize : undefined,
+                batchIndex: batchSize > 1 ? idx : undefined,
+              })
             }
-            display.push({
-              id: `assistant-${i}-${conv.threadId}`,
-              role: 'assistant',
-              content: contentWithTools,
-              toolCalls: pendingToolCalls.length > 0 ? pendingToolCalls.map(tc => ({ name: tc.name, output_length: tc.output_length })) : undefined,
-            })
-            pendingToolCalls = []
-          }
-        } else if (m.role === 'tool') {
-          // tool 返回，更新对应工具的 output_length
-          const toolIdx = pendingToolCalls.findIndex(tc => tc.name === m.tool_name)
-          if (toolIdx !== -1) {
-            pendingToolCalls[toolIdx].output_length = m.content.length
+            
+            // 工具占位符直接追加到当前累积内容后（保持原始顺序）
+            accumulatedContent += toolMarkers
           }
         }
+        // tool消息跳过，已经通过占位符展示
       })
+      
+      flushAIMessage()
 
       // 设置历史工具摘要
       setToolSummaries(historySummaries)
@@ -1608,6 +1736,7 @@ const ChatPage: React.FC = () => {
                       onRollback={() => handleRollback(msg.id)}
                       toolSummaries={toolSummaries}
                       activeTools={activeTools}
+                      activeToolsRef={activeToolsRef}
                     />
                   )
                 })}
@@ -1629,10 +1758,11 @@ const ChatPage: React.FC = () => {
               onKeyDown={e => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault()
-                  sendMessage()
+                  if (!isLoading) {
+                    sendMessage()
+                  }
                 }
               }}
-              disabled={isLoading}
               rows={1}
             />
             

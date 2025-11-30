@@ -199,7 +199,7 @@ const ModelModal: React.FC<ModelModalProps> = ({ open, mode, initial, onOk, onCa
             >
               <Select onChange={handleProviderTypeChange}>
                 <Option value="litellm">通用提供商</Option>
-                <Option value="custom_gateway">自定义网关(暂无法流式响应)</Option>
+                <Option value="custom_gateway">自定义网关</Option>
               </Select>
             </Form.Item>
           </Col>

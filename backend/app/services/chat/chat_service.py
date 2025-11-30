@@ -415,12 +415,7 @@ async def streaming_chat(
                                 "batch_index": idx,
                             }
                             logger.debug(f"[Chat] 发送工具占位符: {placeholder}, tool_call_id={tool_call_id}, batch={current_batch_id}/{batch_size}")
-                            # 先发送占位符到前端（通过 stream 消息）
-                            await websocket.send_text(json.dumps({
-                                "type": "stream",
-                                "content": placeholder,
-                            }, ensure_ascii=False))
-                            # 再发送 tool_start 消息（包含批次信息）
+                            # 先发送 tool_start 消息（包含批次信息）- 确保前端先收到batch信息
                             await websocket.send_text(json.dumps({
                                 "type": "tool_start",
                                 "tool_name": tool_name,
@@ -429,6 +424,11 @@ async def streaming_chat(
                                 "batch_id": current_batch_id,
                                 "batch_size": batch_size,
                                 "batch_index": idx,
+                            }, ensure_ascii=False))
+                            # 再发送占位符到前端（通过 stream 消息）
+                            await websocket.send_text(json.dumps({
+                                "type": "stream",
+                                "content": placeholder,
                             }, ensure_ascii=False))
                     else:
                         content_preview = (output.content[:200] if output and output.content else "").replace('\n', '\\n')
