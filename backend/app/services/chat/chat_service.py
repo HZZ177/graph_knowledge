@@ -611,9 +611,10 @@ async def streaming_regenerate(
             tool_calls_info: List[Dict[str, Any]] = []
             tool_start_times: Dict[str, float] = {}
             tool_inputs: Dict[str, dict] = {}  # run_id -> tool_input
+            tool_placeholder_id = 0
+            tool_call_to_placeholder: Dict[str, dict] = {}  # tool_call_id -> {placeholder_id, batch_id, batch_size, batch_index}
+            run_id_to_tool_info: Dict[str, dict] = {}  # run_id -> {placeholder_id, batch_id, batch_size, batch_index}
             llm_call_count = 0
-            tool_placeholder_id = 0  # 工具占位符 ID 计数器
-            tool_call_to_placeholder: Dict[str, int] = {}  # tool_call_id -> placeholder_id
             
             logger.info(f"[Regenerate] 开始流式执行, temp_thread_id={temp_thread_id}, 历史消息数={len(history_messages)}")
             
@@ -647,15 +648,43 @@ async def streaming_regenerate(
                         tool_names = [tc.get("name", "unknown") for tc in tool_calls]
                         logger.info(f"[Regenerate] LLM调用#{llm_call_count} 结束: 输出长度={output_len}, 工具调用={tool_names}")
                         
-                        # 关键改动：在 LLM 决定调用工具时，立即发送工具占位符
-                        for tc in tool_calls:
+                        # 生成批次信息
+                        current_batch_id = None
+                        batch_size = len(tool_calls)
+                        if batch_size > 1:
+                            current_batch_id = llm_call_count  # 使用LLM调用次数作为批次ID
+                        
+                        # 关键改动：在 LLM 决定调用工具时，立即发送工具占位符和batch信息
+                        for idx, tc in enumerate(tool_calls):
                             tool_name = tc.get("name", "unknown")
                             tool_call_id = tc.get("id", "")
+                            tool_args = tc.get("args", {})
                             tool_placeholder_id += 1
                             placeholder = f"<!--TOOL:{tool_name}:{tool_placeholder_id}-->"
                             full_response += placeholder
-                            tool_call_to_placeholder[tool_call_id] = tool_placeholder_id
-                            logger.debug(f"[Regenerate] 发送工具占位符: {placeholder}")
+                            
+                            # 记录批次信息到映射表
+                            tool_call_to_placeholder[tool_call_id] = {
+                                "placeholder_id": tool_placeholder_id,
+                                "batch_id": current_batch_id,
+                                "batch_size": batch_size,
+                                "batch_index": idx,
+                            }
+                            
+                            logger.debug(f"[Regenerate] 发送工具占位符: {placeholder}, batch={current_batch_id}/{batch_size}")
+                            
+                            # 先发送 tool_start（包含batch信息）
+                            await websocket.send_text(json.dumps({
+                                "type": "tool_start",
+                                "tool_name": tool_name,
+                                "tool_id": tool_placeholder_id,
+                                "tool_input": tool_args,
+                                "batch_id": current_batch_id,
+                                "batch_size": batch_size,
+                                "batch_index": idx,
+                            }, ensure_ascii=False))
+                            
+                            # 再发送占位符
                             await websocket.send_text(json.dumps({
                                 "type": "stream",
                                 "content": placeholder,
@@ -671,22 +700,11 @@ async def streaming_regenerate(
                     tool_start_times[run_id] = time.time()
                     tool_inputs[run_id] = tool_input
                     
-                    # 找到对应的 placeholder_id
-                    placeholder_id = None
-                    for tc_id, p_id in list(tool_call_to_placeholder.items()):
-                        placeholder_id = p_id
-                        del tool_call_to_placeholder[tc_id]
-                        break
-                    
                     input_str = json.dumps(tool_input, ensure_ascii=False) if isinstance(tool_input, dict) else str(tool_input)
                     input_preview = input_str[:300] + "..." if len(input_str) > 300 else input_str
-                    logger.info(f"[Regenerate] 工具调用开始: {tool_name}, placeholder_id={placeholder_id}, 输入: {input_preview}")
-                    await websocket.send_text(json.dumps({
-                        "type": "tool_start",
-                        "tool_name": tool_name,
-                        "tool_id": placeholder_id,
-                        "tool_input": tool_input,
-                    }, ensure_ascii=False))
+                    logger.info(f"[Regenerate] 工具调用开始: {tool_name}, 输入: {input_preview}")
+                    
+                    # 注意：tool_start 消息已经在 on_chat_model_end 时发送，这里不再重复发送
                     
                 elif event_type == "on_tool_end":
                     tool_name = event.get("name", "unknown")
@@ -696,7 +714,23 @@ async def streaming_regenerate(
                     tool_input = tool_inputs.pop(run_id, {})
                     output_str = str(tool_output.content) if hasattr(tool_output, "content") else str(tool_output)
                     output_len = len(output_str)
-                    logger.info(f"[Regenerate] 工具调用结束: {tool_name}, 耗时={elapsed:.2f}s, 输出长度={output_len}")
+                    
+                    # 查找对应的批次信息
+                    placeholder_id = None
+                    batch_id = None
+                    batch_size = 1
+                    batch_index = 0
+                    for tc_id, info in list(tool_call_to_placeholder.items()):
+                        if info.get("placeholder_id"):
+                            # 找到第一个未使用的工具调用记录（按顺序匹配）
+                            placeholder_id = info.get("placeholder_id")
+                            batch_id = info.get("batch_id")
+                            batch_size = info.get("batch_size", 1)
+                            batch_index = info.get("batch_index", 0)
+                            del tool_call_to_placeholder[tc_id]
+                            break
+                    
+                    logger.info(f"[Regenerate] 工具调用结束: {tool_name}, placeholder_id={placeholder_id}, batch={batch_id}/{batch_size}, 耗时={elapsed:.2f}s, 输出长度={output_len}")
                     
                     # 生成摘要
                     input_summary, output_summary = _generate_tool_summaries(tool_name, tool_input, output_str)
@@ -711,9 +745,13 @@ async def streaming_regenerate(
                     await websocket.send_text(json.dumps({
                         "type": "tool_end",
                         "tool_name": tool_name,
+                        "tool_id": placeholder_id,
                         "input_summary": input_summary,
                         "output_summary": output_summary,
                         "elapsed": round(elapsed, 2),
+                        "batch_id": batch_id,
+                        "batch_size": batch_size,
+                        "batch_index": batch_index,
                     }, ensure_ascii=False))
                 
                 # ========== 错误事件 ==========
