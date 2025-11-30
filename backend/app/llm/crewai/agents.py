@@ -1,4 +1,4 @@
-"""预设 Agent 工厂模块
+"""预设 Agent 工厂模块（CrewAI）
 
 提供各业务场景下预配置的 CrewAI Agent，接收 LLM 实例，返回可直接使用的 Agent 对象。
 """

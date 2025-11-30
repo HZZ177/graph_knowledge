@@ -11,7 +11,7 @@ from backend.app.schemas.ai_models import (
     AIModelTestRequest,
 )
 from backend.app.services.ai_model_service import AIModelService
-from backend.app.llm.custom_llm import CustomGatewayLLM
+from backend.app.llm.adapters.crewai_gateway import CustomGatewayLLM
 from backend.app.llm.config import get_provider_base_url
 from backend.app.core.utils import success_response, error_response
 from backend.app.core.logger import logger

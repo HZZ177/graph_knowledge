@@ -1,4 +1,4 @@
-"""自定义网关 LLM 实现
+"""自定义网关 LLM 实现（CrewAI）
 
 支持 NewAPI 等兼容 OpenAI API 格式的自建网关。
 实现 CrewAI BaseLLM 接口，支持流式输出。
@@ -70,19 +70,7 @@ class CustomGatewayLLM(BaseLLM):
         available_functions: Optional[Dict[str, Any]] = None,
         **kwargs,  # 接收 CrewAI 传入的额外参数（如 from_task）
     ) -> Union[str, Any]:
-        """非流式调用 LLM
-        
-        注意：CrewAI 可能传入额外参数，通过 kwargs 接收。
-        
-        Args:
-            messages: 消息列表或单个字符串
-            tools: 工具定义列表（function calling）
-            callbacks: 回调函数列表（当前未使用）
-            available_functions: 可用函数字典（用于执行 function call）
-            
-        Returns:
-            LLM 响应文本
-        """
+        """非流式调用 LLM"""
         # 将字符串转换为消息格式
         if isinstance(messages, str):
             messages = [{"role": "user", "content": messages}]
@@ -140,19 +128,7 @@ class CustomGatewayLLM(BaseLLM):
         available_functions: Optional[Dict[str, Any]] = None,
         **kwargs,  # 接收 CrewAI 传入的额外参数
     ) -> Generator[str, None, None]:
-        """流式调用 LLM
-        
-        使用 SSE (Server-Sent Events) 协议流式获取响应.
-        
-        Args:
-            messages: 消息列表或单个字符串
-            tools: 工具定义列表
-            callbacks: 回调函数列表
-            available_functions: 可用函数字典
-            
-        Yields:
-            每个 token/chunk 的文本内容
-        """
+        """流式调用 LLM"""
         # 将字符串转换为消息格式
         if isinstance(messages, str):
             messages = [{"role": "user", "content": messages}]
@@ -262,10 +238,7 @@ class CustomGatewayLLM(BaseLLM):
         tools: Optional[List[dict]],
         available_functions: Dict[str, Any],
     ) -> str:
-        """处理 function calling
-        
-        执行工具调用并将结果添加到上下文中，然后再次调用 LLM。
-        """
+        """处理 function calling"""
         for tool_call in tool_calls:
             function_name = tool_call["function"]["name"]
             
@@ -308,22 +281,13 @@ class CustomGatewayLLM(BaseLLM):
         return self.call(messages, tools, None, available_functions)
     
     def supports_function_calling(self) -> bool:
-        """是否支持 function calling
-        
-        NewAPI 通常支持，但可根据实际情况调整。
-        """
+        """是否支持 function calling"""
         return True
     
     def supports_stop_words(self) -> bool:
-        """是否支持 stop words
-        
-        OpenAI 兼容 API 通常支持。
-        """
+        """是否支持 stop words"""
         return True
     
     def get_context_window_size(self) -> int:
-        """返回上下文窗口大小
-        
-        根据实际使用的模型调整。默认返回 128k（适用于大多数现代模型）。
-        """
+        """返回上下文窗口大小"""
         return 128000

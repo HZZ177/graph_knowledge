@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { Layout, Menu, Button, Select, Typography, Space } from 'antd'
 import {
   HomeOutlined,
@@ -10,8 +10,7 @@ import {
   MessageOutlined,
 } from '@ant-design/icons'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
-import { listLLMModels, activateLLMModel, activateTaskModel, type AIModelOut } from '../api/llmModels'
-import { showError, showSuccess } from '../utils/message'
+import { useModelContext } from '../contexts/ModelContext'
 
 const { Header, Sider, Content } = Layout
 const { Option } = Select
@@ -19,61 +18,20 @@ const { Text } = Typography
 
 const MainLayout: React.FC = () => {
   const [collapsed, setCollapsed] = useState(true)
-  const [models, setModels] = useState<AIModelOut[]>([])
-  const [activeModelId, setActiveModelId] = useState<number | null>(null)
-  const [taskModelId, setTaskModelId] = useState<number | null>(null)
-  const [modelLoading, setModelLoading] = useState(false)
-  const [activating, setActivating] = useState(false)
-  const [activatingTask, setActivatingTask] = useState(false)
+  
+  const {
+    models,
+    activeModelId,
+    taskModelId,
+    loading: modelLoading,
+    activating,
+    activatingTask,
+    setActiveModel,
+    setTaskModel,
+  } = useModelContext()
 
   const location = useLocation()
   const navigate = useNavigate()
-
-  const fetchModels = async () => {
-    setModelLoading(true)
-    try {
-      const data = await listLLMModels()
-      setModels(data)
-      const active = data.find((m) => m.is_active)
-      const taskActive = data.find((m) => m.is_task_active)
-      setActiveModelId(active ? active.id : null)
-      setTaskModelId(taskActive ? taskActive.id : null)
-    } catch (e) {
-      showError('加载模型列表失败')
-    } finally {
-      setModelLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchModels()
-  }, [])
-
-  const handleChangeActiveModel = async (value: number) => {
-    try {
-      setActivating(true)
-      await activateLLMModel(value)
-      showSuccess('已设置为主力模型')
-      fetchModels()
-    } catch (e) {
-      showError('激活模型失败')
-    } finally {
-      setActivating(false)
-    }
-  }
-
-  const handleChangeTaskModel = async (value: number) => {
-    try {
-      setActivatingTask(true)
-      await activateTaskModel(value)
-      showSuccess('已设置为小任务模型')
-      fetchModels()
-    } catch (e) {
-      showError('激活模型失败')
-    } finally {
-      setActivatingTask(false)
-    }
-  }
 
   const menuItems = [
     {
@@ -199,7 +157,7 @@ const MainLayout: React.FC = () => {
                 size="middle"
                 value={activeModelId ?? undefined}
                 loading={modelLoading || activating}
-                onChange={handleChangeActiveModel}
+                onChange={setActiveModel}
               >
                 {models.map((m) => {
                   const label = m.provider ? `${m.provider}/${m.model_name}` : m.model_name
@@ -221,9 +179,8 @@ const MainLayout: React.FC = () => {
                 size="middle"
                 value={taskModelId ?? undefined}
                 loading={modelLoading || activatingTask}
-                onChange={handleChangeTaskModel}
+                onChange={setTaskModel}
                 allowClear
-                onClear={() => setTaskModelId(null)}
               >
                 {models.map((m) => {
                   const label = m.provider ? `${m.provider}/${m.model_name}` : m.model_name

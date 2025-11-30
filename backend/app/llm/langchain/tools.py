@@ -5,7 +5,7 @@
 - 上下文类（3个）：get_business_context, get_implementation_context, get_resource_context
 - 图拓扑类（2个）：get_neighbors, get_path_between_entities
 
-实体发现采用"候选列表 + 小LLM选择"方案。
+实体发现采用"候选列表 + 快速模型选择"方案。
 """
 
 import json
@@ -31,7 +31,7 @@ from backend.app.services.graph_service import (
     get_resource_usages as _get_resource_usages,
     get_neighborhood,
 )
-from backend.app.llm.base import get_litellm_config
+from backend.app.llm.factory import get_litellm_config
 from backend.app.llm.config import CodeWorkspaceConfig
 from backend.app.core.logger import logger
 from backend.mcp.ace_code_engine import get_ace_mcp_client
@@ -569,9 +569,9 @@ def search_businesses(query: str, limit: int = 5) -> str:
             })
         
         # 调用小 LLM 进行筛选
-        logger.debug(f"[search_businesses] 小LLM输入: query={query}, 候选数={len(candidates_list)}")
+        logger.debug(f"[search_businesses] 快速模型输入: query={query}, 候选数={len(candidates_list)}")
         selected_ids = _call_selector_llm(query, candidates_list, "process_id", limit)
-        logger.info(f"[search_businesses] 小LLM选中: {selected_ids}")
+        logger.info(f"[search_businesses] 快速模型选中: {selected_ids}")
         
         # 根据选中的 ID 构造结果
         id_to_business = {b.process_id: b for b in businesses}
@@ -647,7 +647,7 @@ def search_implementations(query: str, system: Optional[str] = None, limit: int 
         
         # 调用小 LLM 进行筛选
         selected_ids = _call_selector_llm(query, candidates_list, "impl_id", limit)
-        logger.info(f"[search_implementations] 小LLM选中: {selected_ids}")
+        logger.info(f"[search_implementations] 快速模型选中: {selected_ids}")
         
         # 根据选中的 ID 构造结果
         id_to_impl = {impl.impl_id: impl for impl in implementations}
@@ -726,7 +726,7 @@ def search_data_resources(query: str, system: Optional[str] = None, limit: int =
         
         # 调用小 LLM 进行筛选
         selected_ids = _call_selector_llm(query, candidates_list, "resource_id", limit)
-        logger.info(f"[search_data_resources] 小LLM选中: {selected_ids}")
+        logger.info(f"[search_data_resources] 快速模型选中: {selected_ids}")
         
         # 根据选中的 ID 构造结果
         id_to_resource = {res.resource_id: res for res in resources}
@@ -800,7 +800,7 @@ def search_steps(query: str, limit: int = 5) -> str:
         
         # 调用小 LLM 进行筛选
         selected_ids = _call_selector_llm(query, candidates_list, "step_id", limit)
-        logger.info(f"[search_steps] 小LLM选中: {selected_ids}")
+        logger.info(f"[search_steps] 快速模型选中: {selected_ids}")
         
         # 根据选中的 ID 构造结果
         id_to_step = {s.step_id: s for s in steps}

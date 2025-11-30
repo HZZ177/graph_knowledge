@@ -39,6 +39,9 @@ export interface ChatStreamMessage {
   tool_name?: string
   tool_id?: number         // 工具占位符 ID（用于关联 tool_start/end 和占位符）
   tool_input?: Record<string, unknown>
+  batch_id?: number        // 批次 ID（同一批工具调用共享）
+  batch_size?: number      // 批次大小（该批次共有多少个工具）
+  batch_index?: number     // 在批次中的索引（0-based）
   // tool_end 消息
   input_summary?: string   // 输入摘要，如 "关键词: 开卡"
   output_summary?: string  // 输出摘要，如 "找到 3 个结果"
@@ -49,15 +52,22 @@ export interface ChatStreamMessage {
   error?: string
 }
 
+/** 批次信息 */
+export interface BatchInfo {
+  batchId: number
+  batchSize: number
+  batchIndex: number
+}
+
 export interface ChatCallbacks {
   /** 问答开始 */
   onStart?: (requestId: string, threadId: string) => void
   /** 流式内容片段 */
   onStream?: (content: string) => void
   /** 工具开始调用 */
-  onToolStart?: (toolName: string, toolInput: Record<string, unknown>, toolId?: number) => void
+  onToolStart?: (toolName: string, toolInput: Record<string, unknown>, toolId?: number, batch?: BatchInfo) => void
   /** 工具调用结束 */
-  onToolEnd?: (toolName: string, inputSummary: string, outputSummary: string, elapsed: number, toolId?: number) => void
+  onToolEnd?: (toolName: string, inputSummary: string, outputSummary: string, elapsed: number, toolId?: number, batch?: BatchInfo) => void
   /** 最终结果 */
   onResult?: (content: string, threadId: string, toolCalls: ToolCallInfo[]) => void
   /** 错误 */
@@ -161,7 +171,12 @@ export class ChatClient {
         this.callbacks.onToolStart?.(
           message.tool_name || '',
           message.tool_input || {},
-          message.tool_id
+          message.tool_id,
+          message.batch_id !== undefined ? {
+            batchId: message.batch_id,
+            batchSize: message.batch_size || 1,
+            batchIndex: message.batch_index || 0,
+          } : undefined
         )
         break
         
@@ -171,7 +186,12 @@ export class ChatClient {
           message.input_summary || '',
           message.output_summary || '',
           message.elapsed || 0,
-          message.tool_id
+          message.tool_id,
+          message.batch_id !== undefined ? {
+            batchId: message.batch_id,
+            batchSize: message.batch_size || 1,
+            batchIndex: message.batch_index || 0,
+          } : undefined
         )
         break
         
@@ -256,7 +276,16 @@ export class RegenerateClient {
         this.callbacks.onStream?.(message.content || '')
         break
       case 'tool_start':
-        this.callbacks.onToolStart?.(message.tool_name || '', message.tool_input || {}, message.tool_id)
+        this.callbacks.onToolStart?.(
+          message.tool_name || '',
+          message.tool_input || {},
+          message.tool_id,
+          message.batch_id !== undefined ? {
+            batchId: message.batch_id,
+            batchSize: message.batch_size || 1,
+            batchIndex: message.batch_index || 0,
+          } : undefined
+        )
         break
       case 'tool_end':
         this.callbacks.onToolEnd?.(
@@ -264,7 +293,12 @@ export class RegenerateClient {
           message.input_summary || '',
           message.output_summary || '',
           message.elapsed || 0,
-          message.tool_id
+          message.tool_id,
+          message.batch_id !== undefined ? {
+            batchId: message.batch_id,
+            batchSize: message.batch_size || 1,
+            batchIndex: message.batch_index || 0,
+          } : undefined
         )
         break
       case 'result':

@@ -5,7 +5,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from backend.app.api.v1 import (
     processes,
-    llm,
+    llm_chat,
+    llm_skeleton,
     graph,
     resource_nodes,
     canvas,
@@ -54,7 +55,8 @@ app.add_middleware(
 app.middleware("http")(trace_id_middleware)
 
 app.include_router(processes.router, prefix="/api/v1")
-app.include_router(llm.router, prefix="/api/v1")
+app.include_router(llm_chat.router, prefix="/api/v1")
+app.include_router(llm_skeleton.router, prefix="/api/v1")
 app.include_router(graph.router, prefix="/api/v1")
 app.include_router(resource_nodes.router, prefix="/api/v1")
 app.include_router(canvas.router, prefix="/api/v1")

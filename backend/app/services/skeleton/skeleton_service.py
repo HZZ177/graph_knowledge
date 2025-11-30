@@ -1,4 +1,7 @@
-"""骨架生成服务 - 多Agent协作 + WebSocket流式响应"""
+"""骨架生成服务 - 多Agent协作 + WebSocket流式响应
+
+基于 CrewAI 多Agent协作生成业务流程骨架。
+"""
 
 import json
 import uuid
@@ -7,14 +10,13 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 from crewai import Crew
-from crewai.utilities.prompts import Prompts
 from starlette.websockets import WebSocket
 
-from backend.app.llm.base import get_crewai_llm
-from backend.app.llm.streaming import run_agent_stream
-from backend.app.llm.agents import CrewAiAgents
-from backend.app.llm.tasks import CrewAiTasks
-from backend.app.llm.prompts import (
+from backend.app.llm.factory import get_crewai_llm
+from backend.app.llm.crewai.streaming import run_agent_stream
+from backend.app.llm.crewai.agents import CrewAiAgents
+from backend.app.llm.crewai.tasks import CrewAiTasks
+from backend.app.llm.crewai.prompts import (
     DATA_ANALYSIS_PROMPT,
     FLOW_DESIGN_PROMPT,
     TECH_ENRICH_PROMPT,
@@ -44,6 +46,7 @@ from backend.app.schemas.canvas import (
     CanvasImplDataLink,
 )
 from backend.app.core.logger import logger
+
 
 # ==================== 核心服务函数 ====================
 
@@ -147,27 +150,22 @@ async def generate_skeleton(
 
 
 def _extract_json_block(text: str) -> Optional[str]:
-    """从LLM输出中提取第一段JSON对象，避免前后解释性文字的干扰。
-
-    默认策略：使用正则匹配第一个以 "{" 开始、以 "}" 结束的块。
-    如果未找到有效的 JSON 块，则返回 None。
-    """
+    """从LLM输出中提取第一段JSON对象，避免前后解释性文字的干扰。"""
     if not text:
         return None
-    # 优先从 ```json ... ``` 代码块中提取，通常最终的完整结构会放在最后一个代码块里
+    # 优先从 ```json ... ``` 代码块中提取
     fence_pattern = r"```json\s*([\s\S]*?)```"
     fenced_blocks = re.findall(fence_pattern, text, re.IGNORECASE)
     if fenced_blocks:
         for block in reversed(fenced_blocks):
             candidate = block.strip()
             try:
-                # 验证是否为有效 JSON
                 json.loads(candidate)
                 return candidate
             except Exception:
                 continue
 
-    # 回退策略：匹配整段文本中的第一段 {...}，用于没有代码块包裹的场景
+    # 回退策略：匹配整段文本中的第一段 {...}
     match = re.search(r"\{[\s\S]*\}", text)
     if not match:
         return None
@@ -253,7 +251,7 @@ def _parse_skeleton_output(output: str, request: SkeletonGenerateRequest) -> Ske
                 step_type=step_data.get("step_type", "process"),
             ))
 
-        # 解析edges（目前仅保留基础连线类型，不再携带条件/标签语义）
+        # 解析edges
         edges = []
         for edge_data in data.get("edges", []):
             edges.append(EdgeSkeleton(
@@ -335,7 +333,7 @@ def _parse_skeleton_output(output: str, request: SkeletonGenerateRequest) -> Ske
 # ==================== 骨架转画布 ====================
 
 def convert_skeleton_to_canvas(skeleton: SkeletonAgentOutput) -> SaveProcessCanvasRequest:
-    """将Agent输出转换为画布结构（新格式）"""
+    """将Agent输出转换为画布结构"""
 
     process_id = uuid.uuid4().hex
 
@@ -355,8 +353,7 @@ def convert_skeleton_to_canvas(skeleton: SkeletonAgentOutput) -> SaveProcessCanv
         ))
     logger.info(f"生成{len(steps)}个步骤节点")
 
-    # 2. 生成边（从edges列表）
-    # 目前仅生成基础连线信息，不再写入条件/标签语义
+    # 2. 生成边
     edges: List[CanvasEdge] = []
     for edge in skeleton.edges:
         from_id = step_name_to_id.get(edge.from_step_name)
@@ -387,7 +384,7 @@ def convert_skeleton_to_canvas(skeleton: SkeletonAgentOutput) -> SaveProcessCanv
         ))
     logger.info(f"生成{len(implementations)}个实现节点")
 
-    # 4. 生成步骤-实现关联（从step_impl_links列表）
+    # 4. 生成步骤-实现关联
     step_impl_links: List[CanvasStepImplLink] = []
     for link in skeleton.step_impl_links:
         step_id = step_name_to_id.get(link.step_name)
@@ -416,7 +413,7 @@ def convert_skeleton_to_canvas(skeleton: SkeletonAgentOutput) -> SaveProcessCanv
         ))
     logger.info(f"生成{len(data_resources)}个数据资源节点")
 
-    # 6. 生成实现-数据资源关联（从impl_data_links列表）
+    # 6. 生成实现-数据资源关联
     impl_data_links: List[CanvasImplDataLink] = []
     for link in skeleton.impl_data_links:
         impl_id = impl_name_to_id.get(link.impl_name)

@@ -3,7 +3,6 @@ import { Card, Typography, Button, Space, Tag, Modal, Form, Input, InputNumber, 
 import { PlusOutlined, ReloadOutlined, FileTextOutlined, LinkOutlined, ExperimentOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons'
 
 import {
-  listLLMModels,
   createLLMModel,
   updateLLMModel,
   deleteLLMModel,
@@ -15,6 +14,7 @@ import {
   type ProviderType,
   LITELLM_PROVIDERS,
 } from '../api/llmModels'
+import { useModelContext } from '../contexts/ModelContext'
 import { showError, showSuccess, showInfo } from '../utils/message'
 
 const { Title, Text } = Typography
@@ -300,28 +300,11 @@ const ModelModal: React.FC<ModelModalProps> = ({ open, mode, initial, onOk, onCa
 }
 
 const LLMModelManagePage: React.FC = () => {
-  const [models, setModels] = useState<AIModelOut[]>([])
-  const [loading, setLoading] = useState(false)
+  const { models, loading, refreshModels } = useModelContext()
   const [modalOpen, setModalOpen] = useState(false)
   const [modalMode, setModalMode] = useState<'create' | 'edit'>('create')
   const [editingModel, setEditingModel] = useState<AIModelOut | null>(null)
   const [testingSavedId, setTestingSavedId] = useState<number | null>(null)
-
-  const fetchModels = async () => {
-    setLoading(true)
-    try {
-      const data = await listLLMModels()
-      setModels(data)
-    } catch (e) {
-      showError('加载模型列表失败')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  useEffect(() => {
-    fetchModels()
-  }, [])
 
   const handleOpenCreate = () => {
     setModalMode('create')
@@ -339,7 +322,7 @@ const LLMModelManagePage: React.FC = () => {
     try {
       await deleteLLMModel(record.id)
       showSuccess('删除模型成功')
-      fetchModels()
+      refreshModels()
     } catch (e: any) {
       showError('删除模型失败')
     }
@@ -372,7 +355,7 @@ const LLMModelManagePage: React.FC = () => {
           <Text type="secondary">管理你的大语言模型配置（接入方式、密钥与参数等）。</Text>
         </div>
         <Space>
-          <Button icon={<ReloadOutlined />} onClick={fetchModels}>
+          <Button icon={<ReloadOutlined />} onClick={refreshModels}>
             刷新
           </Button>
           <Button type="primary" icon={<PlusOutlined />} onClick={handleOpenCreate}>
@@ -520,7 +503,7 @@ const LLMModelManagePage: React.FC = () => {
         initial={editingModel}
         onOk={() => {
           setModalOpen(false)
-          fetchModels()
+          refreshModels()
         }}
         onCancel={() => setModalOpen(false)}
       />

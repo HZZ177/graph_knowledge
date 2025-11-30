@@ -1,3 +1,11 @@
+"""LLM 实例工厂
+
+统一的 LLM 实例创建入口：
+- get_crewai_llm: 创建 CrewAI LLM 实例
+- get_langchain_llm: 创建 LangChain ChatOpenAI 实例
+- get_litellm_config: 获取 LiteLLM 配置（用于直接调用 litellm）
+"""
+
 from dataclasses import dataclass
 from typing import Union, Optional
 
@@ -5,7 +13,8 @@ from sqlalchemy.orm import Session
 from crewai import LLM, BaseLLM
 
 from backend.app.services.ai_model_service import AIModelService
-from backend.app.llm.custom_llm import CustomGatewayLLM
+from backend.app.llm.adapters.crewai_gateway import CustomGatewayLLM
+from backend.app.llm.adapters.langchain_patched import PatchedChatOpenAI
 from backend.app.llm.config import get_provider_base_url
 from backend.app.core.logger import logger
 
@@ -18,8 +27,6 @@ class LiteLLMConfig:
     api_base: Optional[str] = None
     temperature: float = 0.7
     max_tokens: int = 4096
-
-
 
 
 def get_litellm_config(db: Session) -> LiteLLMConfig:
@@ -80,20 +87,18 @@ def get_litellm_config(db: Session) -> LiteLLMConfig:
     )
 
 
-def get_langchain_llm(db: Session):
+def get_langchain_llm(db: Session) -> PatchedChatOpenAI:
     """基于当前激活的 AIModel 构造 LangChain ChatOpenAI 实例
     
-    LangChain 的 ChatOpenAI 不需要 LiteLLM 的 provider 前缀，
-    直接使用模型名 + base_url 即可。
+    使用 PatchedChatOpenAI 修复流式响应中 tool_call index 字段错误的问题。
+    某些 API 网关返回的 index 全为 0，会导致多个工具调用被错误合并。
     
     Args:
         db: 数据库会话
         
     Returns:
-        ChatOpenAI 实例
+        PatchedChatOpenAI 实例
     """
-    from langchain_openai import ChatOpenAI
-    
     config = AIModelService.get_active_llm_config(db)
     
     # 自定义网关模式
@@ -101,12 +106,16 @@ def get_langchain_llm(db: Session):
         base_url = config.gateway_endpoint.rstrip("/")
         # ChatOpenAI 会自动追加 /chat/completions，因此如果 endpoint 已经包含了该路径，需要移除
         if base_url.endswith("/chat/completions"):
-            base_url = base_url[:-17] # len("/chat/completions") == 17
+            base_url = base_url[:-17]  # len("/chat/completions") == 17
         elif base_url.endswith("/chat/completions/"):
-             base_url = base_url[:-18]
-             
+            base_url = base_url[:-18]
+        
+        # 确保 base_url 以 /v1 结尾
+        if not base_url.endswith("/v1"):
+            base_url = base_url + "/v1"
+        
         logger.info(f"[LangChainLLM] 自定义网关模式: model={config.model_name}, base={base_url}")
-        return ChatOpenAI(
+        return PatchedChatOpenAI(
             model=config.model_name,
             api_key=config.api_key,
             base_url=base_url,
@@ -121,7 +130,7 @@ def get_langchain_llm(db: Session):
     
     logger.info(f"[LangChainLLM] 标准模式: model={config.model_name}, base={base_url}")
     
-    return ChatOpenAI(
+    return PatchedChatOpenAI(
         model=config.model_name,
         api_key=config.api_key,
         base_url=base_url,
@@ -131,7 +140,7 @@ def get_langchain_llm(db: Session):
 
 
 def get_crewai_llm(db: Session) -> Union[LLM, BaseLLM]:
-    """基于当前激活的 AIModel 构造 LLM 实例。
+    """基于当前激活的 AIModel 构造 CrewAI LLM 实例
     
     根据 provider_type 返回不同类型的 LLM：
     - litellm: 使用 CrewAI 内置的 LLM 类（基于 LiteLLM）

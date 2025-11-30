@@ -1,4 +1,4 @@
-"""预设 Task 工厂模块
+"""预设 Task 工厂模块（CrewAI）
 
 提供各业务场景下预配置的 CrewAI Task，接收 Agent 和 prompt，返回可直接使用的 Task 对象。
 """

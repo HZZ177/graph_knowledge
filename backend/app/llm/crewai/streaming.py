@@ -1,13 +1,8 @@
-"""流式 LLM 响应基础设施（CrewAI 1.6.0 版）
+"""流式 LLM 响应基础设施（CrewAI）
 
 核心组件：
 - run_agent_stream: 执行单个 Agent 并自动发送流式响应到 WebSocket
 - iter_crew_text_stream: 底层异步迭代器（内部使用）
-- parse_agent_output: 解析 Thought/Final Answer 结构
-
-使用方式：
-    # Service 层只需调用，不处理 chunk
-    output = await run_agent_stream(crew, websocket, agent_meta)
 """
 
 import asyncio
@@ -16,7 +11,7 @@ import queue
 import re
 import threading
 import time
-from typing import Any, AsyncGenerator, Optional, Tuple
+from typing import Any, AsyncGenerator, Optional
 from dataclasses import dataclass, field
 
 from crewai import Crew
@@ -43,18 +38,7 @@ class StreamSectionTracker:
         self._answer_started = False
     
     def process_chunk(self, chunk: str) -> dict:
-        """处理新的 chunk，返回该 chunk 所属的区域信息
-        
-        Args:
-            chunk: 新收到的文本片段
-            
-        Returns:
-            dict: {
-                "section": 当前区域 ("thought" | "answer" | "unknown"),
-                "content": 该区域应显示的内容（过滤掉标记文本）,
-                "section_changed": 是否刚切换到新区域,
-            }
-        """
+        """处理新的 chunk，返回该 chunk 所属的区域信息"""
         self.buffer += chunk
         
         result = {
@@ -123,7 +107,7 @@ class StreamSectionTracker:
 
 @dataclass
 class StreamMessage:
-    """通用流式消息格式（用于 Chat 等场景）"""
+    """通用流式消息格式"""
     type: str  # 'start' | 'chunk' | 'done' | 'error'
     content: Optional[str] = None
     request_id: Optional[str] = None
@@ -183,9 +167,9 @@ async def run_agent_stream(
                 "type": "stream",
                 "agent_name": agent_name,
                 "agent_index": agent_index,
-                "content": section_info["content"],  # 过滤掉标记的内容
-                "section": section_info["section"],  # 当前区域: thought / answer / unknown
-                "section_changed": section_info["section_changed"],  # 是否刚切换区域
+                "content": section_info["content"],
+                "section": section_info["section"],
+                "section_changed": section_info["section_changed"],
             }))
         
         # 获取最终分区内容
@@ -196,13 +180,12 @@ async def run_agent_stream(
             "type": "agent_end",
             "agent_name": agent_name,
             "agent_index": agent_index,
-            "agent_output": parsed["raw"],  # 保留原始输出以兼容
-            "thought": parsed["thought"],  # 思考过程
-            "final_answer": parsed["final_answer"],  # 最终结果
+            "agent_output": parsed["raw"],
+            "thought": parsed["thought"],
+            "final_answer": parsed["final_answer"],
             "duration_ms": int((time.time() - start_time) * 1000),
         }))
         
-        # 调试用：打印该 Agent 的完整输出内容
         logger.debug(f"[{agent_name}] 完整输出内容:\n{parsed['raw']}")
         logger.info(f"[{agent_name}] 执行完成，输出长度: {len(parsed['raw'])} 字符, thought: {len(parsed['thought'])} 字符, answer: {len(parsed['final_answer'])} 字符")
         return parsed["raw"]
@@ -222,18 +205,7 @@ async def iter_crew_text_stream(
     crew: Crew,
     **kickoff_kwargs: Any,
 ) -> AsyncGenerator[str, None]:
-    """将 CrewAI 1.6.0 的同步 streaming 接口封装为异步文本迭代器。
-
-    Crew(stream=True) 时，``crew.kickoff(...)`` 会返回一个可迭代的 streaming 对象，
-    我们在后台线程中迭代该对象，并通过线程安全队列把文本 chunk 送入 asyncio 协程世界。
-
-    Args:
-        crew: 已配置好的 Crew 实例（需要在创建时设置 ``stream=True``）。
-        **kickoff_kwargs: 传递给 ``crew.kickoff()`` 的可选参数（如 inputs 等）。
-
-    Yields:
-        str: 每个文本 chunk（通常来自 ``chunk.content``）。
-    """
+    """将 CrewAI 的同步 streaming 接口封装为异步文本迭代器"""
 
     loop = asyncio.get_event_loop()
     q: "queue.Queue[Optional[str]]" = queue.Queue()
@@ -242,7 +214,6 @@ async def iter_crew_text_stream(
         try:
             streaming = crew.kickoff(**kickoff_kwargs)
             
-            # CrewStreamingOutput 有 chunks, get_full_text, result 等属性
             chunk_count = 0
             
             # 方式1: 迭代 chunks 属性
@@ -285,7 +256,7 @@ async def iter_crew_text_stream(
             
             logger.info(f"[iter_crew_text_stream] 完成, 共 {chunk_count} 个输出")
 
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.error("[iter_crew_text_stream] 执行 crew.kickoff() 失败: {}", exc, exc_info=True)
         finally:
             # 使用 None 作为结束信号
