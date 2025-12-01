@@ -579,30 +579,48 @@
   transition: transform 0.3s ease; /* 展开时 */
 }
 
-.inline-expandable-content {
+/* 可展开内容区域（使用 JS 动态计算高度，支持任意长度内容） */
+.expandable-content {
   overflow: hidden;
   margin-left: 4px;
-  padding-left: 10px !important;
+  padding-left: 10px;
   border-left: 2px solid var(--border-color);
   color: var(--text-secondary);
   font-size: 14px;
   line-height: 1.7;
-  /* 收起状态 */
+  margin-top: 8px;
+  /* 高度和透明度动画 */
+  transition: height 0.25s ease-out, opacity 0.2s ease-out;
+}
+
+/* 收起状态时隐藏边框 */
+.expandable-content[style*="height: 0"] {
+  border-left-color: transparent;
+}
+
+/* 兼容旧的纯 CSS 实现（作为 fallback） */
+.inline-expandable-content:not(.expandable-content) {
+  overflow: hidden;
+  margin-left: 4px;
+  padding-left: 10px !important;
+  border-left: 2px solid transparent;
+  color: var(--text-secondary);
+  font-size: 14px;
+  line-height: 1.7;
   max-height: 0;
   opacity: 0;
   margin-top: 0;
-  /* 收起动画：稍快一些（约 0.2s） */
-  transition: max-height 0.2s ease, opacity 0.2s ease, margin-top 0.2s ease;
+  visibility: hidden;
+  transition: max-height 0.2s ease-out, opacity 0.15s ease-out, margin-top 0.15s ease, border-color 0.15s ease, visibility 0s 0.2s;
 }
 
-.inline-expandable.expanded .inline-expandable-content {
-  /* 展开状态：用较大的 max-height 做过渡，保留展开动画 */
-  max-height: 9999px;        /* 极大值，避免长内容被截断 */
-  overflow: hidden;          /* 展开时仍然通过高度控制容器 */
+.inline-expandable.expanded .inline-expandable-content:not(.expandable-content) {
+  max-height: 800px;
   opacity: 1;
   margin-top: 8px;
-  /* 展开动画：稍慢一些（约 0.3s） */
-  transition: max-height 0.3s ease, opacity 0.3s ease, margin-top 0.3s ease;
+  border-left-color: var(--border-color);
+  visibility: visible;
+  transition: max-height 0.25s ease-out, opacity 0.2s ease-out 0.05s, margin-top 0.15s ease, border-color 0.15s ease, visibility 0s;
 }
 
 /* Thought 思考内容：顶部稍微增加一点间距，避免紧贴标题行 */

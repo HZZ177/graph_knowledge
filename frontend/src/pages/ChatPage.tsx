@@ -96,7 +96,53 @@ const WelcomeScreen: React.FC<{ onSuggestionClick: (q: string) => void }> = ({ o
   )
 }
 
-// 2. 工具调用过程展示（单个调用，一个面板）
+// 2. 通用可展开内容组件（动态测量高度，实现平滑动画）
+interface ExpandableContentProps {
+  isExpanded: boolean
+  className?: string
+  children: React.ReactNode
+}
+
+const ExpandableContent: React.FC<ExpandableContentProps> = ({ isExpanded, className, children }) => {
+  const contentRef = useRef<HTMLDivElement>(null)
+  const [height, setHeight] = useState<number | 'auto'>(0)
+  
+  useEffect(() => {
+    if (!contentRef.current) return
+    
+    if (isExpanded) {
+      // 展开：测量实际高度
+      const scrollHeight = contentRef.current.scrollHeight
+      setHeight(scrollHeight)
+      // 动画结束后设为 auto，允许内容动态变化
+      const timer = setTimeout(() => setHeight('auto'), 300)
+      return () => clearTimeout(timer)
+    } else {
+      // 收起：先设为当前高度（触发过渡），再设为 0
+      const scrollHeight = contentRef.current.scrollHeight
+      setHeight(scrollHeight)
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setHeight(0))
+      })
+    }
+  }, [isExpanded])
+  
+  return (
+    <div
+      ref={contentRef}
+      className={`expandable-content ${className || ''}`}
+      style={{
+        height: height === 'auto' ? 'auto' : height,
+        opacity: isExpanded ? 1 : 0,
+        visibility: isExpanded || height !== 0 ? 'visible' : 'hidden',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
+
+// 3. 工具调用过程展示（单个调用，一个面板）
 interface ToolProcessProps {
   name: string
   isActive: boolean
@@ -143,7 +189,7 @@ const ToolProcess: React.FC<ToolProcessProps> = ({ name, isActive, inputSummary,
         {canExpand && <span className="inline-chevron">›</span>}
       </span>
       {canExpand && (
-        <div className="inline-expandable-content">
+        <ExpandableContent isExpanded={isExpanded} className="inline-expandable-content">
           {inputSummary && (
             <div className="tool-summary-item">
               <span className="tool-summary-label">查询:</span> {inputSummary}
@@ -154,13 +200,13 @@ const ToolProcess: React.FC<ToolProcessProps> = ({ name, isActive, inputSummary,
               <span className="tool-summary-label">结果:</span> {outputSummary}
             </div>
           )}
-        </div>
+        </ExpandableContent>
       )}
     </div>
   )
 }
 
-// 3. 批量工具调用展示组件（合并展示，但保持和单个工具一样的 UI 样式）
+// 4. 批量工具调用展示组件（合并展示，但保持和单个工具一样的 UI 样式）
 interface BatchToolItemInfo {
   toolId: number
   name: string
@@ -215,8 +261,8 @@ const BatchToolProcess: React.FC<BatchToolProcessProps> = ({ tools }) => {
         {label}
         {canExpand && <span className="inline-chevron">›</span>}
       </span>
-      {canExpand && isExpanded && (
-        <div className="inline-expandable-content">
+      {canExpand && (
+        <ExpandableContent isExpanded={isExpanded} className="inline-expandable-content">
           {tools.map((tool, idx) => {
             const prettyName = tool.name.replace(/_/g, ' ')
             const elapsedStr = tool.elapsed ? (tool.elapsed < 1 ? `${Math.round(tool.elapsed * 1000)}ms` : `${tool.elapsed.toFixed(1)}s`) : ''
@@ -235,13 +281,13 @@ const BatchToolProcess: React.FC<BatchToolProcessProps> = ({ tools }) => {
               </div>
             )
           })}
-        </div>
+        </ExpandableContent>
       )}
     </div>
   )
 }
 
-// 4. 内容段落类型定义
+// 5. 内容段落类型定义
 // 工具占位符格式: <!--TOOL:toolName--> 或 <!--TOOL:toolName|inputSummary|outputSummary-->
 
 interface ContentSegment {
@@ -604,18 +650,18 @@ const ThinkBlock: React.FC<ThinkBlockProps> = ({ content, isStreaming, isComplet
         {title}
         <span className="inline-chevron">›</span>
       </span>
-      <div className="inline-expandable-content think-text markdown-body">
+      <ExpandableContent isExpanded={isExpanded} className="inline-expandable-content think-text markdown-body">
         <MarkdownPreview 
           source={content} 
           style={{ background: 'transparent', fontSize: 14 }}
           wrapperElement={{ 'data-color-mode': 'light' }}
         />
-      </div>
+      </ExpandableContent>
     </div>
   )
 }
 
-// 5. 消息气泡
+// 6. 消息气泡
 interface MessageItemProps {
   message: DisplayMessage
   isLoading?: boolean

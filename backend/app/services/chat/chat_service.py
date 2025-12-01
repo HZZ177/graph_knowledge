@@ -345,6 +345,7 @@ async def streaming_chat(
             # 流式执行
             tool_calls_info: List[Dict[str, Any]] = []
             llm_call_count = 0
+            llm_first_token_logged = False  # 标记当前 LLM 调用是否已打印首 token 日志
             tool_placeholder_id = 0  # 工具占位符 ID 计数器
             tool_batch_id = 0  # 批量工具调用的批次 ID
             # tool_call_id -> 工具调用信息映射（包含 placeholder_id, tool_name, tool_args, start_time, batch_id）
@@ -360,6 +361,7 @@ async def streaming_chat(
                 # ========== LLM 开始事件 ==========
                 if event_type == "on_chat_model_start":
                     llm_call_count += 1
+                    llm_first_token_logged = False  # 重置首 token 日志标记
                     input_data = event.get("data", {}).get("input", {})
                     messages = input_data.get("messages", [[]])
                     msg_count = len(messages[0]) if messages else 0
@@ -371,6 +373,12 @@ async def streaming_chat(
                     if chunk and hasattr(chunk, "content") and chunk.content:
                         content = chunk.content
                         full_response += content
+                        
+                        # 首 token 日志（每轮 LLM 调用只打印一次）
+                        if not llm_first_token_logged:
+                            llm_first_token_logged = True
+                            logger.info(f"[Chat] LLM调用 round-{llm_call_count} 接收到首字响应：开始流式输出")
+                        
                         # 发送流式内容（逐 token）
                         await websocket.send_text(json.dumps({
                             "type": "stream",
