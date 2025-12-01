@@ -7,9 +7,11 @@
 """
 
 from typing import Dict, Any, List
+import uuid
 
 from sqlalchemy.orm import Session
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+from langchain_core.messages import HumanMessage, AIMessage
 
 from backend.app.llm.factory import get_lite_task_llm
 from backend.app.models.conversation import Conversation
@@ -346,3 +348,79 @@ async def generate_conversation_title(db: Session, thread_id: str) -> str:
     except Exception as e:
         logger.error(f"[HistoryService] 生成标题失败: {e}")
         return "新对话"
+
+
+async def save_error_to_history(
+    thread_id: str,
+    question: str,
+    partial_response: str,
+    error_message: str,
+) -> bool:
+    """将报错信息保存到对话历史
+    
+    当对话中途报错时，将用户问题、已生成的部分回复和错误信息一起保存，
+    以便恢复历史对话时能看到报错的那次对话。
+    
+    Args:
+        thread_id: 会话 ID
+        question: 用户问题
+        partial_response: 已生成的部分 AI 回复
+        error_message: 错误消息
+        
+    Returns:
+        是否成功保存
+    """
+    try:
+        async with AsyncSqliteSaver.from_conn_string("llm_checkpoints.db") as memory:
+            config = get_agent_config(thread_id)
+            checkpoint_tuple = await memory.aget_tuple(config)
+            
+            # 构造错误提示内容（与前端显示一致，不泄露堆栈）
+            if partial_response:
+                error_content = f"{partial_response}\n\n---\n\n对话中断：{error_message}"
+            else:
+                error_content = f"对话失败：{error_message}"
+            
+            # 构造消息
+            user_msg = HumanMessage(content=question)
+            ai_msg = AIMessage(content=error_content)
+            
+            if checkpoint_tuple and checkpoint_tuple.checkpoint:
+                # 已有 checkpoint，追加消息
+                checkpoint = checkpoint_tuple.checkpoint
+                messages = checkpoint.get("channel_values", {}).get("messages", [])
+                messages.append(user_msg)
+                messages.append(ai_msg)
+                checkpoint["channel_values"]["messages"] = messages
+                
+                await memory.aput(
+                    checkpoint_tuple.config,
+                    checkpoint,
+                    checkpoint_tuple.metadata,
+                    {}
+                )
+            else:
+                # 新会话，创建 checkpoint
+                new_checkpoint = {
+                    "v": 1,
+                    "id": str(uuid.uuid4()),
+                    "ts": str(uuid.uuid4()),
+                    "channel_values": {
+                        "messages": [user_msg, ai_msg]
+                    },
+                    "channel_versions": {},
+                    "versions_seen": {},
+                }
+                await memory.aput(
+                    config,
+                    new_checkpoint,
+                    {"source": "error_recovery", "step": 0},
+                    {}
+                )
+            
+            logger.info(f"[HistoryService] 保存错误到历史成功: thread_id={thread_id}, partial_len={len(partial_response)}")
+            return True
+            
+    except Exception as e:
+        logger.error(f"[HistoryService] 保存错误到历史失败: {e}")
+        return False

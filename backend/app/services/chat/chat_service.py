@@ -26,6 +26,7 @@ from backend.app.llm.langchain.agent import (
 from backend.app.services.chat.history_service import (
     get_raw_messages,
     replace_assistant_response,
+    save_error_to_history,
 )
 from backend.app.core.logger import logger
 
@@ -319,6 +320,9 @@ async def streaming_chat(
     
     logger.info(f"[Chat] 开始处理问题: {question[:100]}..., request_id={request_id}, thread_id={thread_id}")
     
+    # 在 try 外初始化，便于 except 块访问
+    full_response = ""
+    
     try:
         # 发送开始消息
         await websocket.send_text(json.dumps({
@@ -339,7 +343,6 @@ async def streaming_chat(
             }
             
             # 流式执行
-            full_response = ""
             tool_calls_info: List[Dict[str, Any]] = []
             llm_call_count = 0
             tool_placeholder_id = 0  # 工具占位符 ID 计数器
@@ -534,6 +537,15 @@ async def streaming_chat(
         import traceback
         error_traceback = traceback.format_exc()
         logger.error("[Chat] 问答失败: " + str(e) + "\n" + error_traceback)
+        
+        # 保存错误到对话历史，确保即使报错也能恢复
+        await save_error_to_history(
+            thread_id=thread_id,
+            question=question,
+            partial_response=full_response,
+            error_message=str(e),
+        )
+        
         await websocket.send_text(json.dumps({
             "type": "error",
             "request_id": request_id,

@@ -16,6 +16,7 @@ from backend.app.services.chat.history_service import (
     generate_conversation_title,
     get_raw_messages,
     replace_assistant_response,
+    save_error_to_history,
 )
 
 __all__ = [
@@ -27,4 +28,5 @@ __all__ = [
     "generate_conversation_title",
     "get_raw_messages",
     "replace_assistant_response",
+    "save_error_to_history",
 ]
