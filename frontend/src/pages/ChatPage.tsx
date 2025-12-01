@@ -835,7 +835,7 @@ const buildRenderItems = (
 const MessageItem: React.FC<MessageItemProps> = React.memo(({ message, isLoading, canRegenerate, onRegenerate, onRollback, toolSummaries, activeTools, activeToolsRef }) => {
   const isUser = message.role === 'user'
   
-  // 用户消息直接渲染
+  // 用户消息使用 Markdown 渲染（和 AI 消息一致）
   if (isUser) {
     return (
       <div className={`message-item user`}>
@@ -847,7 +847,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({ message, isLoading
         </div>
         <div className="message-bubble-wrapper">
           <div className="message-bubble">
-            <pre style={{ whiteSpace: 'pre-wrap', margin: 0 }}>{message.content}</pre>
+            <MemoizedMarkdown source={message.content} />
           </div>
           {onRollback && !isLoading && (
             <div className="message-actions-external">
@@ -1691,12 +1691,16 @@ const ChatPage: React.FC = () => {
       })
       setToolSummariesVersion(v => v + 1)
       setMessages(result.messages)
+      // 历史会话加载完成后，直接定位到底部（不使用动画）
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
+      }, 50)
     } catch (e) {
       console.error('加载会话历史失败', e)
     } finally {
       setIsLoading(false)
     }
-  }, [resetTypewriter])
+  }, [resetTypewriter, scrollToBottom])
 
   const handleDeleteConversation = async (e: React.MouseEvent, conv: ConversationSummary) => {
     e.stopPropagation()
