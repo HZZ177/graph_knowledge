@@ -1,6 +1,13 @@
-from typing import List, Optional
+from typing import List, Optional, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+
+
+# 枚举类型定义
+StepTypeEnum = Literal["inner", "outer"]
+ImplementationTypeEnum = Literal["api", "function", "job"]
+DataResourceTypeEnum = Literal["table", "redis"]
+SystemEnum = Literal["admin", "owner-center", "pay-center"]
 
 
 class BusinessBase(BaseModel):
@@ -38,7 +45,7 @@ class PaginatedBusinesses(BaseModel):
 class StepBase(BaseModel):
     name: str
     description: Optional[str] = None
-    step_type: Optional[str] = None
+    step_type: Optional[StepTypeEnum] = None
 
 
 class StepCreate(StepBase):
@@ -48,7 +55,7 @@ class StepCreate(StepBase):
 class StepUpdate(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
-    step_type: Optional[str] = None
+    step_type: Optional[StepTypeEnum] = None
 
 
 class StepOut(StepBase):
@@ -67,8 +74,8 @@ class PaginatedSteps(BaseModel):
 
 class ImplementationBase(BaseModel):
     name: str
-    type: Optional[str] = None
-    system: Optional[str] = None
+    type: Optional[ImplementationTypeEnum] = None
+    system: Optional[SystemEnum] = None
     description: Optional[str] = None
     code_ref: Optional[str] = None
 
@@ -79,8 +86,8 @@ class ImplementationCreate(ImplementationBase):
 
 class ImplementationUpdate(BaseModel):
     name: Optional[str] = None
-    type: Optional[str] = None
-    system: Optional[str] = None
+    type: Optional[ImplementationTypeEnum] = None
+    system: Optional[SystemEnum] = None
     description: Optional[str] = None
     code_ref: Optional[str] = None
 
@@ -141,3 +148,38 @@ class ImplementationUpdatePayload(ImplementationUpdate):
 
 class StepImplementationLinkIdRequest(BaseModel):
     link_id: int
+
+
+# ---- 分组统计响应 ----
+
+
+class GroupCount(BaseModel):
+    """单个分组的统计信息"""
+    value: Optional[str] = None  # 分组值，None 表示"其他"
+    count: int
+
+
+class BusinessGroupStats(BaseModel):
+    """业务流程分组统计"""
+    by_channel: List[GroupCount]
+    total: int
+
+
+class StepGroupStats(BaseModel):
+    """步骤分组统计"""
+    by_step_type: List[GroupCount]
+    total: int
+
+
+class ImplementationGroupStats(BaseModel):
+    """实现分组统计 - 两级分组"""
+    by_system: List[GroupCount]
+    by_type: List[GroupCount]
+    total: int
+
+
+class DataResourceGroupStats(BaseModel):
+    """数据资源分组统计 - 两级分组"""
+    by_system: List[GroupCount]
+    by_type: List[GroupCount]
+    total: int

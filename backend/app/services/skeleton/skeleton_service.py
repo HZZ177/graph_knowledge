@@ -121,6 +121,8 @@ async def generate_skeleton(
         channel=request.channel or "通用",
         flow_steps=flow_output,
         analysis_result=analysis_output,
+        api_captures=request.api_captures or "无",
+        structured_logs=request.structured_logs or "无",
     )
 
     architect_agent = CrewAiAgents.create_tech_architect_agent(llm)

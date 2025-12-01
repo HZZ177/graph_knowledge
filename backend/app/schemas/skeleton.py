@@ -39,7 +39,7 @@ class StepSkeleton(BaseModel):
     """步骤骨架"""
     name: str
     description: str = ""
-    step_type: str = Field(default="process", description="start | process | decision | end")
+    step_type: str = Field(default="inner", description="outer=用户可见步骤 | inner=后台不可见步骤")
 
 
 class EdgeSkeleton(BaseModel):
@@ -52,7 +52,7 @@ class EdgeSkeleton(BaseModel):
 class ImplSkeleton(BaseModel):
     """实现骨架"""
     name: str
-    type: str = Field(default="http_endpoint", description="http_endpoint | rpc_method | mq_consumer | scheduled_job")
+    type: str = Field(default="api", description="api=接口 | function=内部方法 | job=定时任务")
     system: str
     description: Optional[str] = None
     code_ref: Optional[str] = None
@@ -62,7 +62,7 @@ class ImplSkeleton(BaseModel):
 class DataResourceSkeleton(BaseModel):
     """数据资源骨架"""
     name: str
-    type: str = "db_table"  # db_table | cache | mq | api
+    type: str = "table"  # table=数据库表 | redis=缓存
     system: str
     description: Optional[str] = None
 

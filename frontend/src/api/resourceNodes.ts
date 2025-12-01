@@ -7,6 +7,28 @@ export interface PaginatedResult<T> {
   items: T[]
 }
 
+// 分组统计类型
+export interface GroupCount {
+  value: string | null
+  count: number
+}
+
+export interface BusinessGroupStats {
+  by_channel: GroupCount[]
+  total: number
+}
+
+export interface StepGroupStats {
+  by_step_type: GroupCount[]
+  total: number
+}
+
+export interface ImplementationGroupStats {
+  by_system: GroupCount[]
+  by_type: GroupCount[]
+  total: number
+}
+
 export interface BusinessNode {
   process_id: string
   name: string
@@ -43,9 +65,42 @@ export interface StepImplementationLink {
   impl_id: string
 }
 
-export async function listBusinessesPaged(q: string, page: number, pageSize: number) {
+export async function getBusinessGroupStats() {
+  const { data } = await http.get<BusinessGroupStats>('/resource-nodes/business_group_stats')
+  return data
+}
+
+// 获取所有已存在的渠道列表（用于下拉选择）
+export async function getChannelOptions(): Promise<string[]> {
+  const stats = await getBusinessGroupStats()
+  return stats.by_channel
+    .map((g) => g.value)
+    .filter((v): v is string => v !== null && v !== '')
+}
+
+// 获取所有已存在的系统列表（用于下拉选择）
+export async function getSystemOptions(): Promise<string[]> {
+  const stats = await getImplementationGroupStats()
+  return stats.by_system
+    .map((g) => g.value)
+    .filter((v): v is string => v !== null && v !== '')
+}
+
+export interface ListBusinessesParams {
+  q?: string
+  channel?: string
+  page?: number
+  page_size?: number
+}
+
+export async function listBusinessesPaged(
+  q: string,
+  page: number,
+  pageSize: number,
+  channel?: string,
+) {
   const { data } = await http.get<PaginatedResult<BusinessNode>>('/resource-nodes/list_businesses', {
-    params: { q: q || undefined, page, page_size: pageSize },
+    params: { q: q || undefined, page, page_size: pageSize, channel },
   })
   return data
 }
@@ -67,9 +122,19 @@ export async function deleteBusiness(processId: string) {
   await http.post('/resource-nodes/delete_business', { process_id: processId })
 }
 
-export async function listStepsPaged(q: string, page: number, pageSize: number) {
+export async function getStepGroupStats() {
+  const { data } = await http.get<StepGroupStats>('/resource-nodes/step_group_stats')
+  return data
+}
+
+export async function listStepsPaged(
+  q: string,
+  page: number,
+  pageSize: number,
+  stepType?: string,
+) {
   const { data } = await http.get<PaginatedResult<StepNode>>('/resource-nodes/list_steps', {
-    params: { q: q || undefined, page, page_size: pageSize },
+    params: { q: q || undefined, page, page_size: pageSize, step_type: stepType },
   })
   return data
 }
@@ -91,9 +156,20 @@ export async function deleteStep(stepId: string) {
   await http.post('/resource-nodes/delete_step', { step_id: stepId })
 }
 
-export async function listImplementationsPaged(q: string, page: number, pageSize: number) {
+export async function getImplementationGroupStats() {
+  const { data } = await http.get<ImplementationGroupStats>('/resource-nodes/implementation_group_stats')
+  return data
+}
+
+export async function listImplementationsPaged(
+  q: string,
+  page: number,
+  pageSize: number,
+  system?: string,
+  type?: string,
+) {
   const { data } = await http.get<PaginatedResult<ImplementationNode>>('/resource-nodes/list_implementations', {
-    params: { q: q || undefined, page, page_size: pageSize },
+    params: { q: q || undefined, page, page_size: pageSize, system, type },
   })
   return data
 }

@@ -9,6 +9,18 @@ export interface DataResource {
   description?: string
 }
 
+// 分组统计类型
+export interface GroupCount {
+  value: string | null
+  count: number
+}
+
+export interface DataResourceGroupStats {
+  by_system: GroupCount[]
+  by_type: GroupCount[]
+  total: number
+}
+
 export type DataResourceCreatePayload = Omit<DataResource, 'resource_id'>
 
 export interface PaginatedDataResources {
@@ -77,6 +89,11 @@ export interface ListDataResourcesParams {
   system?: string
   process_id?: string
   step_id?: string
+}
+
+export async function getDataResourceGroupStats() {
+  const { data } = await http.get<DataResourceGroupStats>('/resource-nodes/data_resource_group_stats')
+  return data
 }
 
 export async function listDataResources(params: ListDataResourcesParams) {

@@ -1,29 +1,31 @@
-from typing import List, Optional
+from typing import List, Optional, Literal
 
 from pydantic import BaseModel
+
+from backend.app.schemas.resource_nodes import DataResourceTypeEnum, SystemEnum
 
 
 class DataResourceBase(BaseModel):
     resource_id: str
     name: str
-    type: Optional[str] = None
-    system: Optional[str] = None
+    type: Optional[DataResourceTypeEnum] = None
+    system: Optional[SystemEnum] = None
     location: Optional[str] = None
     description: Optional[str] = None
 
 
 class DataResourceCreate(BaseModel):
     name: str
-    type: Optional[str] = None
-    system: Optional[str] = None
+    type: Optional[DataResourceTypeEnum] = None
+    system: Optional[SystemEnum] = None
     location: Optional[str] = None
     description: Optional[str] = None
 
 
 class DataResourceUpdate(BaseModel):
     name: Optional[str] = None
-    type: Optional[str] = None
-    system: Optional[str] = None
+    type: Optional[DataResourceTypeEnum] = None
+    system: Optional[SystemEnum] = None
     location: Optional[str] = None
     description: Optional[str] = None
 

@@ -56,10 +56,31 @@ DATA_ANALYSIS_PROMPT = """
     "call_sequence": ["步骤1的描述", "步骤2的描述"]
 }}
 
-注意：
-1. 只提取与核心业务流程直接相关的接口和资源，过滤所有噪声
-2. 如果原始数据混杂了多个不相关的业务，只提取与"{business_name}"相关的部分
-3. 如果某项信息无法从数据中提取，请基于业务描述进行合理推断
+==========【核心原则：严禁编造，必须有据】==========
+
+★ systems：【严禁推测，且只能使用指定枚举】
+  - 只能填写以下三个系统之一：admin, owner-center, pay-center
+  - 只有在原始数据中明确出现这些系统名称时才能填写
+  - 如果原始数据中没有系统信息，数组应为空[]
+
+★ apis：【严禁推测】
+  - 只能填写原始数据（抓包/日志）中明确出现的接口路径
+  - path 必须是原始数据中的完整接口路径，禁止编造
+  - system 只能是以下三个之一：admin, owner-center, pay-center
+  - 如果原始数据中没有接口信息，数组应为空[]
+
+★ data_resources：【严禁推测】
+  - 只能填写原始数据中明确出现的表名、缓存键、队列名
+  - type 只能是：table 或 redis
+  - system 只能是以下三个之一：admin, owner-center, pay-center
+  - 禁止根据业务描述猜测可能存在的表名
+  - 如果原始数据中没有数据资源信息，数组应为空[]
+
+★ call_sequence：【允许推断】
+  - 可以根据接口调用顺序和业务描述合理推断调用流程
+  - 这是唯一允许推断的字段
+
+【重要】宁可返回空数组，也不能编造不存在的接口或表名！
 
 为了便于系统解析，你在最终回答时必须严格遵守下面的输出格式：
 - 先输出一行以 "Thought:" 开头，用中文简要说明你的分析思路，例如：
@@ -96,7 +117,7 @@ FLOW_DESIGN_PROMPT = """
         {{
             "name": "步骤名称（简短，描述实际业务动作）",
             "description": "步骤详细描述",
-            "step_type": "process/decision",
+            "step_type": "inner/outer",
             "order": 1,
             "system_hint": "可能涉及的系统",
             "api_hint": "可能调用的接口",
@@ -110,11 +131,11 @@ FLOW_DESIGN_PROMPT = """
 
 要求：
 1. 【重要】不要生成"开始"、"结束"这类虚拟节点，只生成实际的业务步骤
-2. 所有步骤的step_type只能是"process"或"decision"
-3. decision类型用于有分支判断的步骤，此时填写branches
-4. process类型用于普通顺序执行的步骤
+2. 所有步骤的step_type只能是"inner"或"outer"
+3. outer表示用户可见/可操作的步骤（如点击按钮、查看页面、填写表单、接收通知等用户能感知的操作）
+4. inner表示用户不可见的后台步骤（如内部判断、调用外部接口、数据库操作、业务逻辑处理等后端操作）
 5. order从1开始递增
-6. 步骤名称应描述实际业务动作，如"展示车卡列表"、"用户选择套餐"、"调用支付接口"等
+6. 步骤名称应描述实际业务动作，如"用户点击开通按钮"(outer)、"校验用户资格"(inner)、"调用支付接口"(inner)、"展示支付结果页"(outer)
 7. 在输出时必须先给出一行以 "Thought:" 开头的中文思考说明，概述你是如何设计这些步骤的。
 8. 紧接着给出一行以 "Final Answer:" 开头的最终结果，该行后面直接跟上完整的 JSON 对象（即上面定义的 steps 结构），不要再追加其它自然语言解释。例如：
 Final Answer: 
@@ -149,8 +170,42 @@ Final Answer:
 【流程步骤】
 {flow_steps}
 
-【技术分析结果】
+【技术分析摘要】
 {analysis_result}
+
+【原始技术数据 - 抓包接口】
+{api_captures}
+
+【原始技术数据 - 结构化日志】
+{structured_logs}
+
+==========【核心原则：严格区分"可推断"与"必须有据"】==========
+
+★ 步骤（steps）：【允许推断】
+  - 可以根据业务描述合理分析和推断步骤流程
+  - 步骤名称、描述、类型可以基于业务逻辑推理
+
+★ 实现单元（implementations）：【严禁推测，必须有据】
+  - 必须从【原始技术数据】或【技术分析摘要】中找到明确的接口/方法信息才能填写
+  - name：必须是原始数据中明确出现的接口路径或方法名（如日志中的URL、抓包中的路径），禁止编造
+  - type：只能是 api / function / job
+  - system：只能是以下三个之一：admin, owner-center, pay-center
+  - code_ref：必须是原始数据中明确出现的代码路径，如无明确信息则填空字符串""
+  - 如果原始数据中没有任何明确的技术信息，implementations数组应为空[]
+
+★ 数据资源（data_resources）：【严禁推测，必须有据】
+  - 必须从【原始技术数据】或【技术分析摘要】中找到明确的表名/资源名才能填写
+  - name：必须是原始数据中明确出现的表名或资源名，禁止编造
+  - type：只能是 table / redis
+  - system：只能是以下三个之一：admin, owner-center, pay-center
+  - 如果原始数据中没有任何明确的数据资源信息，data_resources数组应为空[]
+
+★ 关联关系（step_impl_links, impl_data_links）：
+  - 只能关联上述已生成的实际节点，不能凭空创建关联
+
+【重要提示】请仔细查阅【原始技术数据】，从中提取精确的接口路径和资源名称。
+
+==========【输出格式】==========
 
 请输出完整的骨架结构，以JSON格式（严格遵循以下结构）：
 {{
@@ -163,7 +218,7 @@ Final Answer:
         {{
             "name": "步骤名称（实际业务动作，不要开始/结束）",
             "description": "步骤描述",
-            "step_type": "process/decision"
+            "step_type": "inner/outer（outer=用户可见步骤，inner=后台不可见步骤）"
         }}
     ],
     "edges": [
@@ -175,11 +230,11 @@ Final Answer:
     ],
     "implementations": [
         {{
-            "name": "POST /api/xxx 或 ServiceName.MethodName",
-            "type": "http_endpoint/rpc_method/mq_consumer/scheduled_job",
-            "system": "服务名称，如 user-service、payment-service",
+            "name": "【必须来自分析结果】POST /api/xxx 或 ServiceName.MethodName",
+            "type": "api/function/job（api=接口，function=内部方法，job=定时任务）",
+            "system": "【必须来自分析结果】服务名称",
             "description": "实现功能描述",
-            "code_ref": "服务名/controllers/xxx.py:method_name",
+            "code_ref": "【必须来自分析结果，无则填空】",
             "step_name": "关联的步骤名称"
         }}
     ],
@@ -191,9 +246,9 @@ Final Answer:
     ],
     "data_resources": [
         {{
-            "name": "表名或资源名，如 user_card、pay_order",
-            "type": "db_table/cache/mq/api",
-            "system": "所属服务名称",
+            "name": "【必须来自分析结果】表名或资源名",
+            "type": "table/redis（table=数据库表，redis=缓存）",
+            "system": "【必须来自分析结果】所属服务名称",
             "description": "数据资源描述"
         }}
     ],
@@ -202,26 +257,16 @@ Final Answer:
             "impl_name": "实现名称",
             "resource_name": "数据资源名称",
             "access_type": "read/write/read_write",
-            "access_pattern": "访问模式描述，如'按user_id查询用户信息'"
+            "access_pattern": "访问模式描述"
         }}
     ]
 }}
 
-参考示例（Implementation命名规范）：
-- HTTP接口: "POST /api/v1/user/verify_identity" 或 "GET /api/v1/card/list"
-- RPC方法: "MemberCardService.CheckOpenEligibility"
-- 消息队列: "PaymentResultConsumer"
-- 定时任务: "CardExpirationJob"
+==========【要求】==========
 
-参考示例（DataResource命名规范）：
-- 数据库表: user_card, pay_order, card_plate_bind
-- 缓存: user_session_cache
-- 消息队列: payment_result_queue
-
-要求：
-1. 每个步骤（除start/end外）至少关联一个implementation
-2. 合理推断数据资源的访问类型（read/write/read_write）
-3. 确保所有引用的数据资源都在data_resources中定义
+1. 步骤可以根据业务逻辑推断，但实现单元和数据资源必须严格基于【技术分析结果】中的明确信息
+2. 宁可不填，也不能编造：如果分析结果中没有具体的接口/表名/服务名，对应数组留空
+3. edges中用步骤名称指定连接关系，按流程顺序排列
 4. step_impl_links和impl_data_links使用名称引用，不要使用ID
-5. edges中用步骤名称指定连接关系，按流程顺序排列
+5. 只有明确存在的实现和数据资源才能建立关联关系
 """

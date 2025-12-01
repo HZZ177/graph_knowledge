@@ -1,6 +1,6 @@
 from typing import List, Optional, Tuple
 
-from sqlalchemy import or_
+from sqlalchemy import or_, func
 from sqlalchemy.orm import Session
 
 from backend.app.models.resource_graph import (
@@ -42,6 +42,7 @@ def list_businesses(
     page: int = 1,
     page_size: int = 20,
     keyword: Optional[str] = None,
+    channel: Optional[str] = None,
 ) -> Tuple[List[Business], int]:
     query = db.query(Business)
 
@@ -55,6 +56,14 @@ def list_businesses(
             )
         )
 
+    # 按渠道过滤
+    if channel is not None:
+        if channel == "":
+            # 空字符串表示"其他"（未分类）
+            query = query.filter(or_(Business.channel == None, Business.channel == ""))
+        else:
+            query = query.filter(Business.channel == channel)
+
     total = query.count()
     items = (
         query.order_by(Business.process_id)
@@ -63,6 +72,30 @@ def list_businesses(
         .all()
     )
     return items, total
+
+
+def get_business_group_stats(db: Session) -> dict:
+    """获取业务流程按渠道分组的统计信息"""
+    # 按 channel 分组统计
+    rows = (
+        db.query(Business.channel, func.count(Business.process_id))
+        .group_by(Business.channel)
+        .all()
+    )
+
+    by_channel = []
+    total = 0
+    for channel, count in rows:
+        by_channel.append({
+            "value": channel if channel else None,
+            "count": count,
+        })
+        total += count
+
+    return {
+        "by_channel": by_channel,
+        "total": total,
+    }
 
 
 def get_business(db: Session, process_id: str) -> Optional[Business]:
@@ -189,6 +222,45 @@ def get_data_resource(db: Session, resource_id: str) -> Optional[DataResource]:
         .filter(DataResource.resource_id == resource_id)
         .first()
     )
+
+
+def get_data_resource_group_stats(db: Session) -> dict:
+    """获取数据资源按系统和类型分组的统计信息"""
+    # 按 system 分组
+    system_rows = (
+        db.query(DataResource.system, func.count(DataResource.resource_id))
+        .group_by(DataResource.system)
+        .all()
+    )
+
+    by_system = []
+    total = 0
+    for system, count in system_rows:
+        by_system.append({
+            "value": system if system else None,
+            "count": count,
+        })
+        total += count
+
+    # 按 type 分组
+    type_rows = (
+        db.query(DataResource.type, func.count(DataResource.resource_id))
+        .group_by(DataResource.type)
+        .all()
+    )
+
+    by_type = []
+    for type_, count in type_rows:
+        by_type.append({
+            "value": type_ if type_ else None,
+            "count": count,
+        })
+
+    return {
+        "by_system": by_system,
+        "by_type": by_type,
+        "total": total,
+    }
 
 
 def create_data_resource(db: Session, data: DataResourceCreate) -> DataResource:
@@ -511,6 +583,7 @@ def list_steps(
     page: int = 1,
     page_size: int = 20,
     keyword: Optional[str] = None,
+    step_type: Optional[str] = None,
 ) -> Tuple[List[Step], int]:
     query = db.query(Step)
 
@@ -524,6 +597,14 @@ def list_steps(
             )
         )
 
+    # 按步骤类型过滤
+    if step_type is not None:
+        if step_type == "":
+            # 空字符串表示"其他"（未分类）
+            query = query.filter(or_(Step.step_type == None, Step.step_type == ""))
+        else:
+            query = query.filter(Step.step_type == step_type)
+
     total = query.count()
     items = (
         query.order_by(Step.step_id)
@@ -532,6 +613,29 @@ def list_steps(
         .all()
     )
     return items, total
+
+
+def get_step_group_stats(db: Session) -> dict:
+    """获取步骤按类型分组的统计信息"""
+    rows = (
+        db.query(Step.step_type, func.count(Step.step_id))
+        .group_by(Step.step_type)
+        .all()
+    )
+
+    by_step_type = []
+    total = 0
+    for step_type, count in rows:
+        by_step_type.append({
+            "value": step_type if step_type else None,
+            "count": count,
+        })
+        total += count
+
+    return {
+        "by_step_type": by_step_type,
+        "total": total,
+    }
 
 
 def get_step(db: Session, step_id: str) -> Optional[Step]:
@@ -593,6 +697,8 @@ def list_implementations(
     page: int = 1,
     page_size: int = 20,
     keyword: Optional[str] = None,
+    system: Optional[str] = None,
+    type_: Optional[str] = None,
 ) -> Tuple[List[Implementation], int]:
     query = db.query(Implementation)
 
@@ -606,6 +712,20 @@ def list_implementations(
             )
         )
 
+    # 按系统过滤
+    if system is not None:
+        if system == "":
+            query = query.filter(or_(Implementation.system == None, Implementation.system == ""))
+        else:
+            query = query.filter(Implementation.system == system)
+
+    # 按类型过滤
+    if type_ is not None:
+        if type_ == "":
+            query = query.filter(or_(Implementation.type == None, Implementation.type == ""))
+        else:
+            query = query.filter(Implementation.type == type_)
+
     total = query.count()
     items = (
         query.order_by(Implementation.impl_id)
@@ -614,6 +734,45 @@ def list_implementations(
         .all()
     )
     return items, total
+
+
+def get_implementation_group_stats(db: Session) -> dict:
+    """获取实现按系统和类型分组的统计信息"""
+    # 按 system 分组
+    system_rows = (
+        db.query(Implementation.system, func.count(Implementation.impl_id))
+        .group_by(Implementation.system)
+        .all()
+    )
+
+    by_system = []
+    total = 0
+    for system, count in system_rows:
+        by_system.append({
+            "value": system if system else None,
+            "count": count,
+        })
+        total += count
+
+    # 按 type 分组
+    type_rows = (
+        db.query(Implementation.type, func.count(Implementation.impl_id))
+        .group_by(Implementation.type)
+        .all()
+    )
+
+    by_type = []
+    for type_, count in type_rows:
+        by_type.append({
+            "value": type_ if type_ else None,
+            "count": count,
+        })
+
+    return {
+        "by_system": by_system,
+        "by_type": by_type,
+        "total": total,
+    }
 
 
 def get_implementation(db: Session, impl_id: str) -> Optional[Implementation]:

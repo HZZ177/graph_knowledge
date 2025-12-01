@@ -26,6 +26,10 @@ from backend.app.schemas.resource_nodes import (
     ImplementationIdRequest,
     ImplementationUpdatePayload,
     StepImplementationLinkIdRequest,
+    BusinessGroupStats,
+    StepGroupStats,
+    ImplementationGroupStats,
+    DataResourceGroupStats,
 )
 from backend.app.schemas.data_resources import (
     BusinessSimple,
@@ -51,6 +55,15 @@ router = APIRouter(prefix="/resource-nodes", tags=["resource-nodes"])
 
 
 # ---- Data Resources ----
+
+
+@router.get("/data_resource_group_stats", response_model=DataResourceGroupStats)
+def get_data_resource_group_stats(
+    db: Session = Depends(get_db),
+) -> DataResourceGroupStats:
+    """获取数据资源按系统和类型分组的统计信息。"""
+    stats = resource_node_service.get_data_resource_group_stats(db)
+    return success_response(data=stats)
 
 
 @router.get("/list_data_resources", response_model=PaginatedDataResources)
@@ -270,16 +283,26 @@ def list_data_resource_steps(
 # ---- Business ----
 
 
+@router.get("/business_group_stats", response_model=BusinessGroupStats)
+def get_business_group_stats(
+    db: Session = Depends(get_db),
+) -> BusinessGroupStats:
+    """获取业务流程按渠道分组的统计信息。"""
+    stats = resource_node_service.get_business_group_stats(db)
+    return success_response(data=stats)
+
+
 @router.get("/list_businesses", response_model=PaginatedBusinesses)
 def list_businesses(
     page: int = Query(1),
     page_size: int = Query(20),
     q: Optional[str] = Query(None),
+    channel: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ) -> PaginatedBusinesses:
-    """分页查询业务节点（Business），支持按关键字过滤。"""
+    """分页查询业务节点（Business），支持按关键字和渠道过滤。"""
     items, total = resource_node_service.list_businesses(
-        db, page=page, page_size=page_size, keyword=q
+        db, page=page, page_size=page_size, keyword=q, channel=channel
     )
     result = PaginatedBusinesses(
         page=page,
@@ -369,16 +392,26 @@ def delete_step_implementation_link(
 # ---- Step ----
 
 
+@router.get("/step_group_stats", response_model=StepGroupStats)
+def get_step_group_stats(
+    db: Session = Depends(get_db),
+) -> StepGroupStats:
+    """获取步骤按类型分组的统计信息。"""
+    stats = resource_node_service.get_step_group_stats(db)
+    return success_response(data=stats)
+
+
 @router.get("/list_steps", response_model=PaginatedSteps)
 def list_steps(
     page: int = Query(1),
     page_size: int = Query(20),
     q: Optional[str] = Query(None),
+    step_type: Optional[str] = Query(None),
     db: Session = Depends(get_db),
 ) -> PaginatedSteps:
-    """分页查询步骤节点（Step），支持按关键字过滤。"""
+    """分页查询步骤节点（Step），支持按关键字和步骤类型过滤。"""
     items, total = resource_node_service.list_steps(
-        db, page=page, page_size=page_size, keyword=q
+        db, page=page, page_size=page_size, keyword=q, step_type=step_type
     )
     result = PaginatedSteps(
         page=page,
@@ -441,16 +474,27 @@ def delete_step(
 # ---- Implementation ----
 
 
+@router.get("/implementation_group_stats", response_model=ImplementationGroupStats)
+def get_implementation_group_stats(
+    db: Session = Depends(get_db),
+) -> ImplementationGroupStats:
+    """获取实现按系统和类型分组的统计信息。"""
+    stats = resource_node_service.get_implementation_group_stats(db)
+    return success_response(data=stats)
+
+
 @router.get("/list_implementations", response_model=PaginatedImplementations)
 def list_implementations(
     page: int = Query(1),
     page_size: int = Query(20),
     q: Optional[str] = Query(None),
+    system: Optional[str] = Query(None),
+    type: Optional[str] = Query(None),  # noqa: A002
     db: Session = Depends(get_db),
 ) -> PaginatedImplementations:
-    """分页查询实现节点（Implementation），支持按关键字过滤。"""
+    """分页查询实现节点（Implementation），支持按关键字、系统和类型过滤。"""
     items, total = resource_node_service.list_implementations(
-        db, page=page, page_size=page_size, keyword=q
+        db, page=page, page_size=page_size, keyword=q, system=system, type_=type
     )
     result = PaginatedImplementations(
         page=page,
