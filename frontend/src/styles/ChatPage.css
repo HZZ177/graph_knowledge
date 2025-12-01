@@ -494,7 +494,6 @@
   display: flex;
   align-items: center;
   margin-bottom: 8px;
-  padding: 0 4px;
 }
 
 .avatar {
@@ -511,6 +510,8 @@
 .avatar.assistant {
   background: transparent;
   color: var(--text-primary);
+  width: auto;  /* 宽度自适应，让图标紧贴文字 */
+  margin-right: 12px;
 }
 
 .role-name {

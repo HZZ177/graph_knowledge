@@ -66,6 +66,25 @@ interface ConversationGroup {
 // Components
 // ==========================================
 
+// 0. 缓存的 Markdown 组件（避免重复渲染已完成的内容）
+interface MemoizedMarkdownProps {
+  source: string
+  fontSize?: number
+}
+
+const MemoizedMarkdown = React.memo<MemoizedMarkdownProps>(({ source, fontSize = 16 }) => {
+  return (
+    <MarkdownPreview
+      source={source}
+      style={{ background: 'transparent', fontSize }}
+      wrapperElement={{ "data-color-mode": "light" }}
+    />
+  )
+}, (prevProps, nextProps) => {
+  // 只有 source 变化才重新渲染
+  return prevProps.source === nextProps.source && prevProps.fontSize === nextProps.fontSize
+})
+
 // 1. 欢迎屏幕
 const WelcomeScreen: React.FC<{ onSuggestionClick: (q: string) => void }> = ({ onSuggestionClick }) => {
   const suggestions = [
@@ -651,11 +670,7 @@ const ThinkBlock: React.FC<ThinkBlockProps> = ({ content, isStreaming, isComplet
         <span className="inline-chevron">›</span>
       </span>
       <ExpandableContent isExpanded={isExpanded} className="inline-expandable-content think-text markdown-body">
-        <MarkdownPreview 
-          source={content} 
-          style={{ background: 'transparent', fontSize: 14 }}
-          wrapperElement={{ 'data-color-mode': 'light' }}
-        />
+        <MemoizedMarkdown source={content} fontSize={14} />
       </ExpandableContent>
     </div>
   )
@@ -876,7 +891,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({ message, isLoading
         <div className="avatar assistant">
           <RobotOutlined />
         </div>
-        <span className="role-name">Graph AI</span>
+        <span className="role-name">Keytop AI</span>
       </div>
       
       <div className="message-bubble-wrapper">
@@ -924,11 +939,7 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({ message, isLoading
             if (item.type === 'text') {
               return (
                 <div key={item.key} className="markdown-body">
-                  <MarkdownPreview
-                    source={item.textContent || ''}
-                    style={{ background: 'transparent', fontSize: 16 }}
-                    wrapperElement={{ "data-color-mode": "light" }}
-                  />
+                  <MemoizedMarkdown source={item.textContent || ''} />
                 </div>
               )
             }
@@ -1034,13 +1045,21 @@ const ChatPage: React.FC = () => {
   const currentToolCallsRef = useRef<ToolCallInfo[]>([])
   const toolCallIdRef = useRef(0)  // 工具调用唯一 ID 计数器
   const currentToolIdRef = useRef(0)  // 当前正在执行的工具 ID
-  // 工具摘要存储：key = "toolName:id", value = {input, output, batchId, batchSize, batchIndex}
-  const [toolSummaries, setToolSummaries] = useState<Map<string, ToolSummaryInfo>>(new Map())
+  // 工具摘要存储（使用 ref 避免频繁创建新 Map 触发重渲染）
+  const toolSummariesRef = useRef<Map<string, ToolSummaryInfo>>(new Map())
   const [toolSummariesVersion, setToolSummariesVersion] = useState(0)
-  // 活跃工具存储：toolId -> {batchId, batchSize, batchIndex}（用于渲染时判断批次）
-  const [activeTools, setActiveTools] = useState<Map<number, ActiveToolInfo>>(new Map())
+  // 提供给组件使用的稳定引用
+  const toolSummaries = toolSummariesRef.current
+  
+  // 活跃工具存储（使用 ref）
+  const activeToolsRef = useRef<Map<number, ActiveToolInfo>>(new Map())
   const [activeToolsVersion, setActiveToolsVersion] = useState(0)
-  const activeToolsRef = useRef<Map<number, ActiveToolInfo>>(new Map()) // 同步ref，避免异步setState问题
+  // 提供给组件使用的稳定引用
+  const activeTools = activeToolsRef.current
+  
+  // 节流更新消息的 RAF ID
+  const updateMessageRafRef = useRef<number | null>(null)
+  const pendingContentRef = useRef<string>('')
   
   const chatClientRef = useRef<ChatClient | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -1126,40 +1145,60 @@ const ChatPage: React.FC = () => {
     })
   }, [])
 
-  // 监听流式内容变化，更新消息
+  // 监听流式内容变化，节流更新消息（使用 RAF 避免过于频繁的重渲染）
   useEffect(() => {
     if (messages.length === 0 || (!isLoading && !isTyping)) return
     
-    // 查找正在加载的assistant消息（可能不是最后一条，比如regenerate时）
-    setMessages(prev => {
-      const newPrev = [...prev]
-      let updated = false
+    // 存储待更新的内容
+    pendingContentRef.current = streamingContent
+    
+    // 如果已有 RAF 在等待，直接返回（节流）
+    if (updateMessageRafRef.current !== null) return
+    
+    // 使用 RAF 进行节流更新
+    updateMessageRafRef.current = requestAnimationFrame(() => {
+      updateMessageRafRef.current = null
+      const content = pendingContentRef.current
       
-      // 从后往前找第一个isThinking=true的assistant消息
-      for (let i = newPrev.length - 1; i >= 0; i--) {
-        if (newPrev[i].role === 'assistant' && newPrev[i].isThinking) {
-          newPrev[i] = {
-            ...newPrev[i],
-            content: streamingContent,
+      // 查找正在加载的assistant消息（可能不是最后一条，比如regenerate时）
+      setMessages(prev => {
+        const newPrev = [...prev]
+        let updated = false
+        
+        // 从后往前找第一个isThinking=true的assistant消息
+        for (let i = newPrev.length - 1; i >= 0; i--) {
+          if (newPrev[i].role === 'assistant' && newPrev[i].isThinking) {
+            newPrev[i] = {
+              ...newPrev[i],
+              content: content,
+            }
+            updated = true
+            break
           }
-          updated = true
-          break
         }
-      }
-      
-      // 如果没找到isThinking的，更新最后一条assistant消息（兼容旧逻辑）
-      if (!updated && isLoading) {
-        const lastIdx = newPrev.length - 1
-        if (lastIdx >= 0 && newPrev[lastIdx].role === 'assistant') {
-          newPrev[lastIdx] = {
-            ...newPrev[lastIdx],
-            content: streamingContent,
+        
+        // 如果没找到isThinking的，更新最后一条assistant消息（兼容旧逻辑）
+        if (!updated && isLoading) {
+          const lastIdx = newPrev.length - 1
+          if (lastIdx >= 0 && newPrev[lastIdx].role === 'assistant') {
+            newPrev[lastIdx] = {
+              ...newPrev[lastIdx],
+              content: content,
+            }
           }
         }
-      }
-      
-      return newPrev
+        
+        return newPrev
+      })
     })
+    
+    return () => {
+      // 清理 RAF
+      if (updateMessageRafRef.current !== null) {
+        cancelAnimationFrame(updateMessageRafRef.current)
+        updateMessageRafRef.current = null
+      }
+    }
   }, [streamingContent, isLoading, isTyping, messages.length])
 
   // 自动高度 textarea
@@ -1199,8 +1238,11 @@ const ChatPage: React.FC = () => {
     fullContentRef.current = ''
     currentToolCallsRef.current = []
     toolCallIdRef.current = 0  // 重置工具调用 ID 计数器
-    setToolSummaries(new Map())  // 清空工具摘要
-    setActiveTools(new Map())    // 清空活跃工具
+    // 清空工具状态（使用 ref.clear() 避免创建新 Map）
+    toolSummariesRef.current.clear()
+    activeToolsRef.current.clear()
+    setToolSummariesVersion(v => v + 1)
+    setActiveToolsVersion(v => v + 1)
     setCurrentTool(null)
     userScrolledUpRef.current = false
     
@@ -1217,6 +1259,12 @@ const ChatPage: React.FC = () => {
         onStart: (_rid, newThreadId) => {
           setThreadId(newThreadId)
           setActiveConversationId(newThreadId)
+          
+          // 立即将对话添加到历史列表（不等 AI 回复完成）
+          const isNewConversation = !threadId
+          if (isNewConversation && newThreadId) {
+            upsertConversation(newThreadId, '新对话', new Date().toISOString())
+          }
         },
         
         onStream: (chunk) => {
@@ -1264,15 +1312,9 @@ const ChatPage: React.FC = () => {
               batchIndex: batch.batchIndex,
             }
             
-            // 立即保存到ref（同步）
+            // 保存到 ref 并触发版本更新
             activeToolsRef.current.set(toolId, toolInfo)
-            
-            // 也保存到state（异步）
-            setActiveTools(prev => {
-              const newMap = new Map(prev)
-              newMap.set(toolId, toolInfo)
-              return newMap
-            })
+            setActiveToolsVersion(v => v + 1)
           }
           
           setCurrentTool(name)
@@ -1295,29 +1337,22 @@ const ChatPage: React.FC = () => {
           // 记录工具调用
           currentToolCallsRef.current.push({ name, output_length: 0 })
           
-          // 把摘要存入 state（包含批次信息和耗时）
+          // 把摘要存入 ref（包含批次信息和耗时）
           const toolKey = `${name}:${finalToolId}`
-          setToolSummaries(prev => {
-            const newMap = new Map(prev)
-            newMap.set(toolKey, { 
-              input: inputSummary, 
-              output: outputSummary,
-              elapsed: elapsed,
-              batchId: batch?.batchId,
-              batchSize: batch?.batchSize,
-              batchIndex: batch?.batchIndex,
-            })
-            return newMap
+          toolSummariesRef.current.set(toolKey, { 
+            input: inputSummary, 
+            output: outputSummary,
+            elapsed: elapsed,
+            batchId: batch?.batchId,
+            batchSize: batch?.batchSize,
+            batchIndex: batch?.batchIndex,
           })
+          setToolSummariesVersion(v => v + 1)
           
           // 从活跃工具中移除
           if (finalToolId) {
             activeToolsRef.current.delete(finalToolId)
-            setActiveTools(prev => {
-              const newMap = new Map(prev)
-              newMap.delete(finalToolId)
-              return newMap
-            })
+            setActiveToolsVersion(v => v + 1)
           }
           
           setMessages(prev => {
@@ -1383,23 +1418,16 @@ const ChatPage: React.FC = () => {
           // 延迟 500ms 后开始检查（给打字机一点加速时间）
           setTimeout(ensureComplete, 500)
           
-          // 延迟处理会话元数据
+          // 延迟处理：生成对话标题（如果是新对话）
           setTimeout(() => {
             const finalThreadId = resultThreadId || threadId
-            if (finalThreadId) {
-              const isNewConversation = !threadId
-              upsertConversation(finalThreadId, isNewConversation ? '新对话' : '', new Date().toISOString())
-              setActiveConversationId(finalThreadId)
-              setThreadId(finalThreadId)
-              
-              // 如果是新对话，触发标题生成
-              if (isNewConversation) {
-                generateConversationTitle(finalThreadId)
-                  .then(title => {
-                    upsertConversation(finalThreadId, title, new Date().toISOString())
-                  })
-                  .catch(e => console.warn('生成标题失败', e))
-              }
+            const isNewConversation = !threadId
+            if (finalThreadId && isNewConversation) {
+              generateConversationTitle(finalThreadId)
+                .then(title => {
+                  upsertConversation(finalThreadId, title, new Date().toISOString())
+                })
+                .catch(e => console.warn('生成标题失败', e))
             }
           }, 200)
         },
@@ -1487,7 +1515,11 @@ const ChatPage: React.FC = () => {
     fullContentRef.current = ''
     currentToolCallsRef.current = []
     toolCallIdRef.current = 0  // 重置工具调用 ID 计数器
-    setToolSummaries(new Map())  // 清空工具摘要
+    // 清空工具状态
+    toolSummariesRef.current.clear()
+    activeToolsRef.current.clear()
+    setToolSummariesVersion(v => v + 1)
+    setActiveToolsVersion(v => v + 1)
     
     // 使用 RegenerateClient 调用后端
     const client = createRegenerateClient()
@@ -1537,13 +1569,10 @@ const ChatPage: React.FC = () => {
           setCurrentTool(null)
           currentToolCallsRef.current.push({ name, output_length: 0 })
           
-          // 把摘要存入 state（不再替换内容）
+          // 把摘要存入 ref
           const toolKey = `${name}:${toolId}`
-          setToolSummaries(prev => {
-            const newMap = new Map(prev)
-            newMap.set(toolKey, { input: inputSummary, output: outputSummary })
-            return newMap
-          })
+          toolSummariesRef.current.set(toolKey, { input: inputSummary, output: outputSummary })
+          setToolSummariesVersion(v => v + 1)
           
           setMessages(prev => prev.map((msg, idx) => 
             idx === targetAssistantIdx 
@@ -1653,10 +1682,15 @@ const ChatPage: React.FC = () => {
       const rawMessages = await fetchConversationHistory(conv.threadId)
       
       // 使用统一的转换函数
-      const { messages, toolSummaries } = convertRawMessagesToDisplay(rawMessages, conv.threadId)
+      const result = convertRawMessagesToDisplay(rawMessages, conv.threadId)
       
-      setToolSummaries(toolSummaries)
-      setMessages(messages)
+      // 更新工具摘要 ref
+      toolSummariesRef.current.clear()
+      result.toolSummaries.forEach((value, key) => {
+        toolSummariesRef.current.set(key, value)
+      })
+      setToolSummariesVersion(v => v + 1)
+      setMessages(result.messages)
     } catch (e) {
       console.error('加载会话历史失败', e)
     } finally {
