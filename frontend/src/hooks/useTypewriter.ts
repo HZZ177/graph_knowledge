@@ -47,10 +47,10 @@ interface TypewriterReturn {
 }
 
 const DEFAULT_OPTIONS: Required<Omit<TypewriterOptions, 'onTick'>> = {
-  normalSpeed: { min: 20, max: 30 },
-  catchUpSpeed: { min: 5, max: 15 },
-  finishSpeed: { min: 3, max: 10 },
-  catchUpThreshold: 50,
+  normalSpeed: { min: 3, max: 10 },      // 正常模式
+  catchUpSpeed: { min: 1, max: 5 },      // 追赶模式
+  finishSpeed: { min: 1, max: 3 },       // 完成模式
+  catchUpThreshold: 20,                  // 更早触发追赶
 }
 
 export function useTypewriter(options?: TypewriterOptions): TypewriterReturn {
@@ -98,20 +98,25 @@ export function useTypewriter(options?: TypewriterOptions): TypewriterReturn {
     return Math.floor(max - ratio * (max - min))
   }, [opts])
   
-  // 计算每次取出的字符数
+  // 计算每次取出的字符数：根据积压量动态调整，确保吐量跟得上输入
   const getCharsToTake = useCallback((bufLen: number, firstChar: string, finished: boolean) => {
     const isChinese = /[\u4e00-\u9fa5]/.test(firstChar)
     
     if (finished) {
-      if (bufLen > 100) return isChinese ? 8 : 15
-      if (bufLen > 50) return isChinese ? 5 : 10
-      return isChinese ? 3 : 5
+      // 完成后立即清空
+      if (bufLen > 1000) return isChinese ? 100 : 150
+      if (bufLen > 500) return isChinese ? 50 : 80
+      if (bufLen > 200) return isChinese ? 25 : 40
+      if (bufLen > 100) return isChinese ? 15 : 25
+      return isChinese ? 8 : 12
     }
     
-    if (bufLen > 200) return isChinese ? 5 : 10
-    if (bufLen > 100) return isChinese ? 3 : 6
-    if (bufLen > 50) return isChinese ? 2 : 4
-    return isChinese ? 1 : 2
+    // 正常模式：积压越多，每次取越多，保持吐量平衡
+    if (bufLen > 500) return isChinese ? 30 : 50
+    if (bufLen > 200) return isChinese ? 15 : 25
+    if (bufLen > 100) return isChinese ? 8 : 15
+    if (bufLen > 50) return isChinese ? 5 : 8
+    return isChinese ? 3 : 5
   }, [])
   
   // 启动打字机
@@ -246,14 +251,19 @@ export function useMultiTypewriter(
   const getCharsToTake = useCallback((bufLen: number, firstChar: string, finished: boolean) => {
     const isChinese = /[\u4e00-\u9fa5]/.test(firstChar)
     if (finished) {
-      if (bufLen > 100) return isChinese ? 8 : 15
-      if (bufLen > 50) return isChinese ? 5 : 10
-      return isChinese ? 3 : 5
+      // 完成后立即清空
+      if (bufLen > 1000) return isChinese ? 100 : 150
+      if (bufLen > 500) return isChinese ? 50 : 80
+      if (bufLen > 200) return isChinese ? 25 : 40
+      if (bufLen > 100) return isChinese ? 15 : 25
+      return isChinese ? 8 : 12
     }
-    if (bufLen > 200) return isChinese ? 5 : 10
-    if (bufLen > 100) return isChinese ? 3 : 6
-    if (bufLen > 50) return isChinese ? 2 : 4
-    return isChinese ? 1 : 2
+    // 正常模式：积压越多，每次取越多
+    if (bufLen > 500) return isChinese ? 30 : 50
+    if (bufLen > 200) return isChinese ? 15 : 25
+    if (bufLen > 100) return isChinese ? 8 : 15
+    if (bufLen > 50) return isChinese ? 5 : 8
+    return isChinese ? 3 : 5
   }, [])
   
   const startTypewriter = useCallback(() => {

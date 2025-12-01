@@ -225,7 +225,12 @@ const BatchToolProcess: React.FC<BatchToolProcessProps> = ({ tools }) => {
                 {tool.isActive ? (
                   <span className="loading-dots">calling tool: {prettyName}</span>
                 ) : (
-                  <span>called tool: {prettyName}{elapsedStr && ` (${elapsedStr})`}{tool.outputSummary && ` · ${tool.outputSummary}`}</span>
+                  <span>
+                    <strong>{prettyName}</strong>
+                    {tool.inputSummary && <> · <span className="tool-summary-label">查询:</span> {tool.inputSummary}</>}
+                    {tool.outputSummary && <> · <span className="tool-summary-label">结果:</span> {tool.outputSummary}</>}
+                    {elapsedStr && <> · {elapsedStr}</>}
+                  </span>
                 )}
               </div>
             )
@@ -1032,11 +1037,16 @@ const ChatPage: React.FC = () => {
     }
   }, [isNearBottom, isLoading])
 
-  // 打字机 Hook
-  const { text: streamingContent, append: appendToTypewriter, finish: finishTypewriter, reset: resetTypewriter, isTyping } = useTypewriter({
+  // 打字机 Hook（使用默认速度配置）
+  const { text: streamingContent, append: appendToTypewriter, finish: finishTypewriter, reset: resetTypewriter, isTyping, bufferLength } = useTypewriter({
     onTick: scrollToBottom,
-    normalSpeed: { min: 10, max: 30 }, // 更快的打字速度
   })
+  
+  // 缓冲区长度 ref（用于 setTimeout 回调中获取最新值）
+  const bufferLengthRef = useRef(0)
+  useEffect(() => {
+    bufferLengthRef.current = bufferLength
+  }, [bufferLength])
 
   // 加载本地存储的会话列表
   useEffect(() => {
@@ -1297,8 +1307,17 @@ const ChatPage: React.FC = () => {
           setIsLoading(false)
           chatClientRef.current = null
           
-          // 兜底：打字机播放完后，确保内容完整（等待2秒后检查）
-          setTimeout(() => {
+          // 兜底：等待打字机真正完成后，确保内容完整
+          const ensureComplete = () => {
+            // 检查打字机缓冲区是否还有内容
+            const bufferLen = bufferLengthRef.current
+            if (bufferLen > 0) {
+              // 打字机还在工作，等待后重试
+              setTimeout(ensureComplete, 200)
+              return
+            }
+            
+            // 打字机已完成，确保内容一致
             setMessages(prev => {
               const newPrev = [...prev]
               const lastIdx = newPrev.findIndex(m => m.id === assistantMessageId)
@@ -1314,7 +1333,9 @@ const ChatPage: React.FC = () => {
               }
               return newPrev
             })
-          }, 2000)
+          }
+          // 延迟 500ms 后开始检查（给打字机一点加速时间）
+          setTimeout(ensureComplete, 500)
           
           // 延迟处理会话元数据
           setTimeout(() => {
@@ -1507,18 +1528,23 @@ const ChatPage: React.FC = () => {
           
           setIsLoading(false)
           
-          // 兜底：打字机播放完后，确保内容完整（等待2秒后检查）
-          setTimeout(() => {
+          // 兜底：等待打字机真正完成后，确保内容完整
+          const ensureComplete = () => {
+            const bufferLen = bufferLengthRef.current
+            if (bufferLen > 0) {
+              setTimeout(ensureComplete, 200)
+              return
+            }
             setMessages(prev => prev.map((msg, idx) => {
               if (idx !== targetAssistantIdx) return msg
               const finalContent = fullContentRef.current || content
-              // 只在内容不一致时更新
               if (msg.content !== finalContent) {
                 return { ...msg, content: finalContent }
               }
               return msg
             }))
-          }, 2000)
+          }
+          setTimeout(ensureComplete, 500)
         },
         onError: (err) => {
           console.error(err)
