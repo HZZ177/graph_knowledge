@@ -3,10 +3,9 @@
 统一的 LLM 实例创建入口：
 - get_crewai_llm: 创建 CrewAI LLM 实例
 - get_langchain_llm: 创建 LangChain ChatOpenAI 实例
-- get_litellm_config: 获取 LiteLLM 配置（用于直接调用 litellm）
+- get_lite_task_llm: 创建轻量任务 LLM 实例（低温度，用于工具内部快速调用）
 """
 
-from dataclasses import dataclass
 from typing import Union, Optional
 
 from sqlalchemy.orm import Session
@@ -18,73 +17,6 @@ from backend.app.llm.adapters.langchain_patched import PatchedChatOpenAI
 from backend.app.llm.config import get_provider_base_url
 from backend.app.core.logger import logger
 
-
-@dataclass
-class LiteLLMConfig:
-    """LiteLLM 调用配置"""
-    model: str                    # 完整模型名（含 provider 前缀）
-    api_key: str
-    api_base: Optional[str] = None
-    temperature: float = 0.7
-    max_tokens: int = 4096
-
-
-def get_litellm_config(db: Session) -> LiteLLMConfig:
-    """获取用于 litellm.completion 调用的配置
-    
-    用于工具内部直接调用 litellm（如小 LLM 实体选择器），
-    不经过 CrewAI Agent，避免提示词干扰。
-    
-    优先使用小任务模型配置，未设置则 fallback 到主力模型。
-    
-    Args:
-        db: 数据库会话
-        
-    Returns:
-        LiteLLMConfig: 包含 model, api_key, api_base 等配置
-    """
-    config = AIModelService.get_task_llm_config(db)
-    
-    # 自定义网关模式：使用 openai/ 前缀 + gateway_endpoint
-    # 告诉 litellm 走 OpenAI 兼容路径，避免模型名被误识别（如 gemini 被当作 Vertex AI）
-    if config.provider_type == "custom_gateway" and config.gateway_endpoint:
-        model_full_name = f"openai/{config.model_name}"
-        base_url = config.gateway_endpoint.rstrip("/")
-        # LiteLLM 会自动追加 /chat/completions，因此如果 endpoint 已经包含了该路径，需要移除
-        if base_url.endswith("/chat/completions"):
-            base_url = base_url[:-17]  # len("/chat/completions") == 17
-        elif base_url.endswith("/chat/completions/"):
-            base_url = base_url[:-18]
-        
-        logger.debug(f"[LiteLLMConfig] 自定义网关模式: model={model_full_name}, base={base_url}")
-        
-        return LiteLLMConfig(
-            model=model_full_name,
-            api_key=config.api_key,
-            api_base=base_url,
-            temperature=config.temperature,
-            max_tokens=config.max_tokens,
-        )
-    
-    # LiteLLM 标准模式
-    if config.provider:
-        model_full_name = f"{config.provider}/{config.model_name}"
-    else:
-        model_full_name = config.model_name
-    
-    base_url = config.base_url
-    if not base_url and config.provider:
-        base_url = get_provider_base_url(config.provider)
-    
-    logger.debug(f"[LiteLLMConfig] 标准模式: model={model_full_name}, base={base_url}")
-    
-    return LiteLLMConfig(
-        model=model_full_name,
-        api_key=config.api_key,
-        api_base=base_url,
-        temperature=config.temperature,
-        max_tokens=config.max_tokens,
-    )
 
 
 def get_langchain_llm(db: Session) -> PatchedChatOpenAI:
@@ -201,3 +133,55 @@ def get_crewai_llm(db: Session) -> Union[LLM, BaseLLM]:
         
         logger.info("[LLM] LiteLLM实例创建成功")
         return llm
+
+
+def get_lite_task_llm(db: Session) -> PatchedChatOpenAI:
+    """基于小任务模型配置构造轻量 LLM 实例
+    
+    用于工具内部快速调用（如实体选择器），固定低温度保证输出稳定。
+    未设置小任务模型时自动 fallback 到主力模型。
+    
+    Args:
+        db: 数据库会话
+        
+    Returns:
+        PatchedChatOpenAI 实例（temperature=0.1, max_tokens=2000）
+    """
+    config = AIModelService.get_task_llm_config(db)
+    
+    # 自定义网关模式
+    if config.provider_type == "custom_gateway" and config.gateway_endpoint:
+        base_url = config.gateway_endpoint.rstrip("/")
+        if base_url.endswith("/chat/completions"):
+            base_url = base_url[:-17]
+        elif base_url.endswith("/chat/completions/"):
+            base_url = base_url[:-18]
+        
+        if not base_url.endswith("/v1"):
+            base_url = base_url + "/v1"
+        
+        logger.debug(f"[LiteTaskLLM] 自定义网关模式: model={config.model_name}, base={base_url}")
+        return PatchedChatOpenAI(
+            model=config.model_name,
+            api_key=config.api_key,
+            base_url=base_url,
+            temperature=0.1,
+            max_tokens=2000,
+            streaming=False,
+        )
+    
+    # 标准模式
+    base_url = config.base_url
+    if not base_url and config.provider:
+        base_url = get_provider_base_url(config.provider)
+    
+    logger.debug(f"[LiteTaskLLM] 标准模式: model={config.model_name}, base={base_url}")
+    
+    return PatchedChatOpenAI(
+        model=config.model_name,
+        api_key=config.api_key,
+        base_url=base_url,
+        temperature=0.1,
+        max_tokens=2000,
+        streaming=False,
+    )

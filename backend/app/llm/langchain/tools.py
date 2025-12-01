@@ -15,7 +15,6 @@ from typing import Optional, List
 
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
-import litellm
 
 from backend.app.db.sqlite import SessionLocal
 from backend.app.models.resource_graph import (
@@ -31,7 +30,7 @@ from backend.app.services.graph_service import (
     get_resource_usages as _get_resource_usages,
     get_neighborhood,
 )
-from backend.app.llm.factory import get_litellm_config
+from backend.app.llm.factory import get_lite_task_llm
 from backend.app.llm.config import CodeWorkspaceConfig
 from backend.app.core.logger import logger
 from backend.mcp.ace_code_engine import get_ace_mcp_client
@@ -65,7 +64,7 @@ ENTITY_SELECTOR_PROMPT = """你是一个实体匹配助手。根据用户的查�
 
 
 def _call_selector_llm(query: str, candidates: List[dict], id_field: str, limit: int = 5) -> List[str]:
-    """调用小 LLM 进行实体选择
+    """调用轻量 LLM 进行实体选择
     
     Args:
         query: 用户查询
@@ -78,7 +77,7 @@ def _call_selector_llm(query: str, candidates: List[dict], id_field: str, limit:
     """
     db = SessionLocal()
     try:
-        config = get_litellm_config(db)
+        llm = get_lite_task_llm(db)
         
         # 将候选列表转为 JSON 字符串
         candidates_json = json.dumps(candidates, ensure_ascii=False, indent=2)
@@ -89,19 +88,10 @@ def _call_selector_llm(query: str, candidates: List[dict], id_field: str, limit:
             limit=limit,
         )
         
-        logger.debug(f"[EntitySelector] 调用模型: {config.model}, base: {config.api_base}")
+        logger.debug(f"[EntitySelector] 调用轻量模型")
         
-        response = litellm.completion(
-            model=config.model,
-            api_key=config.api_key,
-            api_base=config.api_base,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.1,
-            max_tokens=2000,
-        )
-
-        logger.debug(f"[EntitySelector] 模型响应: {response}")
-        result_text = response.choices[0].message.content.strip()
+        response = llm.invoke(prompt)
+        result_text = response.content.strip()
         logger.debug(f"[EntitySelector] LLM 返回: {result_text}")
         
         # 检查是否为空

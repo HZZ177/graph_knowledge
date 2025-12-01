@@ -11,7 +11,7 @@ from typing import Dict, Any, List
 from sqlalchemy.orm import Session
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from backend.app.llm.factory import get_langchain_llm
+from backend.app.llm.factory import get_lite_task_llm
 from backend.app.models.conversation import Conversation
 from backend.app.core.logger import logger
 from backend.app.llm.langchain.agent import get_agent_config
@@ -316,8 +316,8 @@ async def generate_conversation_title(db: Session, thread_id: str) -> str:
             
         question = first_user_msg["content"]
         
-        # 3. 调用 LLM 生成标题
-        llm = get_langchain_llm(db)
+        # 3. 调用轻量 LLM 生成标题
+        llm = get_lite_task_llm(db)
         prompt = f"""
 请根据以下用户问题，生成一个简短的会话标题（5个字以上，不超过15个字）。
 只返回标题内容，不要包含引号或其他说明。

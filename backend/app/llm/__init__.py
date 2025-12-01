@@ -14,8 +14,7 @@
 from backend.app.llm.factory import (
     get_crewai_llm,
     get_langchain_llm,
-    get_litellm_config,
-    LiteLLMConfig,
+    get_lite_task_llm,
 )
 from backend.app.llm.adapters.crewai_gateway import CustomGatewayLLM
 from backend.app.llm.adapters.langchain_patched import PatchedChatOpenAI
@@ -33,8 +32,7 @@ __all__ = [
     # Factory
     "get_crewai_llm",
     "get_langchain_llm",
-    "get_litellm_config",
-    "LiteLLMConfig",
+    "get_lite_task_llm",
     # Adapters
     "CustomGatewayLLM",
     "PatchedChatOpenAI",
