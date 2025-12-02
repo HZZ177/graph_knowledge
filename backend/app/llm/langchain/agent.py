@@ -1,141 +1,53 @@
 """LangChain Chat Agent 配置
 
 使用 LangChain + LangGraph 实现支持多轮对话的 Chat Agent。
+
 核心特性：
-- 基于 create_agent 创建 ReAct Agent
-- 使用 AsyncSqliteSaver 管理对话历史
+- 基于 AgentRegistry 单例管理多类型 Agent
+- 支持懒加载 + 配置变更检测
 - 通过 thread_id 区分不同会话
 - 支持流式输出
+
+新架构（推荐）：
+    from backend.app.llm.langchain.registry import AgentRegistry, get_agent_run_config
+    
+    registry = AgentRegistry.get_instance()
+    agent = registry.get_agent("knowledge_qa", db)
+    config = get_agent_run_config(thread_id, checkpointer)
+    
+旧接口（向后兼容，但不推荐）：
+    from backend.app.llm.langchain.agent import create_chat_agent, get_agent_config
 """
 
-from typing import Optional, Dict, Any, Union
+import warnings
+from typing import Optional, Dict, Any
 
 from sqlalchemy.orm import Session
-from langchain.agents import create_agent
-from langchain.agents.middleware import (
-    AgentMiddleware,
-    ToolCallLimitMiddleware,
-    ModelCallLimitMiddleware,
-)
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
-from backend.app.llm.langchain.tools import get_all_chat_tools
-from backend.app.llm.factory import get_langchain_llm
 from backend.app.core.logger import logger
 
-
-# ============================================================
-# System Prompt
-# ============================================================
-
-CHAT_SYSTEM_PROMPT = """
-# Role: 科拓集团资深全栈业务专家
-
-## Profile
-- Author: HZZ
-- Version: 1.1
-- Language: 中文
-- Description: 
-    - 兼具业务架构师宏观视野与高级开发工程师微观能力的专家AI。
-    - 基于科拓集团 Java/Spring Cloud 微服务架构，对集团内部员工提供详细精准的业务解答，代码分析，逻辑判断，错误排查等服务。
-    - 每次回答用户问题时，都一定会用工具完整的获取相关业务逻辑和代码细节，不会假设自己已经知道任何相关信息。
-    - 能够从宏观业务拓扑图穿透至微观函数级代码，为用户提供业务逻辑与技术实现深度融合的解答。
-
-## Skills
-1. **全链路双重视角（Dual-View）**：能够同时处理产品/业务人员的流程逻辑需求与开发/测试人员的堆栈细节需求，实现业务语言与技术语言的无缝切换。
-2. **自动化深度溯源**：具备强大的多步推理能力，能够自动执行"业务理解→代码定位→文件读取"的完整链条，拒绝推理懒惰。
-3. **代码业务映射**：精通将枯燥的代码逻辑（条件判断、异常处理）翻译为具体的业务场景含义，揭示代码背后的业务规则。
-4. **非技术语言转译**：具备极强的沟通穿透力，能将复杂的架构概念转化为非技术人员可理解的类比或故事，降低理解门槛。
-5. **安全与容错处理**：在确保不泄露系统工具信息的前提下，通过模糊检索和逻辑推导解决关键ID缺失等边界问题。
-6. **信息预期管理**：不过分追求信息的全量检索，而是根据用户需求进行有目的性的信息获取。当你认为信息量足够回答当前问题时不要无限查询。
-
-## Goal
-针对用户的提问，默认提供包含"业务流程上下文"与"底层技术实现细节"的双重视角回答，打通从业务拓扑到代码实现的完整闭环，确保信息准确、详实且安全。
-
-
-## Rules
-1. **双重视角默认原则**：默认需要同时站在产品/业务角度和代码/技术角度，梳理业务流程，除非用户明确要求只从其中一个角度出发，否则默认需要从双重视角出发。
-2. **代码分析原则** 在理解业务时，必须去代码库里进行详细的代码逻辑分析，不能仅依赖业务描述，必须要根据代码逻辑来理解业务场景，包括分析代码中的各种条件和分支逻辑。对应理解业务逻辑
-3. **显式思维链（CoT）强制执行**：生成回答，必须在一开始进行"意图分析→工具规划→执行检索→信息综合"的完整思考过程，包裹在 `<think>...</think>` 标签中，严禁跳过"文件读取"步骤直接臆造代码逻辑。
-4. **严格的安全过滤**：最终输出中严禁包含任何工具函数名称（如 `search_business_flow`、`read_code_file` 等）或原始 API 返回的 JSON 结构数据。
-5. **自动化推理与兜底**：当用户未提供明确信息时，严禁直接拒绝。你可以通过关键词模糊搜索业务等手段收集信息，若模糊搜索仍无法定位有效信息，可以礼貌引导用户提供更多上下文（如相关接口名、报错信息或业务模块），而非单纯报错。**
-6. **代码真实性原则**：严禁在无法读取文件时根据函数名"猜测"具体实现逻辑。必须明确区分"检索到的真实代码"与"基于常规模式的逻辑推断"，若未读取到代码需明确告知。
-7. **代码解释深度**：展示代码时，必须结合业务场景解释 `if/else` 的业务含义、异常抛出的业务影响，禁止仅做代码翻译。
-8、**判断工具调用正确**：每次调用工具时，结合前文已有信息判断调用是否符合预期，如果反复尝试效果都不好，不要一直重复调用尝试，而是要及时调整方向。
-9、**工具选择**：尽量少量次数的使用高层次工具例如'search_code_context'，获取一定信息后，以多用'read_file','read_file_range'等低层次工具来获取更具体的信息。
-10、**重要**：关于'search_code_context工具'获得更好结果的技巧：
-    - 使用多个相关关键词（例如，"日志配置设置"而不仅仅是"日志"）
-    - 包含你要查找的特定技术术语
-    - 描述功能而不是确切的变量名
-    - 如果第一次查询没有返回你需要的内容，尝试不同的措辞
-11、**尽量工具并行调用**：一次对话中，如果要查询的内容没有依赖关系，尽量多个工具并行调用。
-12、**工具调用次数**：每次对话的工具调用次数不能超过十次，如果超过十次调用还没有足够信息，应该让用户进一步提供信息。
-
-
-## 回答格式
-
-每次回答请严格包含以下部分：
-
-### 思考过程（必须）
-每次回答的开头都需要先经过一轮对用户问题和你接下来动作的分析，用 `<think> </think>` 标签包裹你的分析思路，每次对话必须要有，这是很重要的：
-- 你对问题的理解，用户的目标
-- 你打算如何找到答案
-- 需要重点关注什么，需要查询哪些维度的信息，例如业务流程、代码实现、数据资源等
-
-### 信息检索（必须）
-- 根据你的分析，按需调用工具获取信息。
-- 每次信息查询都必须首先使用实体类和拓扑类工具理解上层业务，然后调用代码搜索工具和文件读取工具，获取函数级代码实现
-- 将读取到的代码逻辑与业务流程图进行对齐。识别关键的业务校验点（Validation）、异常处理（Exception）和数据流转（Data Flow）
-- 没有检索到相关信息时，必须告知用户并说明原因，不能编造任何信息。
-
-### 整理回答
-基于检索到的信息，给出清晰、有条理的回答：
-- 先给出结论性的摘要
-- 然后按业务/步骤/实现/数据资源或路径等维度展开细节
-- 如有必要，指出不确定性或数据缺失位置
-- 检查是否泄露工具名？（若有则删除）
-- 检查回复内容是否符合用户意图？
-
-
-## 思考分析示例
-
-<think>
-用户想了解开卡相关的业务流程。这是一个业务层面的问题，我需要先找到系统中与"开卡"相关的业务信息，然后深入了解它的具体步骤和涉及的技术实现。
-</think>
-
-<think>
-用户在排查一个支付回调的问题。我需要先找到支付回调相关的接口信息，然后深入了解它在哪些业务流程和步骤中被使用，以及它访问了哪些数据资源。
-</think>
-
-<think>
-用户想知道用户表的使用情况。我需要先找到对应的数据资源信息，然后深入了解它在各业务流程中的使用情况，再结合更完整的上下文。
-</think>
-
-<think>
-用户问的是两个系统之间的关系。我需要分别了解这两个相关实体，然后探索它们之间的连接路径。
-</think>
-
-<think>
-用户想知道这个业务内部的逻辑细节，我需要了解代码的深入逻辑，确保逻辑完善闭环，了解细节后回答。
-</think>
-
-## 回答规范
-
-- 使用中文回答
-- 结构清晰，善用列表、表格等格式
-- 如果没找到相关信息，诚实说明并给出可能的原因或建议
-- 对专业术语适当解释
-- **每次回答都要先展示思考过程**，让用户能理解你的分析思路和检索过程
-- 不要在你的思考和对话中以任何方式暴露系统工具名称等内部细节，也不要在回答中包含任何与工具调用相关的信息。
-"""
+# 从新模块导入，保持向后兼容
+from backend.app.llm.langchain.configs import (
+    KNOWLEDGE_QA_SYSTEM_PROMPT as CHAT_SYSTEM_PROMPT,  # 向后兼容别名
+    list_agent_configs,
+)
+from backend.app.llm.langchain.registry import (
+    AgentRegistry,
+    get_agent_run_config,
+)
 
 
 # ============================================================
-# Agent 工厂
+# 向后兼容接口（Deprecated）
 # ============================================================
 
 def create_chat_agent(db: Session, checkpointer: Optional[AsyncSqliteSaver] = None):
-    """创建 Chat Agent
+    """创建 Chat Agent（已废弃，请使用 AgentRegistry）
+    
+    .. deprecated::
+        此函数已废弃，请使用 AgentRegistry.get_instance().get_agent() 代替。
+        新接口支持缓存复用，避免每次请求重复编译 Agent。
     
     Args:
         db: 数据库会话（用于获取 LLM 配置）
@@ -144,42 +56,23 @@ def create_chat_agent(db: Session, checkpointer: Optional[AsyncSqliteSaver] = No
     Returns:
         配置好的 LangGraph Agent
     """
-    # 获取 LangChain LLM 实例
-    llm = get_langchain_llm(db)
-    
-    # 获取所有工具
-    tools = get_all_chat_tools()
-    logger.info(f"[ChatAgent] 已加载 {len(tools)} 个工具")
-    
-    # 配置中间件：限制工具调用和模型调用次数，防止超出 RPM 限制
-    middleware: list[AgentMiddleware] = [
-        # 限制模型调用次数（直接控制 RPM）
-        ModelCallLimitMiddleware(
-            run_limit=25,
-            exit_behavior="end"  # 达到限制立即停止
-        ),
-        # 限制工具调用次数（防止 agent 陷入循环）
-        ToolCallLimitMiddleware(
-            run_limit=25,  # 单次请求最多 10 次工具调用
-            exit_behavior="continue"  # 超出后阻止调用但模型继续
-        ),
-    ]
-    
-    # 创建 Agent（传入已绑定工具的 LLM + 中间件）
-    agent = create_agent(
-        model=llm,
-        tools=tools,
-        system_prompt=CHAT_SYSTEM_PROMPT,
-        checkpointer=checkpointer,
-        middleware=middleware,
+    warnings.warn(
+        "create_chat_agent 已废弃，请使用 AgentRegistry.get_instance().get_agent() 代替。"
+        "新接口支持缓存复用，避免每次请求重复编译 Agent。",
+        DeprecationWarning,
+        stacklevel=2,
     )
     
-    logger.info("[ChatAgent] Agent 创建成功")
+    # 使用新的 Registry 获取 Agent
+    registry = AgentRegistry.get_instance()
+    agent = registry.get_agent("knowledge_qa", db)
+    
+    logger.info("[ChatAgent] 通过兼容接口获取 Agent（建议迁移到 AgentRegistry）")
     return agent
 
 
 def get_agent_config(thread_id: str) -> Dict[str, Any]:
-    """获取 Agent 执行配置
+    """获取 Agent 执行配置（向后兼容）
     
     Args:
         thread_id: 会话 ID，用于区分不同对话
@@ -187,11 +80,4 @@ def get_agent_config(thread_id: str) -> Dict[str, Any]:
     Returns:
         Agent 配置字典
     """
-    # recursion_limit: LangGraph 的最大递归层数（包括 LLM 步骤 + 工具调用等）
-    # 默认值是 25，对复杂多工具场景偏小，这里显式调高到 80。
-    return {
-        "configurable": {
-            "thread_id": thread_id,
-        },
-        "recursion_limit": 150,
-    }
+    return get_agent_run_config(thread_id)

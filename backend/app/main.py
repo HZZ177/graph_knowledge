@@ -17,13 +17,15 @@ from backend.app.api.v1 import (
 from backend.app.db.sqlite import Base, engine, SessionLocal
 from backend.app.db.init_db import init_db
 from backend.app.core.middleware import trace_id_middleware
+from backend.app.core.logger import logger
 from backend.app.models import ai_models, conversation  # noqa: F401  确保 ai_models, conversations 表被创建
 from backend.mcp.ace_code_engine import warmup_ace_mcp
+from backend.app.llm.langchain.registry import AgentRegistry
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """FastAPI lifespan handler: 初始化数据库并预热 AceMCP。"""
+    """FastAPI lifespan handler: 初始化数据库、预热 MCP 和 Agent。"""
 
     # startup
     Base.metadata.create_all(bind=engine)
@@ -31,6 +33,15 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     try:
         init_db(db)
+        
+        # 可选：预热关键 Agent（减少首次请求延迟）
+        # 如果 LLM 未配置，跳过预热，不阻断启动
+        try:
+            registry = AgentRegistry.get_instance()
+            registry.warmup("knowledge_qa", db)
+            logger.info("[Lifespan] Agent 预热完成")
+        except Exception as e:
+            logger.warning(f"[Lifespan] Agent 预热跳过（LLM 可能未配置）: {e}")
     finally:
         db.close()
 

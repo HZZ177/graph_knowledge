@@ -19,9 +19,9 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from datetime import datetime, timezone
 from backend.app.models.conversation import Conversation
-from backend.app.llm.langchain.agent import (
-    create_chat_agent,
-    get_agent_config,
+from backend.app.llm.langchain.registry import (
+    AgentRegistry,
+    get_agent_run_config,
 )
 from backend.app.services.chat.history_service import (
     get_raw_messages,
@@ -285,17 +285,20 @@ async def streaming_chat(
     question: str,
     websocket: WebSocket,
     thread_id: Optional[str] = None,
+    agent_type: str = "knowledge_qa",
 ) -> str:
     """基于 LangChain 的流式问答
     
     使用 LangChain Agent + 工具实现自然语言问答。
     支持多轮对话，通过 thread_id 管理会话历史。
+    支持多 Agent 类型，通过 agent_type 切换不同的 Agent。
     
     Args:
         db: 数据库会话
         question: 用户问题
         websocket: WebSocket 连接，用于流式输出
         thread_id: 会话 ID，用于多轮对话。如果为空则创建新会话。
+        agent_type: Agent 类型标识，默认为 "knowledge_qa"
         
     Returns:
         完整的回答文本
@@ -318,7 +321,7 @@ async def streaming_chat(
         logger.error(f"保存会话元数据失败: {e}")
         # 不阻断主流程
     
-    logger.info(f"[Chat] 开始处理问题: {question[:100]}..., request_id={request_id}, thread_id={thread_id}")
+    logger.info(f"[Chat] 开始处理问题: {question[:100]}..., request_id={request_id}, thread_id={thread_id}, agent_type={agent_type}")
     
     # 在 try 外初始化，便于 except 块访问
     full_response = ""
@@ -329,13 +332,17 @@ async def streaming_chat(
             "type": "start",
             "request_id": request_id,
             "thread_id": thread_id,
+            "agent_type": agent_type,
         }, ensure_ascii=False))
         
         # 打开 AsyncSqliteSaver 作为检查点存储
         async with AsyncSqliteSaver.from_conn_string("llm_checkpoints.db") as checkpointer:
-            # 创建 Agent
-            agent = create_chat_agent(db, checkpointer=checkpointer)
-            config = get_agent_config(thread_id)
+            # 从 AgentRegistry 获取 Agent（每次请求需重新绑定 checkpointer）
+            registry = AgentRegistry.get_instance()
+            agent = registry.get_agent(agent_type, db, checkpointer)
+            
+            # 获取运行时配置
+            config = get_agent_run_config(thread_id)
             
             # 构造输入
             inputs = {
@@ -569,6 +576,7 @@ async def streaming_regenerate(
     thread_id: str,
     user_msg_index: int,
     websocket: WebSocket,
+    agent_type: str = "knowledge_qa",
 ) -> str:
     """精准重新生成指定用户消息对应的 AI 回复
     
@@ -577,6 +585,7 @@ async def streaming_regenerate(
         thread_id: 会话 ID
         user_msg_index: 用户消息索引（第几个用户消息，从0开始）
         websocket: WebSocket 连接
+        agent_type: Agent 类型标识，默认为 "knowledge_qa"
         
     Returns:
         新生成的回答文本
@@ -616,9 +625,12 @@ async def streaming_regenerate(
         temp_thread_id = f"regen_{thread_id}_{uuid.uuid4().hex[:8]}"
         
         async with AsyncSqliteSaver.from_conn_string("llm_checkpoints.db") as checkpointer:
-            # 创建 Agent
-            agent = create_chat_agent(db, checkpointer=checkpointer)
-            temp_config = get_agent_config(temp_thread_id)
+            # 从 AgentRegistry 获取 Agent（每次请求需重新绑定 checkpointer）
+            registry = AgentRegistry.get_instance()
+            agent = registry.get_agent(agent_type, db, checkpointer)
+            
+            # 获取运行时配置
+            temp_config = get_agent_run_config(temp_thread_id)
             
             # 构造输入：截断到目标用户消息之前的历史 + 目标用户消息
             history_messages = list(raw_messages[:target_human_idx])  # 不包含目标用户消息

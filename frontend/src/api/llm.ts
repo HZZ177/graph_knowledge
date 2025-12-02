@@ -19,6 +19,15 @@ export interface ChatMessage {
 export interface ChatRequest {
   question: string
   thread_id?: string  // 会话 ID，为空则创建新会话
+  agent_type?: string  // Agent 类型，默认 "knowledge_qa"
+}
+
+/** Agent 类型信息 */
+export interface AgentType {
+  agent_type: string
+  name: string
+  description: string
+  tags: string[]
 }
 
 /** 工具调用信息 */
@@ -89,6 +98,7 @@ const HTTP_BASE_PATH = `${API_BASE_PATH}/llm`
 export interface RegenerateRequest {
   thread_id: string
   user_msg_index: number  // 第几个用户消息（从0开始）
+  agent_type?: string  // Agent 类型，默认 "knowledge_qa"
 }
 
 // ==================== Chat WebSocket 客户端 ====================
@@ -367,4 +377,13 @@ export async function truncateConversation(threadId: string, keepPairs: number):
   if (!resp.ok) {
     throw new Error(`截断对话失败: ${resp.status}`)
   }
+}
+
+/**
+ * 获取可用的 Agent 类型列表
+ */
+export async function fetchAgentTypes(): Promise<AgentType[]> {
+  const resp = await fetch(`${HTTP_BASE_PATH}/agents`)
+  if (!resp.ok) throw new Error('获取 Agent 列表失败')
+  return await resp.json()
 }

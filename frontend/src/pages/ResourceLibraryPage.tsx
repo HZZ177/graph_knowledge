@@ -100,6 +100,7 @@ const BusinessTab: React.FC = () => {
   const [items, setItems] = useState<BusinessNode[]>([])
   const [loading, setLoading] = useState(false)
   const [keyword, setKeyword] = useState('')
+  const [filterKeyword, setFilterKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
@@ -189,6 +190,17 @@ const BusinessTab: React.FC = () => {
 
   const handleGroupSelect = (key: string | null) => {
     setSelectedGroup(key)
+    setPage(1)
+  }
+
+  const handleSearch = () => {
+    setKeyword(filterKeyword)
+    setPage(1)
+  }
+
+  const handleReset = () => {
+    setFilterKeyword('')
+    setKeyword('')
     setPage(1)
   }
 
@@ -286,16 +298,19 @@ const BusinessTab: React.FC = () => {
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, padding: '0 16px', overflow: 'hidden' }}>
         <div className="toolbar-container" style={{ marginBottom: 4 }}>
-          <Input.Search
+          <Input
             allowClear
             placeholder="搜索业务..."
             prefix={<SearchOutlined style={{ color: '#9ca3af' }} />}
-            onSearch={(val) => { setKeyword(val); setPage(1) }}
-            style={{ width: 280 }}
+            value={filterKeyword}
+            onChange={(e) => setFilterKeyword(e.target.value)}
+            onPressEnter={handleSearch}
+            style={{ width: 240 }}
           />
           <Space>
-            <Button onClick={fetchList}>刷新</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleStartCreate}>新建</Button>
+            <Button type="primary" onClick={handleSearch}>查询</Button>
+            <Button onClick={handleReset}>重置</Button>
+            <Button icon={<PlusOutlined />} onClick={handleStartCreate}>新增</Button>
           </Space>
         </div>
 
@@ -406,6 +421,7 @@ const StepTab: React.FC = () => {
   const [items, setItems] = useState<StepNode[]>([])
   const [loading, setLoading] = useState(false)
   const [keyword, setKeyword] = useState('')
+  const [filterKeyword, setFilterKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
@@ -471,6 +487,8 @@ const StepTab: React.FC = () => {
   }, [groupStats])
 
   const handleGroupSelect = (key: string | null) => { setSelectedGroup(key); setPage(1) }
+  const handleSearch = () => { setKeyword(filterKeyword); setPage(1) }
+  const handleReset = () => { setFilterKeyword(''); setKeyword(''); setPage(1) }
   const handleStartCreate = () => { setMode('create'); setSelectedId(null); form.resetFields() }
   const handleEditClick = () => { if (selectedItem) setMode('edit') }
 
@@ -532,10 +550,19 @@ const StepTab: React.FC = () => {
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, padding: '0 16px', overflow: 'hidden' }}>
         <div className="toolbar-container" style={{ marginBottom: 4 }}>
-          <Input.Search allowClear placeholder="搜索步骤..." prefix={<SearchOutlined style={{ color: '#9ca3af' }} />} onSearch={(val) => { setKeyword(val); setPage(1) }} style={{ width: 280 }} />
+          <Input
+            allowClear
+            placeholder="搜索步骤..."
+            prefix={<SearchOutlined style={{ color: '#9ca3af' }} />}
+            value={filterKeyword}
+            onChange={(e) => setFilterKeyword(e.target.value)}
+            onPressEnter={handleSearch}
+            style={{ width: 240 }}
+          />
           <Space>
-            <Button onClick={fetchList}>刷新</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleStartCreate}>新建</Button>
+            <Button type="primary" onClick={handleSearch}>查询</Button>
+            <Button onClick={handleReset}>重置</Button>
+            <Button icon={<PlusOutlined />} onClick={handleStartCreate}>新增</Button>
           </Space>
         </div>
 
@@ -629,6 +656,7 @@ const ImplementationTab: React.FC = () => {
   const [items, setItems] = useState<ImplementationNode[]>([])
   const [loading, setLoading] = useState(false)
   const [keyword, setKeyword] = useState('')
+  const [filterKeyword, setFilterKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
@@ -701,7 +729,7 @@ const ImplementationTab: React.FC = () => {
 
   const sidebarGroups = useMemo<SidebarGroup[]>(() => {
     if (!groupStats) return []
-    return buildTwoLevelGroups(groupStats.by_system, groupStats.by_type, { '': '其他' }, IMPL_TYPE_LABELS)
+    return buildTwoLevelGroups(groupStats.by_system, groupStats.by_type, { '': '其他' }, IMPL_TYPE_LABELS, groupStats.by_system_type)
   }, [groupStats])
 
   const handleGroupSelect = (key: string | null) => {
@@ -723,6 +751,17 @@ const ImplementationTab: React.FC = () => {
     if (selectedSystem === null && selectedType === null) return null
     if (selectedType !== null) return `${selectedSystem}::${selectedType}`
     return selectedSystem
+  }
+
+  const handleSearch = () => {
+    setKeyword(filterKeyword)
+    setPage(1)
+  }
+
+  const handleReset = () => {
+    setFilterKeyword('')
+    setKeyword('')
+    setPage(1)
   }
 
   const handleStartCreate = () => { setMode('create'); setSelectedId(null); form.resetFields() }
@@ -794,10 +833,19 @@ const ImplementationTab: React.FC = () => {
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, padding: '0 16px', overflow: 'hidden' }}>
         <div className="toolbar-container" style={{ marginBottom: 4 }}>
-          <Input.Search allowClear placeholder="搜索实现..." prefix={<SearchOutlined style={{ color: '#9ca3af' }} />} onSearch={(val) => { setKeyword(val); setPage(1) }} style={{ width: 280 }} />
+          <Input
+            allowClear
+            placeholder="搜索实现..."
+            prefix={<SearchOutlined style={{ color: '#9ca3af' }} />}
+            value={filterKeyword}
+            onChange={(e) => setFilterKeyword(e.target.value)}
+            onPressEnter={handleSearch}
+            style={{ width: 240 }}
+          />
           <Space>
-            <Button onClick={fetchList}>刷新</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleStartCreate}>新建</Button>
+            <Button type="primary" onClick={handleSearch}>查询</Button>
+            <Button onClick={handleReset}>重置</Button>
+            <Button icon={<PlusOutlined />} onClick={handleStartCreate}>新增</Button>
           </Space>
         </div>
 
@@ -903,6 +951,7 @@ const DataResourceTab: React.FC = () => {
   const [items, setItems] = useState<DataResource[]>([])
   const [loading, setLoading] = useState(false)
   const [keyword, setKeyword] = useState('')
+  const [filterKeyword, setFilterKeyword] = useState('')
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(20)
   const [total, setTotal] = useState(0)
@@ -975,7 +1024,7 @@ const DataResourceTab: React.FC = () => {
 
   const sidebarGroups = useMemo<SidebarGroup[]>(() => {
     if (!groupStats) return []
-    return buildTwoLevelGroups(groupStats.by_system, groupStats.by_type, { '': '其他' }, DATA_TYPE_LABELS)
+    return buildTwoLevelGroups(groupStats.by_system, groupStats.by_type, { '': '其他' }, DATA_TYPE_LABELS, groupStats.by_system_type)
   }, [groupStats])
 
   const handleGroupSelect = (key: string | null) => {
@@ -997,6 +1046,17 @@ const DataResourceTab: React.FC = () => {
     if (selectedSystem === null && selectedType === null) return null
     if (selectedType !== null) return `${selectedSystem}::${selectedType}`
     return selectedSystem
+  }
+
+  const handleSearch = () => {
+    setKeyword(filterKeyword)
+    setPage(1)
+  }
+
+  const handleReset = () => {
+    setFilterKeyword('')
+    setKeyword('')
+    setPage(1)
   }
 
   const handleStartCreate = () => { setMode('create'); setSelectedId(null); form.resetFields() }
@@ -1068,10 +1128,19 @@ const DataResourceTab: React.FC = () => {
 
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 8, padding: '0 16px', overflow: 'hidden' }}>
         <div className="toolbar-container" style={{ marginBottom: 4 }}>
-          <Input.Search allowClear placeholder="搜索数据资源..." prefix={<SearchOutlined style={{ color: '#9ca3af' }} />} onSearch={(val) => { setKeyword(val); setPage(1) }} style={{ width: 280 }} />
+          <Input
+            allowClear
+            placeholder="搜索数据资源..."
+            prefix={<SearchOutlined style={{ color: '#9ca3af' }} />}
+            value={filterKeyword}
+            onChange={(e) => setFilterKeyword(e.target.value)}
+            onPressEnter={handleSearch}
+            style={{ width: 240 }}
+          />
           <Space>
-            <Button onClick={fetchList}>刷新</Button>
-            <Button type="primary" icon={<PlusOutlined />} onClick={handleStartCreate}>新建</Button>
+            <Button type="primary" onClick={handleSearch}>查询</Button>
+            <Button onClick={handleReset}>重置</Button>
+            <Button icon={<PlusOutlined />} onClick={handleStartCreate}>新增</Button>
           </Space>
         </div>
 

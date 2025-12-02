@@ -864,6 +864,7 @@
 
 .action-buttons {
   display: flex;
+  align-items: center;
   gap: 8px;
   padding-bottom: 4px;
   padding-right: 4px;
@@ -1158,5 +1159,138 @@
 .batch-tool-summary .summary-label {
   color: #80868b;
   margin-right: 4px;
+}
+
+
+/* ==========================================
+   Agent 下拉选择器样式 (Grok 风格)
+   ========================================== */
+
+/* 选择器容器 - 对话区域左上角 */
+.agent-selector-header {
+  position: absolute;
+  top: 16px;
+  left: 24px;
+  z-index: 100;
+}
+
+.agent-dropdown-wrapper {
+  position: relative;
+}
+
+.agent-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  background: var(--bg-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.agent-dropdown-trigger:hover {
+  border-color: var(--text-tertiary);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.agent-trigger-name {
+  font-weight: 500;
+}
+
+.agent-trigger-arrow {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  transition: transform 0.2s ease;
+}
+
+.agent-trigger-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* 下拉菜单 */
+.agent-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 320px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  z-index: 1000;
+  overflow: hidden;
+  /* 动画 */
+  animation: dropdownSlideDown 0.2s ease-out;
+  transform-origin: top left;
+}
+
+@keyframes dropdownSlideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.agent-dropdown-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.agent-dropdown-item:last-child {
+  border-bottom: none;
+}
+
+.agent-dropdown-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.agent-dropdown-item.selected {
+  background: rgba(0, 0, 0, 0.05);
+}
+
+.agent-item-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.agent-item-name {
+  display: block;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 4px;
+}
+
+.agent-item-desc {
+  display: block;
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.agent-dropdown-item.selected .agent-item-name {
+  color: var(--accent-color);
+}
+
+.agent-item-check {
+  font-size: 18px;
+  color: var(--accent-color);
+  margin-top: 2px;
+  flex-shrink: 0;
 }
 

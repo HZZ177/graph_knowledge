@@ -15,6 +15,7 @@ from backend.app.llm.adapters.crewai_gateway import CustomGatewayLLM
 from backend.app.llm.config import get_provider_base_url
 from backend.app.core.utils import success_response, error_response
 from backend.app.core.logger import logger
+from backend.app.llm.langchain.registry import AgentRegistry
 
 
 router = APIRouter(prefix="/llm-models", tags=["llm-models"])
@@ -70,10 +71,18 @@ async def activate_llm_model(
     payload: ActivateAIModelRequest = Body(...),
     db: Session = Depends(get_db),
 ) -> dict:
-    """激活主力模型（用于主对话流程）"""
+    """激活主力模型（用于主对话流程）
+    
+    激活后会自动清除 Agent 缓存，下次请求将使用新的 LLM 配置重建 Agent。
+    """
     obj = AIModelService.set_active_model(db, payload.id)
     if not obj:
         return error_response(message="Not found")
+    
+    # 清除 Agent 缓存，下次请求将使用新配置重建
+    AgentRegistry.get_instance().invalidate()
+    logger.info(f"[激活主力模型] 已清除 Agent 缓存，model_id={payload.id}")
+    
     return success_response(message="激活主力模型成功")
 
 

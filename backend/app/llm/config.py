@@ -96,7 +96,7 @@ class CodeWorkspaceConfig(BaseModel):
         """从固定配置的字符串路径加载项目根目录。"""
         # 注意：这里的路径需要根据实际外部代码库位置进行配置
         # 当前默认与 AceCodeEngineMcp._default_project_root 保持一致
-        fixed_root = os.path.abspath(r"C:\Users\86364\PycharmProjects")
+        fixed_root = os.path.abspath(r"C:\Users\86364\PycharmProjects\vehicle-owner-server")
         return cls(project_root=fixed_root)
 
     @classmethod

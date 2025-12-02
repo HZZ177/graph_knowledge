@@ -24,7 +24,7 @@ import {
   ReloadOutlined,
   RollbackOutlined,
 } from '@ant-design/icons'
-import { createChatClient, ChatClient, ToolCallInfo, fetchConversationHistory, generateConversationTitle, listConversations, deleteConversation, truncateConversation, createRegenerateClient, RegenerateClient, ChatMessage, BatchInfo } from '../api/llm'
+import { createChatClient, ChatClient, ToolCallInfo, fetchConversationHistory, generateConversationTitle, listConversations, deleteConversation, truncateConversation, createRegenerateClient, RegenerateClient, ChatMessage, BatchInfo, AgentType, fetchAgentTypes } from '../api/llm'
 import { useTypewriter } from '../hooks/useTypewriter'
 import '../styles/ChatPage.css'
 import { showConfirm } from '../utils/confirm'
@@ -1039,6 +1039,11 @@ const ChatPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'chat' | 'voice' | 'imagine' | 'projects'>('chat')
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   
+  // Agent 类型状态
+  const [agentTypes, setAgentTypes] = useState<AgentType[]>([])
+  const [currentAgentType, setCurrentAgentType] = useState<string>('knowledge_qa')
+  const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false)
+  
   // 实时状态
   const [currentTool, setCurrentTool] = useState<string | null>(null)
   const fullContentRef = useRef('') 
@@ -1130,6 +1135,37 @@ const ChatPage: React.FC = () => {
     }
     loadConversations()
   }, [])
+  
+  // 加载 Agent 类型列表
+  useEffect(() => {
+    const loadAgentTypes = async () => {
+      try {
+        const types = await fetchAgentTypes()
+        setAgentTypes(types)
+        // 如果有可用类型且当前未设置，使用第一个作为默认
+        if (types.length > 0 && !types.find(t => t.agent_type === currentAgentType)) {
+          setCurrentAgentType(types[0].agent_type)
+        }
+      } catch (e) {
+        console.error('加载 Agent 类型失败', e)
+      }
+    }
+    loadAgentTypes()
+  }, [])
+  
+  // 点击外部关闭 Agent 下拉菜单
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest('.agent-dropdown-wrapper')) {
+        setIsAgentDropdownOpen(false)
+      }
+    }
+    if (isAgentDropdownOpen) {
+      document.addEventListener('click', handleClickOutside)
+      return () => document.removeEventListener('click', handleClickOutside)
+    }
+  }, [isAgentDropdownOpen])
 
   const upsertConversation = useCallback((tid: string, title: string, updatedAt: string) => {
     if (!tid) return
@@ -1254,7 +1290,7 @@ const ChatPage: React.FC = () => {
     chatClientRef.current = client
 
     client.start(
-      { question, thread_id: threadId || undefined },
+      { question, thread_id: threadId || undefined, agent_type: currentAgentType },
       {
         onStart: (_rid, newThreadId) => {
           setThreadId(newThreadId)
@@ -1456,7 +1492,7 @@ const ChatPage: React.FC = () => {
         }
       }
     )
-  }, [inputValue, isLoading, threadId, appendToTypewriter, finishTypewriter, resetTypewriter])
+  }, [inputValue, isLoading, threadId, currentAgentType, upsertConversation, appendToTypewriter, finishTypewriter, resetTypewriter, scrollToBottom])
 
   const handleStop = () => {
     if (chatClientRef.current) {
@@ -1811,6 +1847,47 @@ const ChatPage: React.FC = () => {
       </div>
 
       <div className="chat-main">
+        {/* Agent 选择器 - 对话区域左上角 */}
+        {agentTypes.length > 0 && (
+          <div className="agent-selector-header">
+            <div className="agent-dropdown-wrapper">
+              <button 
+                className="agent-dropdown-trigger"
+                onClick={() => setIsAgentDropdownOpen(!isAgentDropdownOpen)}
+              >
+                <span className="agent-trigger-name">
+                  {agentTypes.find(a => a.agent_type === currentAgentType)?.name || 'Agent'}
+                </span>
+                <DownOutlined className={`agent-trigger-arrow ${isAgentDropdownOpen ? 'open' : ''}`} />
+              </button>
+              
+              {isAgentDropdownOpen && (
+                <div className="agent-dropdown-menu">
+                  {agentTypes.map(agent => {
+                    const isSelected = currentAgentType === agent.agent_type
+                    return (
+                      <div
+                        key={agent.agent_type}
+                        className={`agent-dropdown-item ${isSelected ? 'selected' : ''}`}
+                        onClick={() => {
+                          setCurrentAgentType(agent.agent_type)
+                          setIsAgentDropdownOpen(false)
+                        }}
+                      >
+                        <div className="agent-item-content">
+                          <span className="agent-item-name">{agent.name}</span>
+                          <span className="agent-item-desc">{agent.description}</span>
+                        </div>
+                        {isSelected && <CheckCircleOutlined className="agent-item-check" />}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
         <div className="chat-message-list" ref={messageListRef} onScroll={handleScroll}>
           <div className="chat-content-width">
             {messages.length === 0 ? (
@@ -1861,7 +1938,7 @@ const ChatPage: React.FC = () => {
             <textarea
               ref={inputRef}
               className="chat-textarea"
-              placeholder="输入你的问题..."
+              placeholder={agentTypes.find(a => a.agent_type === currentAgentType)?.description || "输入你的问题..."}
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               onKeyDown={e => {

@@ -315,6 +315,7 @@ def read_file(path: str, max_bytes: int = 200_000) -> str:
     """读取指定文件的文本内容（可能被截断）。"""
     try:
         root = os.path.abspath(CodeWorkspaceConfig.get_project_root())
+        logger.info(f"[read_file] 尝试读取文件: {path}，当前代码库根目录: {root}")
 
         # 规范化传入路径/文件名
         raw_path = path.strip()

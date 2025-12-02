@@ -2111,7 +2111,7 @@ const BusinessLibraryPage: React.FC = () => {
                                     }}
                                     ellipsis={
                                       item.description
-                                        ? { rows: 2, tooltip: item.description }
+                                        ? { rows: 2 }
                                         : false
                                     }
                                   >

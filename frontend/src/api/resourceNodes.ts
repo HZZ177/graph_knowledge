@@ -23,9 +23,16 @@ export interface StepGroupStats {
   total: number
 }
 
+export interface SystemTypeCount {
+  system: string | null
+  type: string | null
+  count: number
+}
+
 export interface ImplementationGroupStats {
   by_system: GroupCount[]
   by_type: GroupCount[]
+  by_system_type: SystemTypeCount[]
   total: number
 }
 

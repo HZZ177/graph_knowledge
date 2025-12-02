@@ -256,9 +256,25 @@ def get_data_resource_group_stats(db: Session) -> dict:
             "count": count,
         })
 
+    # 按 system + type 联合分组（用于二级节点正确显示数量）
+    system_type_rows = (
+        db.query(DataResource.system, DataResource.type, func.count(DataResource.resource_id))
+        .group_by(DataResource.system, DataResource.type)
+        .all()
+    )
+
+    by_system_type = []
+    for system, type_, count in system_type_rows:
+        by_system_type.append({
+            "system": system if system else None,
+            "type": type_ if type_ else None,
+            "count": count,
+        })
+
     return {
         "by_system": by_system,
         "by_type": by_type,
+        "by_system_type": by_system_type,
         "total": total,
     }
 
@@ -768,9 +784,25 @@ def get_implementation_group_stats(db: Session) -> dict:
             "count": count,
         })
 
+    # 按 system + type 联合分组（用于二级节点正确显示数量）
+    system_type_rows = (
+        db.query(Implementation.system, Implementation.type, func.count(Implementation.impl_id))
+        .group_by(Implementation.system, Implementation.type)
+        .all()
+    )
+
+    by_system_type = []
+    for system, type_, count in system_type_rows:
+        by_system_type.append({
+            "system": system if system else None,
+            "type": type_ if type_ else None,
+            "count": count,
+        })
+
     return {
         "by_system": by_system,
         "by_type": by_type,
+        "by_system_type": by_system_type,
         "total": total,
     }
 

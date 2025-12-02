@@ -14,6 +14,12 @@ interface GroupCount {
   count: number
 }
 
+interface SystemTypeCount {
+  system: string | null
+  type: string | null
+  count: number
+}
+
 export interface SidebarGroup {
   key: string
   label: string
@@ -56,18 +62,33 @@ export function buildTwoLevelGroups(
   byType: GroupCount[],
   systemLabelMap?: Record<string, string>,
   typeLabelMap?: Record<string, string>,
+  bySystemType?: SystemTypeCount[],
 ): SidebarGroup[] {
+  // 构建 system+type -> count 的映射表
+  const systemTypeCountMap = new Map<string, number>()
+  if (bySystemType) {
+    for (const item of bySystemType) {
+      const key = `${item.system ?? ''}::${item.type ?? ''}`
+      systemTypeCountMap.set(key, item.count)
+    }
+  }
+
   // 系统作为一级分组
   return bySystem.map((sys) => ({
     key: sys.value ?? '',
     label: systemLabelMap?.[sys.value ?? ''] ?? sys.value ?? '其他',
     count: sys.count,
-    // 类型作为二级分组（目前按全局类型显示，后续可改为按系统内类型统计）
-    children: byType.map((t) => ({
-      key: `${sys.value ?? ''}::${t.value ?? ''}`,
-      label: typeLabelMap?.[t.value ?? ''] ?? t.value ?? '其他',
-      count: t.count,
-    })),
+    // 类型作为二级分组，使用联合统计数据获取正确的数量
+    children: byType.map((t) => {
+      const mapKey = `${sys.value ?? ''}::${t.value ?? ''}`
+      // 如果有联合统计数据，使用它；否则回退到 0
+      const count = systemTypeCountMap.get(mapKey) ?? 0
+      return {
+        key: mapKey,
+        label: typeLabelMap?.[t.value ?? ''] ?? t.value ?? '其他',
+        count,
+      }
+    }).filter((child) => child.count > 0), // 只显示有数据的类型
   }))
 }
 

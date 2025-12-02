@@ -10,7 +10,8 @@ from fastapi import APIRouter, Body, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from backend.app.db.sqlite import get_db, SessionLocal
-from backend.app.schemas.llm import StreamChatRequest, ConversationHistoryResponse, ConversationOut
+from backend.app.schemas.llm import StreamChatRequest, ConversationHistoryResponse, ConversationOut, AgentTypeOut
+from backend.app.llm.langchain.configs import list_agent_configs
 from backend.app.models.conversation import Conversation
 from backend.app.services.chat.chat_service import (
     streaming_chat,
@@ -70,12 +71,13 @@ async def websocket_chat(websocket: WebSocket):
             }, ensure_ascii=False))
             return
         
-        # 调用流式问答服务（支持多轮对话）
+        # 调用流式问答服务（支持多轮对话 + 多 Agent 类型）
         await streaming_chat(
             db=db,
             question=request.question,
             websocket=websocket,
             thread_id=request.thread_id,
+            agent_type=request.agent_type,
         )
         
     except WebSocketDisconnect:
@@ -96,6 +98,16 @@ async def websocket_chat(websocket: WebSocket):
             await websocket.close()
         except:
             pass
+
+
+@router.get("/agents", response_model=List[AgentTypeOut])
+async def get_agent_types():
+    """获取可用的 Agent 类型列表
+    
+    返回所有已注册的 Agent 类型，包括名称、描述、图标等信息。
+    前端可用于展示 Agent 选择器。
+    """
+    return list_agent_configs()
 
 
 @router.get("/conversations", response_model=List[ConversationOut])
@@ -174,6 +186,7 @@ async def websocket_regenerate(websocket: WebSocket):
         request = json.loads(data)
         thread_id = request.get("thread_id")
         user_msg_index = request.get("user_msg_index", 0)
+        agent_type = request.get("agent_type", "knowledge_qa")
         
         if not thread_id:
             await websocket.send_text(json.dumps({
@@ -187,6 +200,7 @@ async def websocket_regenerate(websocket: WebSocket):
             thread_id=thread_id,
             user_msg_index=user_msg_index,
             websocket=websocket,
+            agent_type=agent_type,
         )
         
     except WebSocketDisconnect:

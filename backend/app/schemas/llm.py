@@ -27,6 +27,15 @@ class StreamChatRequest(BaseModel):
     """流式问答 WebSocket 请求"""
     question: str
     thread_id: Optional[str] = None  # 会话 ID，为空则创建新会话
+    agent_type: str = "knowledge_qa"  # Agent 类型，默认为知识问答
+
+
+class AgentTypeOut(BaseModel):
+    """Agent 类型信息（用于前端展示）"""
+    agent_type: str
+    name: str
+    description: str
+    tags: List[str]
 
 
 class ChatResponse(BaseModel):
