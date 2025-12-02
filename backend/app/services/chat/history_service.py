@@ -386,10 +386,10 @@ async def save_error_to_history(
             ai_msg = AIMessage(content=error_content)
             
             if checkpoint_tuple and checkpoint_tuple.checkpoint:
-                # 已有 checkpoint，追加消息
+                # 已有 checkpoint，只追加 AI 错误响应（用户消息已由 Agent 保存）
                 checkpoint = checkpoint_tuple.checkpoint
                 messages = checkpoint.get("channel_values", {}).get("messages", [])
-                messages.append(user_msg)
+                # 不再追加 user_msg，因为 Agent 执行时已经保存了用户消息
                 messages.append(ai_msg)
                 checkpoint["channel_values"]["messages"] = messages
                 
