@@ -654,7 +654,7 @@ const InputStep: React.FC<InputStepProps> = ({ form, error, onGenerate }) => {
             <Form.Item
               label={
                 <span style={{ fontSize: 13, fontWeight: 500, color: '#1d1d1f' }}>
-                  结构化日志
+                  服务器日志
                 </span>
               }
               name="structured_logs"

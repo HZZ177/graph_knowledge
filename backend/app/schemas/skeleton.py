@@ -15,8 +15,8 @@ class SkeletonGenerateRequest(BaseModel):
     business_description: str = Field(..., description="详细的业务流程描述")
     channel: Optional[str] = Field(None, description="渠道，如 'C端'、'B端'")
 
-    # 可选：结构化日志
-    structured_logs: Optional[str] = Field(None, description="结构化日志内容")
+    # 可选：服务器日志
+    structured_logs: Optional[str] = Field(None, description="服务器日志内容")
 
     # 可选：抓包接口数据
     api_captures: Optional[str] = Field(None, description="抓包的HTTP接口信息，curl格式或JSON")

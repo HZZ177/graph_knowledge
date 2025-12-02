@@ -1938,7 +1938,7 @@ const ChatPage: React.FC = () => {
             <textarea
               ref={inputRef}
               className="chat-textarea"
-              placeholder={agentTypes.find(a => a.agent_type === currentAgentType)?.description || "输入你的问题..."}
+              placeholder="输入问题，开始探索"
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               onKeyDown={e => {

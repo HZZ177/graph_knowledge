@@ -1243,7 +1243,7 @@
 
 .agent-dropdown-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
   padding: 14px 16px;
   cursor: pointer;
@@ -1290,7 +1290,6 @@
 .agent-item-check {
   font-size: 18px;
   color: var(--accent-color);
-  margin-top: 2px;
   flex-shrink: 0;
 }
 

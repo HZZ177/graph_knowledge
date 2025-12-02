@@ -32,7 +32,7 @@ DATA_ANALYSIS_PROMPT = """
 【业务描述】
 {business_description}
 
-【结构化日志】
+【服务器日志】
 {structured_logs}
 
 【抓包接口】
@@ -176,7 +176,7 @@ Final Answer:
 【原始技术数据 - 抓包接口】
 {api_captures}
 
-【原始技术数据 - 结构化日志】
+【原始技术数据 - 服务器日志】
 {structured_logs}
 
 ==========【核心原则：严格区分"可推断"与"必须有据"】==========

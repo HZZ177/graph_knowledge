@@ -104,7 +104,7 @@ graph_knowledge/
 | 图数据库   | Neo4j 6.x             | 知识图谱存储与查询           |
 | LLM 框架 | LangChain + LangGraph | Agent 编排 & 多轮对话     |
 | LLM 调用 | LiteLLM               | 多模型统一接口             |
-| 日志     | Loguru                | 结构化日志               |
+| 日志     | Loguru                | 服务器日志               |
 
 ### 前端
 

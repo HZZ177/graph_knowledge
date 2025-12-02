@@ -566,9 +566,8 @@ async def streaming_chat(
             "request_id": request_id,
             "thread_id": thread_id,
             "error": str(e),
-            "traceback": error_traceback,
         }, ensure_ascii=False))
-        raise
+        # 不再 raise，避免 WebSocket 异常关闭导致前端重复触发 onError
 
 
 async def streaming_regenerate(
@@ -827,4 +826,4 @@ async def streaming_regenerate(
             "thread_id": thread_id,
             "error": str(e),
         }, ensure_ascii=False))
-        raise
+        # 不再 raise，避免 WebSocket 异常关闭导致前端重复触发 onError

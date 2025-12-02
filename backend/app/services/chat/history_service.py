@@ -295,6 +295,36 @@ async def replace_assistant_response(thread_id: str, user_msg_index: int, new_me
         return False
 
 
+def _extract_ai_summary(content: str, max_length: int = 300) -> str:
+    """从 AI 回复中提取纯正文摘要（去除 think 块和工具占位符）
+    
+    Args:
+        content: AI 回复原始内容
+        max_length: 最大字符数
+        
+    Returns:
+        提取的正文摘要
+    """
+    import re
+    
+    if not content:
+        return ""
+    
+    # 移除 <think>...</think> 块
+    text = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
+    # 移除未闭合的 <think> 块（流式输出中断的情况）
+    text = re.sub(r'<think>.*', '', text, flags=re.DOTALL)
+    # 移除工具占位符 <!--TOOL:xxx:n-->
+    text = re.sub(r'<!--TOOL:[^>]+-->', '', text)
+    # 清理多余空白
+    text = re.sub(r'\n{3,}', '\n\n', text).strip()
+    
+    if len(text) > max_length:
+        text = text[:max_length] + "..."
+    
+    return text
+
+
 async def generate_conversation_title(db: Session, thread_id: str) -> str:
     """根据会话历史生成标题
     
@@ -318,15 +348,28 @@ async def generate_conversation_title(db: Session, thread_id: str) -> str:
             
         question = first_user_msg["content"]
         
-        # 3. 调用轻量 LLM 生成标题
+        # 3. 提取 AI 回复的正文摘要（去除 think/tool，最多 300 字）
+        first_ai_msg = next((m for m in history if m["role"] == "assistant"), None)
+        ai_summary = _extract_ai_summary(first_ai_msg["content"], 300) if first_ai_msg else ""
+        
+        # 4. 调用轻量 LLM 生成标题
         llm = get_lite_task_llm(db)
-        prompt = f"""
-请根据以下用户问题，生成一个简短的会话标题（5个字以上，不超过15个字）。
+        
+        if ai_summary:
+            prompt = f"""请根据以下对话内容，生成一个简短的会话标题（5个字以上，不超过15个字）。
 只返回标题内容，不要包含引号或其他说明。
 
 用户问题：{question}
-标题：
-"""
+
+AI回复摘要：{ai_summary}
+
+标题："""
+        else:
+            prompt = f"""请根据以下用户问题，生成一个简短的会话标题（5个字以上，不超过15个字）。
+只返回标题内容，不要包含引号或其他说明。
+
+用户问题：{question}
+标题："""
         
         response = await llm.ainvoke(prompt)
         title = response.content.strip().replace('"', '').replace('《', '').replace('》', '')
