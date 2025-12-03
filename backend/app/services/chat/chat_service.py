@@ -31,65 +31,6 @@ from backend.app.services.chat.history_service import (
 from backend.app.core.logger import logger
 
 
-# 所有工具名列表，用于分离拼接的工具名
-TOOL_NAMES = [
-    "search_code_context",
-    "list_directory",
-    "read_file_range",  # 必须在 read_file 之前，因为是更长的前缀
-    "read_file",
-    "search_businesses",
-    "search_implementations",
-    "search_data_resources",
-    "search_steps",
-    "get_business_context",
-    "get_implementation_context",
-    "get_implementation_business_usages",
-    "get_resource_context",
-    "get_resource_business_usages",
-    "get_neighbors",
-    "get_path_between_entities",
-]
-
-
-def _split_concatenated_tool_name(name: str) -> List[str]:
-    """分离被拼接的工具名称
-    
-    例如 'search_stepssearch_implementations' -> ['search_steps', 'search_implementations']
-    """
-    if not name:
-        return []
-    
-    # 先检查是否是有效的单个工具名
-    if name in TOOL_NAMES:
-        return [name]
-    
-    # 尝试分离拼接的工具名
-    result = []
-    remaining = name
-    
-    while remaining:
-        found = False
-        # 按工具名长度从长到短尝试匹配
-        for tool_name in sorted(TOOL_NAMES, key=len, reverse=True):
-            if remaining.startswith(tool_name):
-                result.append(tool_name)
-                remaining = remaining[len(tool_name):]
-                found = True
-                break
-        
-        if not found:
-            # 无法继续分离，可能有未知工具名
-            if remaining:
-                logger.warning(f"[Chat] 无法分离工具名片段: {remaining}")
-                result.append(remaining)
-            break
-    
-    if len(result) > 1:
-        logger.info(f"[Chat] 成功分离拼接的工具名: {name} -> {result}")
-    
-    return result
-
-
 def _generate_tool_summaries(tool_name: str, tool_input: dict, tool_output: str) -> tuple[str, str]:
     """根据工具名称生成输入摘要和输出摘要
     
@@ -108,7 +49,7 @@ def _generate_tool_summaries(tool_name: str, tool_input: dict, tool_output: str)
     
     # ========== 搜索类工具 ==========
     if tool_name in ("search_businesses", "search_steps", "search_implementations", 
-                     "search_data_resources", "search_code_context"):
+                     "search_data_resources"):
         # 输入摘要
         query = tool_input.get("query", "")
         if query:
@@ -128,6 +69,32 @@ def _generate_tool_summaries(tool_name: str, tool_input: dict, tool_output: str)
                 output_summary = f"找到 {count} 个相关代码片段" if count > 0 else "未找到相关代码"
             elif "error" in output_data:
                 output_summary = f"查询失败"
+    
+    # ========== 代码上下文搜索 ==========
+    elif tool_name == "search_code_context":
+        # 输入摘要：显示代码库名称和查询
+        workspace = tool_input.get("workspace", "")
+        query = tool_input.get("query", "")
+        parts = []
+        if workspace:
+            parts.append(f"代码库: {workspace}")
+        if query:
+            # 查询可能较长，截断显示
+            display_query = query[:40] + "..." if len(query) > 40 else query
+            parts.append(f"查询: {display_query}")
+        input_summary = " | ".join(parts) if parts else ""
+        
+        # 输出摘要
+        if output_data:
+            if "content" in output_data and isinstance(output_data["content"], list):
+                count = len(output_data["content"])
+                output_summary = f"找到 {count} 个相关代码片段" if count > 0 else "未找到相关代码"
+            elif "error" in output_data:
+                output_summary = "查询失败"
+            elif "text" in output_data:
+                output_summary = "找到相关代码"
+            else:
+                output_summary = "执行完成"
         
     # ========== 文件读取类工具 ==========
     elif tool_name == "read_file":
@@ -260,6 +227,29 @@ def _generate_tool_summaries(tool_name: str, tool_input: dict, tool_output: str)
                 output_summary = f"找到路径 ({path_len} 跳)"
             elif "error" in output_data or output_data.get("path") is None:
                 output_summary = "未找到路径"
+    
+    # ========== 代码精确搜索 ==========
+    elif tool_name == "grep_code":
+        pattern = tool_input.get("pattern", "")
+        workspace = tool_input.get("workspace", "")
+        file_pattern = tool_input.get("file_pattern", "")
+        
+        parts = []
+        if workspace:
+            parts.append(f"代码库: {workspace}")
+        if pattern:
+            display_pattern = pattern[:30] + "..." if len(pattern) > 30 else pattern
+            parts.append(f"搜索: {display_pattern}")
+        if file_pattern:
+            parts.append(f"文件: {file_pattern}")
+        input_summary = " | ".join(parts) if parts else ""
+        
+        if output_data:
+            if "matches" in output_data:
+                count = len(output_data["matches"])
+                output_summary = f"找到 {count} 处匹配" if count > 0 else "未找到匹配"
+            elif "error" in output_data:
+                output_summary = "搜索失败"
     
     # 默认处理
     if not input_summary and tool_input:

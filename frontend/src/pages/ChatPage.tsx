@@ -33,6 +33,16 @@ import { showConfirm } from '../utils/confirm'
 // Interfaces
 // ==========================================
 
+// 工具摘要信息（包含批次信息）
+interface ToolSummaryInfo {
+  input: string
+  output: string
+  elapsed?: number    // 耗时（秒）
+  batchId?: number    // 批次 ID
+  batchSize?: number  // 批次大小
+  batchIndex?: number // 批次内索引
+}
+
 interface DisplayMessage {
   id: string
   role: 'user' | 'assistant'
@@ -40,6 +50,7 @@ interface DisplayMessage {
   toolCalls?: ToolCallInfo[]
   isThinking?: boolean // 是否正在思考（等待工具返回）
   currentToolName?: string // 当前正在调用的工具名称
+  toolSummaries?: Map<string, ToolSummaryInfo> // 该消息关联的工具摘要，key 为 "toolName:toolId"
 }
 
 // 后端返回的原始消息格式
@@ -88,10 +99,10 @@ const MemoizedMarkdown = React.memo<MemoizedMarkdownProps>(({ source, fontSize =
 // 1. 欢迎屏幕
 const WelcomeScreen: React.FC<{ onSuggestionClick: (q: string) => void }> = ({ onSuggestionClick }) => {
   const suggestions = [
-    '开卡流程是怎样的？',
+    'C端封闭的开卡流程是怎样的？',
     '订单相关的接口有哪些？',
     '用户表被哪些服务使用？',
-    '支付成功后的回调逻辑是什么？',
+    '微信公众号登录时的校验逻辑是怎么走的？',
   ]
 
   return (
@@ -322,9 +333,275 @@ interface ContentSegment {
 }
 
 /**
- * 解析内容为有序的段落列表
- * 支持 <think> 块、工具占位符 <!--TOOL:name:id--> 和正文交错
+ * 根据工具名称生成输入摘要和输出摘要（与后端 _generate_tool_summaries 保持一致）
  */
+const generateToolSummary = (
+  toolName: string, 
+  toolInput: Record<string, unknown>, 
+  toolOutput: string
+): { input: string; output: string } => {
+  let inputSummary = ''
+  let outputSummary = ''
+  
+  // 尝试解析输出为 JSON
+  let outputData: Record<string, unknown> | null = null
+  try {
+    outputData = JSON.parse(toolOutput)
+  } catch {
+    // 解析失败，保持 null
+  }
+  
+  // ========== 搜索类工具 ==========
+  if (['search_businesses', 'search_steps', 'search_implementations', 'search_data_resources'].includes(toolName)) {
+    const query = String(toolInput.query || '')
+    if (query) {
+      inputSummary = `关键词: ${query}`
+    }
+    
+    if (outputData) {
+      if (Array.isArray(outputData.candidates)) {
+        const count = outputData.candidates.length
+        const total = typeof outputData.total_count === 'number' ? outputData.total_count : count
+        if (count > 0) {
+          outputSummary = `找到 ${count} 个结果` + (total > count ? ` (共 ${total} 个)` : '')
+        } else {
+          outputSummary = String(outputData.message || '未找到结果')
+        }
+      } else if (Array.isArray(outputData.results)) {
+        const count = outputData.results.length
+        outputSummary = count > 0 ? `找到 ${count} 个相关代码片段` : '未找到相关代码'
+      } else if (outputData.error) {
+        outputSummary = '查询失败'
+      }
+    }
+  }
+  
+  // ========== 代码上下文搜索 ==========
+  else if (toolName === 'search_code_context') {
+    const workspace = String(toolInput.workspace || '')
+    const query = String(toolInput.query || '')
+    const parts: string[] = []
+    if (workspace) {
+      parts.push(`代码库: ${workspace}`)
+    }
+    if (query) {
+      const displayQuery = query.length > 40 ? query.slice(0, 40) + '...' : query
+      parts.push(`查询: ${displayQuery}`)
+    }
+    inputSummary = parts.join(' | ')
+    
+    if (outputData) {
+      if (Array.isArray(outputData.content)) {
+        const count = outputData.content.length
+        outputSummary = count > 0 ? `找到 ${count} 个相关代码片段` : '未找到相关代码'
+      } else if (outputData.error) {
+        outputSummary = '查询失败'
+      } else if (outputData.text) {
+        outputSummary = '找到相关代码'
+      } else {
+        outputSummary = '执行完成'
+      }
+    }
+  }
+  
+  // ========== 文件读取类工具 ==========
+  else if (toolName === 'read_file') {
+    const path = String(toolInput.path || '')
+    if (path) {
+      const filename = path.split('/').pop()?.split('\\').pop() || path
+      inputSummary = `文件: ${filename}`
+    }
+    
+    if (outputData) {
+      if (typeof outputData.content === 'string') {
+        const lines = outputData.content.split('\n').length
+        outputSummary = `读取成功 (${lines} 行)`
+      } else if (outputData.error) {
+        outputSummary = '读取失败'
+      }
+    } else if (toolOutput && !toolOutput.startsWith('{')) {
+      const lines = toolOutput.split('\n').length
+      outputSummary = `读取成功 (${lines} 行)`
+    }
+  }
+  
+  else if (toolName === 'read_file_range') {
+    const path = String(toolInput.path || '')
+    const startLine = Number(toolInput.start_line || 0)
+    const endLine = Number(toolInput.end_line || 0)
+    if (path) {
+      const filename = path.split('/').pop()?.split('\\').pop() || path
+      inputSummary = `文件: ${filename} (L${startLine}-${endLine})`
+    }
+    
+    if (toolOutput && !toolOutput.toLowerCase().includes('error')) {
+      outputSummary = `读取成功 (${endLine - startLine + 1} 行)`
+    } else {
+      outputSummary = '读取失败'
+    }
+  }
+  
+  else if (toolName === 'list_directory') {
+    const path = String(toolInput.path || '/')
+    const depth = Number(toolInput.max_depth || 2)
+    inputSummary = `目录: ${path}` + (depth !== 2 ? ` (深度 ${depth})` : '')
+    
+    if (outputData) {
+      if (Array.isArray(outputData.entries)) {
+        outputSummary = `列出 ${outputData.entries.length} 个条目`
+      } else if (outputData.error) {
+        outputSummary = '列出失败'
+      }
+    }
+  }
+  
+  // ========== 上下文获取类工具 ==========
+  else if (toolName === 'get_business_context') {
+    const processIds = Array.isArray(toolInput.process_ids) ? toolInput.process_ids : []
+    const count = processIds.length
+    inputSummary = count > 1 ? `批量查询 ${count} 个业务` : `业务ID: ${String(processIds[0] || '').slice(0, 20)}`
+    
+    if (outputData?.results) {
+      const total = typeof outputData.total === 'number' ? outputData.total : 0
+      outputSummary = `获取 ${total} 个业务上下文`
+    } else if (outputData?.error) {
+      outputSummary = '获取失败'
+    }
+  }
+  
+  else if (toolName === 'get_implementation_context') {
+    const implIds = Array.isArray(toolInput.impl_ids) ? toolInput.impl_ids : []
+    const count = implIds.length
+    inputSummary = count > 1 ? `批量查询 ${count} 个接口` : `接口ID: ${String(implIds[0] || '').slice(0, 20)}`
+    
+    if (outputData?.results) {
+      const total = typeof outputData.total === 'number' ? outputData.total : 0
+      outputSummary = `获取 ${total} 个接口上下文`
+    } else if (outputData?.error) {
+      outputSummary = '获取失败'
+    }
+  }
+  
+  else if (toolName === 'get_implementation_business_usages') {
+    const implIds = Array.isArray(toolInput.impl_ids) ? toolInput.impl_ids : []
+    const count = implIds.length
+    inputSummary = count > 1 ? `批量查询 ${count} 个接口使用情况` : `接口ID: ${String(implIds[0] || '').slice(0, 20)}`
+    
+    if (outputData?.results) {
+      const total = typeof outputData.total === 'number' ? outputData.total : 0
+      outputSummary = `获取 ${total} 个接口的业务使用`
+    } else if (outputData?.error) {
+      outputSummary = '查询失败'
+    }
+  }
+  
+  else if (toolName === 'get_resource_context') {
+    const resourceIds = Array.isArray(toolInput.resource_ids) ? toolInput.resource_ids : []
+    const count = resourceIds.length
+    inputSummary = count > 1 ? `批量查询 ${count} 个资源` : `资源ID: ${String(resourceIds[0] || '').slice(0, 20)}`
+    
+    if (outputData?.results) {
+      const total = typeof outputData.total === 'number' ? outputData.total : 0
+      outputSummary = `获取 ${total} 个资源上下文`
+    } else if (outputData?.error) {
+      outputSummary = '获取失败'
+    }
+  }
+  
+  else if (toolName === 'get_resource_business_usages') {
+    const resourceIds = Array.isArray(toolInput.resource_ids) ? toolInput.resource_ids : []
+    const count = resourceIds.length
+    inputSummary = count > 1 ? `批量查询 ${count} 个资源使用情况` : `资源ID: ${String(resourceIds[0] || '').slice(0, 20)}`
+    
+    if (outputData?.results) {
+      const total = typeof outputData.total === 'number' ? outputData.total : 0
+      outputSummary = `获取 ${total} 个资源的业务使用`
+    } else if (outputData?.error) {
+      outputSummary = '查询失败'
+    }
+  }
+  
+  // ========== 图遍历类工具 ==========
+  else if (toolName === 'get_neighbors') {
+    const nodeIds = Array.isArray(toolInput.node_ids) ? toolInput.node_ids : []
+    const depth = Number(toolInput.depth || 1)
+    const count = nodeIds.length
+    inputSummary = count > 1 ? `批量查询 ${count} 个节点邻居` : `节点: ${String(nodeIds[0] || '').slice(0, 20)}`
+    if (depth > 1) {
+      inputSummary += ` (深度 ${depth})`
+    }
+    
+    if (outputData?.neighbors) {
+      const neighborCount = Array.isArray(outputData.neighbors) ? outputData.neighbors.length : 0
+      outputSummary = `找到 ${neighborCount} 个邻居节点`
+    } else if (outputData?.error) {
+      outputSummary = '查询失败'
+    }
+  }
+  
+  else if (toolName === 'get_path_between_entities') {
+    inputSummary = '路径查询'
+    
+    if (outputData) {
+      if (Array.isArray(outputData.path)) {
+        outputSummary = `找到路径 (${outputData.path.length} 跳)`
+      } else if (outputData.error || outputData.path === null) {
+        outputSummary = '未找到路径'
+      }
+    }
+  }
+  
+  // ========== 代码精确搜索 ==========
+  else if (toolName === 'grep_code') {
+    const pattern = String(toolInput.pattern || '')
+    const workspace = String(toolInput.workspace || '')
+    const filePattern = String(toolInput.file_pattern || '')
+    
+    const parts: string[] = []
+    if (workspace) {
+      parts.push(`代码库: ${workspace}`)
+    }
+    if (pattern) {
+      const displayPattern = pattern.length > 30 ? pattern.slice(0, 30) + '...' : pattern
+      parts.push(`搜索: ${displayPattern}`)
+    }
+    if (filePattern) {
+      parts.push(`文件: ${filePattern}`)
+    }
+    inputSummary = parts.join(' | ')
+    
+    if (outputData) {
+      if (Array.isArray(outputData.matches)) {
+        const count = outputData.matches.length
+        outputSummary = count > 0 ? `找到 ${count} 处匹配` : '未找到匹配'
+      } else if (outputData.error) {
+        outputSummary = '搜索失败'
+      }
+    }
+  }
+  
+  // 默认处理
+  if (!inputSummary && toolInput) {
+    const firstKey = Object.keys(toolInput)[0]
+    if (firstKey) {
+      const firstVal = String(toolInput[firstKey])
+      inputSummary = firstVal.length > 30 ? `${firstKey}: ${firstVal.slice(0, 30)}...` : `${firstKey}: ${firstVal}`
+    }
+  }
+  
+  if (!outputSummary) {
+    if (outputData?.error) {
+      outputSummary = '执行失败'
+    } else if (toolOutput.length > 0) {
+      outputSummary = '执行完成'
+    } else {
+      outputSummary = '无结果'
+    }
+  }
+  
+  return { input: inputSummary, output: outputSummary }
+}
+
 /**
  * 统一的消息转换函数：将后端原始消息转换为前端显示格式
  * 处理逻辑：
@@ -340,12 +617,13 @@ const convertRawMessagesToDisplay = (
   toolSummaries: Map<string, ToolSummaryInfo> 
 } => {
   const display: DisplayMessage[] = []
-  const toolSummaries = new Map<string, ToolSummaryInfo>()
+  const globalToolSummaries = new Map<string, ToolSummaryInfo>()
   
   let globalToolId = 0
   let globalBatchId = 0
   let accumulatedContent = ''
   let accumulatedToolCalls: ToolCallInfo[] = []
+  let accumulatedToolSummaries = new Map<string, ToolSummaryInfo>() // 当前消息的工具摘要
   let aiMessageStartIndex = -1
 
   const flushAIMessage = () => {
@@ -356,10 +634,12 @@ const convertRawMessagesToDisplay = (
       role: 'assistant',
       content: accumulatedContent,
       toolCalls: accumulatedToolCalls.length > 0 ? accumulatedToolCalls : undefined,
+      toolSummaries: accumulatedToolSummaries.size > 0 ? new Map(accumulatedToolSummaries) : undefined,
     })
     
     accumulatedContent = ''
     accumulatedToolCalls = []
+    accumulatedToolSummaries = new Map()
     aiMessageStartIndex = -1
   }
 
@@ -391,33 +671,35 @@ const convertRawMessagesToDisplay = (
           const tc = m.tool_calls[idx]
           globalToolId++
           
-          // 生成输入摘要
-          let inputSummary = ''
-          if (tc.args) {
-            const firstKey = Object.keys(tc.args)[0]
-            if (firstKey) {
-              const val = String(tc.args[firstKey])
-              inputSummary = val.length > 30 ? val.slice(0, 30) + '...' : val
-            }
-          }
-          
-          // 查找对应的tool返回消息
-          let outputLength = 0
+          // 查找对应的 tool 返回消息
+          let toolOutput = ''
           for (let j = i + 1; j < rawMessages.length; j++) {
             if (rawMessages[j].role === 'tool' && rawMessages[j].tool_name === tc.name) {
-              outputLength = rawMessages[j].content.length
+              toolOutput = rawMessages[j].content
               break
             }
           }
           
-          // 存入摘要Map
-          toolSummaries.set(`${tc.name}:${globalToolId}`, {
+          // 使用与后端一致的摘要生成函数
+          const { input: inputSummary, output: outputSummary } = generateToolSummary(
+            tc.name,
+            tc.args || {},
+            toolOutput
+          )
+          
+          const toolKey = `${tc.name}:${globalToolId}`
+          const summaryInfo: ToolSummaryInfo = {
             input: inputSummary,
-            output: outputLength > 0 ? `返回 ${outputLength} 字符` : '已完成',
+            output: outputSummary,
             batchId: batchSize > 1 ? globalBatchId : undefined,
             batchSize: batchSize > 1 ? batchSize : undefined,
             batchIndex: batchSize > 1 ? idx : undefined,
-          })
+          }
+          
+          // 存入当前消息的摘要Map
+          accumulatedToolSummaries.set(toolKey, summaryInfo)
+          // 同时存入全局Map（保持向后兼容）
+          globalToolSummaries.set(toolKey, summaryInfo)
           
           // 追加工具占位符（保持原始顺序）
           accumulatedContent += `<!--TOOL:${tc.name}:${globalToolId}-->`
@@ -425,7 +707,7 @@ const convertRawMessagesToDisplay = (
           // 记录到toolCalls
           accumulatedToolCalls.push({
             name: tc.name,
-            output_length: outputLength,
+            output_length: toolOutput.length,
           })
         }
       }
@@ -435,7 +717,7 @@ const convertRawMessagesToDisplay = (
   
   flushAIMessage()
   
-  return { messages: display, toolSummaries }
+  return { messages: display, toolSummaries: globalToolSummaries }
 }
 
 const parseContentSegments = (
@@ -688,16 +970,6 @@ interface MessageItemProps {
   activeToolsRef?: React.MutableRefObject<Map<number, ActiveToolInfo>>  // ref版本，用于同步获取
 }
 
-// 工具摘要扩展类型（包含批次信息和耗时）
-interface ToolSummaryInfo {
-  input: string
-  output: string
-  elapsed?: number  // 耗时（秒）
-  batchId?: number
-  batchSize?: number
-  batchIndex?: number
-}
-
 // 活跃工具信息（包含批次信息）
 interface ActiveToolInfo {
   toolId: number
@@ -865,7 +1137,9 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({ message, isLoading
   // 因为 Map 对象作为依赖项会导致每次都重新计算（每次 setState 创建新 Map）
   // buildRenderItems 本身不是重计算，真正的性能问题来自无限调用循环
   // 通过合理的组件设计避免无限循环，而不是依赖 useMemo
-  const renderItems = buildRenderItems(message.content, message.currentToolName, toolSummaries, activeTools, activeToolsRef)
+  // 优先使用消息自带的 toolSummaries（已完成的历史消息），否则使用 props 传入的全局 toolSummaries（当前正在流式输出）
+  const effectiveToolSummaries = message.toolSummaries || toolSummaries
+  const renderItems = buildRenderItems(message.content, message.currentToolName, effectiveToolSummaries, activeTools, activeToolsRef)
   
   // 初始思考状态：正在思考但还没有任何内容
   const isInitialThinking = message.isThinking && renderItems.length === 0
@@ -1407,6 +1681,9 @@ const ChatPage: React.FC = () => {
           // 最终结果 - 触发打字机加速清空缓冲区
           finishTypewriter()
           
+          // 快照当前工具摘要（后续会清空 ref，需要先复制一份）
+          const snapshotToolSummaries = new Map(toolSummariesRef.current)
+          
           // 更新元数据和状态（但不替换content，让打字机继续播放）
           setMessages(prev => {
             const newPrev = [...prev]
@@ -1416,6 +1693,7 @@ const ChatPage: React.FC = () => {
                 ...newPrev[lastIdx],
                 toolCalls: toolCalls.length > 0 ? toolCalls : currentToolCallsRef.current,
                 isThinking: false,
+                toolSummaries: snapshotToolSummaries.size > 0 ? snapshotToolSummaries : undefined,
               }
             }
             return newPrev
@@ -1625,6 +1903,9 @@ const ChatPage: React.FC = () => {
           // 触发打字机加速清空缓冲区
           finishTypewriter()
           
+          // 快照当前工具摘要（后续会清空 ref，需要先复制一份）
+          const snapshotToolSummaries = new Map(toolSummariesRef.current)
+          
           // 更新元数据（但不替换content，让打字机继续播放）
           setMessages(prev => prev.map((msg, idx) => 
             idx === targetAssistantIdx 
@@ -1633,6 +1914,7 @@ const ChatPage: React.FC = () => {
                   toolCalls: toolCalls.length > 0 ? toolCalls : currentToolCallsRef.current,
                   isThinking: false,
                   currentToolName: undefined,
+                  toolSummaries: snapshotToolSummaries.size > 0 ? snapshotToolSummaries : undefined,
                 }
               : msg
           ))

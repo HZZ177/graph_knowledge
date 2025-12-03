@@ -120,10 +120,7 @@ def _call_selector_llm(query: str, candidates: List[dict], id_field: str, limit:
 
 class SearchCodeContextInput(BaseModel):
     query: str = Field(..., description="用于代码上下文检索的自然语言查询，如'开卡接口的校验逻辑'、'支付回调处理流程'")
-    workspace: Optional[str] = Field(
-        default=None,
-        description="目标代码库标识符。不指定时使用默认工作区。可通过上下文判断应该搜索哪个代码库"
-    )
+    workspace: str = Field(..., description="目标代码库名称，用于指定搜索哪个代码库")
 
 
 @tool(args_schema=SearchCodeContextInput)
@@ -537,6 +534,162 @@ def read_file_range(path: str, workspace: Optional[str] = None, start_line: int 
 
     except Exception as e:
         logger.error(f"[read_file_range] 失败: {e}", exc_info=True)
+        return json.dumps({"error": str(e)}, ensure_ascii=False)
+
+
+class GrepCodeInput(BaseModel):
+    """grep_code 工具输入参数"""
+    pattern: str = Field(..., description="搜索模式，支持正则表达式。如 'getUserById'、'class.*Service'、'def\\s+process_'")
+    workspace: str = Field(..., description="目标代码库名称")
+    path: Optional[str] = Field(default=None, description="限制搜索的子目录路径，如 'src/services'。不指定则搜索整个代码库")
+    file_pattern: Optional[str] = Field(default=None, description="文件名 glob 过滤，如 '*.java'、'*.py'、'*.ts'")
+    ignore_case: bool = Field(default=True, description="是否忽略大小写，默认忽略")
+    context_lines: int = Field(default=3, ge=0, le=10, description="匹配行前后显示的上下文行数，默认3行")
+    max_matches: int = Field(default=30, ge=1, le=100, description="最大匹配数量，防止结果过多")
+
+
+@tool(args_schema=GrepCodeInput)
+def grep_code(
+    pattern: str,
+    workspace: str,
+    path: Optional[str] = None,
+    file_pattern: Optional[str] = None,
+    ignore_case: bool = True,
+    context_lines: int = 3,
+    max_matches: int = 30,
+) -> str:
+    """在代码库中精确搜索文本或正则表达式，快速定位函数、类、变量等。
+    
+    适用场景：
+    - 精确查找函数名、类名、变量名的定义和引用
+    - 搜索特定字符串、错误消息、日志关键词
+    - 查找特定模式的代码（如所有 TODO 注释）
+    
+    与 search_code_context 的区别：
+    - grep_code: 精确的文本/正则匹配，速度快，适合已知关键词
+    - search_code_context: 语义级搜索，理解代码含义，适合模糊需求
+    """
+    import subprocess
+    from backend.app.core.ripgrep import get_ripgrep_path, is_ripgrep_installed
+    
+    try:
+        if not is_ripgrep_installed():
+            return json.dumps({
+                "error": "ripgrep 未安装，请重启服务器自动安装或手动安装",
+            }, ensure_ascii=False)
+        
+        rg_path = get_ripgrep_path()
+        root = os.path.abspath(CodeWorkspaceConfig.get_workspace_root(workspace))
+        search_path = os.path.join(root, path) if path else root
+        
+        # 验证搜索路径
+        if not os.path.exists(search_path):
+            return json.dumps({
+                "error": f"搜索路径不存在: {path}",
+                "workspace": workspace,
+            }, ensure_ascii=False)
+        
+        # 构建 ripgrep 命令
+        cmd = [
+            rg_path,
+            "--json",           # JSON 输出便于解析
+            "--no-heading",     # 不分组显示
+            "-m", str(max_matches),  # 限制总匹配数
+        ]
+        
+        if ignore_case:
+            cmd.append("-i")
+        
+        if context_lines > 0:
+            cmd.extend(["-C", str(context_lines)])
+        
+        if file_pattern:
+            cmd.extend(["-g", file_pattern])
+        
+        cmd.append(pattern)
+        cmd.append(search_path)
+        
+        # 执行搜索（指定 UTF-8 编码，处理 Windows 默认 GBK 问题）
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            encoding='utf-8',
+            errors='replace',
+            timeout=30,
+            cwd=root
+        )
+        
+        # 解析 JSON 输出
+        matches = []
+        current_file = None
+        current_match = None
+        
+        stdout = result.stdout or ""
+        for line in stdout.strip().split("\n"):
+            if not line:
+                continue
+            try:
+                data = json.loads(line)
+                msg_type = data.get("type")
+                
+                if msg_type == "match":
+                    # 保存上一个匹配
+                    if current_match:
+                        matches.append(current_match)
+                    
+                    match_data = data.get("data", {})
+                    file_path = match_data.get("path", {}).get("text", "")
+                    rel_path = os.path.relpath(file_path, root).replace("\\", "/")
+                    
+                    current_match = {
+                        "file": rel_path,
+                        "line_number": match_data.get("line_number"),
+                        "line_text": match_data.get("lines", {}).get("text", "").rstrip("\n\r"),
+                        "context_before": [],
+                        "context_after": [],
+                    }
+                    current_file = rel_path
+                    
+                elif msg_type == "context" and current_match:
+                    # 上下文行
+                    ctx_data = data.get("data", {})
+                    ctx_line_num = ctx_data.get("line_number")
+                    ctx_text = ctx_data.get("lines", {}).get("text", "").rstrip("\n\r")
+                    
+                    if ctx_line_num < current_match["line_number"]:
+                        current_match["context_before"].append(ctx_text)
+                    else:
+                        current_match["context_after"].append(ctx_text)
+                        
+            except json.JSONDecodeError:
+                continue
+        
+        # 添加最后一个匹配
+        if current_match:
+            matches.append(current_match)
+        
+        if not matches:
+            return json.dumps({
+                "pattern": pattern,
+                "workspace": workspace,
+                "path": path,
+                "matches": [],
+                "message": f"未找到匹配 '{pattern}' 的内容"
+            }, ensure_ascii=False)
+        
+        return json.dumps({
+            "pattern": pattern,
+            "workspace": workspace,
+            "path": path,
+            "total_matches": len(matches),
+            "matches": matches,
+        }, ensure_ascii=False)
+        
+    except subprocess.TimeoutExpired:
+        return json.dumps({"error": "搜索超时，请缩小搜索范围"}, ensure_ascii=False)
+    except Exception as e:
+        logger.error(f"[grep_code] 失败: {e}", exc_info=True)
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 
@@ -1177,6 +1330,7 @@ def get_all_chat_tools():
         get_neighbors,
         get_path_between_entities,
         search_code_context,
+        grep_code,
         list_directory,
         read_file,
         read_file_range,

@@ -18,7 +18,7 @@ app_path = os.path.abspath(os.path.join(project_path, 'app'))     # app根目录
 '''二级目录'''
 core_path = os.path.abspath(os.path.join(app_path, 'core'))     # core目录
 log_path = os.path.abspath(os.path.join(project_path, 'logs'))      # 日志目录
-static_path = os.path.abspath(os.path.join(project_path, 'static'))     # 静态资源目录
+static_path = os.path.abspath(os.path.join(project_path, 'resource'))     # 静态资源目录
 
 
 if __name__ == '__main__':

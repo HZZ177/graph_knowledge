@@ -21,7 +21,7 @@ from backend.app.core.logger import logger
 from backend.app.models import ai_models, conversation  # noqa: F401  确保 ai_models, conversations 表被创建
 from backend.mcp.ace_code_engine import warmup_ace_mcp
 from backend.app.llm.langchain.registry import AgentRegistry
-
+from backend.app.core.ripgrep import ensure_ripgrep_installed
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -47,6 +47,9 @@ async def lifespan(app: FastAPI):
 
     # 预热 AceCodeEngine MCP 客户端，降低首次调用时的冷启动开销
     warmup_ace_mcp()
+
+    # 确保 ripgrep 已安装（用于 grep_code 工具）
+    ensure_ripgrep_installed()
 
     # yield 控制应用的存活周期；目前没有特殊的 shutdown 逻辑
     yield

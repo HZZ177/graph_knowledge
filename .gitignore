@@ -211,3 +211,4 @@ node_modules/
 */logs
 backend/app/app.db
 /backend/app/llm_checkpoints.db
+/backend/resource/rg.exe
