@@ -82,24 +82,80 @@ class LLMConfig(BaseModel):
     timeout: int = 120
 
 
-class CodeWorkspaceConfig(BaseModel):
+class WorkspaceInfo(BaseModel):
+    """单个代码工作区信息"""
+    key: str              # 工作区标识符
+    name: str             # 显示名称
+    root: str             # 项目根目录路径
+    description: str      # 工作区描述（用于 Agent 理解）
+
+
+class CodeWorkspaceConfig:
     """代码工作区配置
     
-    为代码相关工具提供统一的项目根目录配置，限制工具只读访问该目录内的文件。
-    使用在此处硬编码配置的项目根目录，用于访问外部代码库。
+    为代码相关工具提供多工作区配置，支持在多个代码库之间切换。
+    AI Agent 可根据上下文选择正确的代码库进行搜索和文件读取。
     """
-
-    project_root: str
-
+    
+    # ============================================================
+    # 多代码库配置（在此添加需要支持的代码库）
+    # ============================================================
+    WORKSPACES: dict[str, dict] = {
+        "vehicle-owner-server": {
+            "name": "C端逻辑服务",
+            "root": r"C:\Users\86364\PycharmProjects\vehicle-owner-server",
+            "description": "C端逻辑服务，主要包含非后台相关的owner-center和pay-center两大业务模块"
+        },
+        "vehicle-admin": {
+            "name": "C端后台服务",
+            "root": r"C:\Users\86364\PycharmProjects\yongce-pro-admin-vehicle-owner",
+            "description": "C端后台服务，主要包含后台管理相关的业务模块"
+        },
+    }
+    
     @classmethod
-    def load(cls) -> "CodeWorkspaceConfig":
-        """从固定配置的字符串路径加载项目根目录。"""
-        # 注意：这里的路径需要根据实际外部代码库位置进行配置
-        # 当前默认与 AceCodeEngineMcp._default_project_root 保持一致
-        fixed_root = os.path.abspath(r"C:\Users\86364\PycharmProjects\vehicle-owner-server")
-        return cls(project_root=fixed_root)
-
+    def get_workspace_root(cls, workspace: Optional[str] = None) -> str:
+        """获取指定工作区的项目根目录绝对路径。
+        
+        Args:
+            workspace: 工作区标识符，必须指定
+            
+        Returns:
+            项目根目录的绝对路径
+            
+        Raises:
+            ValueError: 未指定工作区或未知的工作区标识符
+        """
+        if not workspace:
+            available = list(cls.WORKSPACES.keys())
+            raise ValueError(f"必须指定 workspace 参数，可用工作区: {available}")
+        ws_config = cls.WORKSPACES.get(workspace)
+        if not ws_config:
+            available = list(cls.WORKSPACES.keys())
+            raise ValueError(f"未知工作区: {workspace}，可用工作区: {available}")
+        return os.path.abspath(ws_config["root"])
+    
     @classmethod
-    def get_project_root(cls) -> str:
-        """获取项目根目录的绝对路径。"""
-        return cls.load().project_root
+    def list_workspaces(cls) -> list[WorkspaceInfo]:
+        """列出所有配置的工作区。
+        
+        Returns:
+            工作区信息列表
+        """
+        return [
+            WorkspaceInfo(key=k, **v)
+            for k, v in cls.WORKSPACES.items()
+        ]
+    
+    @classmethod
+    def get_workspace_description(cls) -> str:
+        """生成工作区描述文本，用于 Agent System Prompt。"""
+        lines = []
+        for key, ws in cls.WORKSPACES.items():
+            lines.append(f"  - `{key}`: {ws['name']} - {ws['description']}")
+        return "\n".join(lines)
+    
+    @classmethod
+    def get_available_workspace_keys(cls) -> list[str]:
+        """获取所有可用的工作区标识符列表。"""
+        return list(cls.WORKSPACES.keys())

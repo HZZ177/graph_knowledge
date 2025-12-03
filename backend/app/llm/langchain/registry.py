@@ -23,6 +23,7 @@ from backend.app.llm.langchain.configs import (
     AgentConfig,
     AGENT_CONFIGS,
     get_agent_config,
+    get_knowledge_qa_system_prompt,
 )
 from backend.app.llm.factory import get_langchain_llm
 from backend.app.services.ai_model_service import AIModelService
@@ -140,11 +141,17 @@ class AgentRegistry:
             ),
         ]
         
+        # 获取 System Prompt（knowledge_qa 使用动态生成的 prompt，包含工作区信息）
+        if agent_type == "knowledge_qa":
+            system_prompt = get_knowledge_qa_system_prompt()
+        else:
+            system_prompt = config.system_prompt
+        
         # 创建 Agent（绑定 checkpointer 以支持持久化）
         agent = create_agent(
             model=llm,
             tools=tools,
-            system_prompt=config.system_prompt,
+            system_prompt=system_prompt,
             middleware=middleware,
             checkpointer=checkpointer,
         )

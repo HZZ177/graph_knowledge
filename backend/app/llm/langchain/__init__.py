@@ -21,6 +21,7 @@ from backend.app.llm.langchain.configs import (
     get_agent_config as get_agent_type_config,
     list_agent_configs,
     KNOWLEDGE_QA_SYSTEM_PROMPT,
+    get_knowledge_qa_system_prompt,
 )
 
 # 向后兼容导出（Deprecated）
@@ -40,6 +41,7 @@ __all__ = [
     "get_agent_type_config",
     "list_agent_configs",
     "KNOWLEDGE_QA_SYSTEM_PROMPT",
+    "get_knowledge_qa_system_prompt",
     # 向后兼容（Deprecated）
     "create_chat_agent",
     "get_agent_config",

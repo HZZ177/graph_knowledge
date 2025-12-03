@@ -120,14 +120,19 @@ def _call_selector_llm(query: str, candidates: List[dict], id_field: str, limit:
 
 class SearchCodeContextInput(BaseModel):
     query: str = Field(..., description="用于代码上下文检索的自然语言查询，如'开卡接口的校验逻辑'、'支付回调处理流程'")
+    workspace: Optional[str] = Field(
+        default=None,
+        description="目标代码库标识符。不指定时使用默认工作区。可通过上下文判断应该搜索哪个代码库"
+    )
 
 
 @tool(args_schema=SearchCodeContextInput)
-def search_code_context(query: str) -> str:
-    """在代码仓库中检索与查询相关的代码上下文，用于深入了解接口、服务或业务流程的实现细节。"""
+def search_code_context(query: str, workspace: Optional[str] = None) -> str:
+    """在指定代码仓库中检索与查询相关的代码上下文，用于深入了解接口、服务或业务流程的实现细节。"""
     try:
+        project_root = CodeWorkspaceConfig.get_workspace_root(workspace)
         client = get_ace_mcp_client()
-        result = client.search_context(query)
+        result = client.search_context(query, project_root_path=project_root)
         if isinstance(result, dict):
             def _normalize_item(item: dict) -> Optional[dict]:
                 if not isinstance(item, dict) or not isinstance(item.get("text"), str):
@@ -178,6 +183,10 @@ class ListDirectoryInput(BaseModel):
         default=None,
         description="相对项目根目录的目录路径，如 'backend/app'；为空表示项目根目录",
     )
+    workspace: Optional[str] = Field(
+        default=None,
+        description="目标代码库标识符。不指定时使用默认工作区",
+    )
     max_depth: int = Field(
         default=1,
         ge=1,
@@ -201,14 +210,15 @@ class ListDirectoryInput(BaseModel):
 @tool(args_schema=ListDirectoryInput)
 def list_directory(
     path: Optional[str] = None,
+    workspace: Optional[str] = None,
     max_depth: int = 2,
     include_hidden: bool = False,
     include_files: bool = True,
     include_dirs: bool = True,
 ) -> str:
-    """列出指定目录下的文件和子目录，用于浏览项目结构。"""
+    """列出指定代码库目录下的文件和子目录，用于浏览项目结构。"""
     try:
-        root = os.path.abspath(CodeWorkspaceConfig.get_project_root())
+        root = os.path.abspath(CodeWorkspaceConfig.get_workspace_root(workspace))
         rel_path = path or ""
         target = os.path.abspath(os.path.join(root, rel_path))
 
@@ -302,6 +312,10 @@ def list_directory(
 
 class ReadFileInput(BaseModel):
     path: str = Field(..., description="仅传文件名如 'MyClass.java'，也兼容相对项目根目录的文件路径，如 'backend/app/main.py'，注意winodws分隔符")
+    workspace: Optional[str] = Field(
+        default=None,
+        description="目标代码库标识符。不指定时使用默认工作区",
+    )
     max_bytes: int = Field(
         default=200_000,
         ge=1,
@@ -311,10 +325,10 @@ class ReadFileInput(BaseModel):
 
 
 @tool(args_schema=ReadFileInput)
-def read_file(path: str, max_bytes: int = 200_000) -> str:
-    """读取指定文件的文本内容（可能被截断）。"""
+def read_file(path: str, workspace: Optional[str] = None, max_bytes: int = 200_000) -> str:
+    """读取指定代码库中文件的文本内容（可能被截断）。"""
     try:
-        root = os.path.abspath(CodeWorkspaceConfig.get_project_root())
+        root = os.path.abspath(CodeWorkspaceConfig.get_workspace_root(workspace))
         logger.info(f"[read_file] 尝试读取文件: {path}，当前代码库根目录: {root}")
 
         # 规范化传入路径/文件名
@@ -454,13 +468,17 @@ def read_file(path: str, max_bytes: int = 200_000) -> str:
 
 class ReadFileRangeInput(BaseModel):
     path: str = Field(..., description="相对项目根目录的文件路径，如 'backend/app/main.py'")
+    workspace: Optional[str] = Field(
+        default=None,
+        description="目标代码库标识符。不指定时使用默认工作区",
+    )
     start_line: int = Field(..., ge=1, description="起始行号（从 1 开始，包含）")
     end_line: int = Field(..., ge=1, description="结束行号（从 1 开始，包含）")
 
 
 @tool(args_schema=ReadFileRangeInput)
-def read_file_range(path: str, start_line: int, end_line: int) -> str:
-    """按行读取文件的部分内容，用于查看局部代码上下文。"""
+def read_file_range(path: str, workspace: Optional[str] = None, start_line: int = 1, end_line: int = 100) -> str:
+    """按行读取指定代码库文件的部分内容，用于查看局部代码上下文。"""
     try:
         if end_line < start_line:
             return json.dumps({
@@ -470,7 +488,7 @@ def read_file_range(path: str, start_line: int, end_line: int) -> str:
                 "end_line": end_line,
             }, ensure_ascii=False)
 
-        root = os.path.abspath(CodeWorkspaceConfig.get_project_root())
+        root = os.path.abspath(CodeWorkspaceConfig.get_workspace_root(workspace))
         full_path = os.path.abspath(os.path.join(root, path))
 
         try:
