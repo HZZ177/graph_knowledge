@@ -590,15 +590,14 @@ const InputStep: React.FC<InputStepProps> = ({ form, error, onGenerate }) => {
               letterSpacing: '-0.01em',
             }}>
               渠道
-              <span style={{ fontWeight: 400, color: '#86868b', marginLeft: 6 }}>可选</span>
             </span>
           }
           name="channel"
+          rules={[{ required: true, message: '请选择渠道' }]}
           style={{ marginBottom: 24 }}
         >
           <Select
             placeholder="选择渠道"
-            allowClear
             style={{ height: 48 }}
             options={[
               { value: 'mobile', label: '移动端' },
@@ -1600,6 +1599,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
           label: impl.name,
           type: impl.type,
           system: impl.system,
+          isExisting: impl.is_existing,
         },
         style: { 
           width: pos.width || 150,
@@ -1623,6 +1623,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
           label: res.name,
           resourceType: res.type,
           description: res.description,
+          isExisting: res.is_existing,
         },
         style: { 
           width: pos.width || 140,
@@ -1822,6 +1823,16 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                   wordBreak: 'break-word',
                 }}
               >
+                {impl.is_existing && (
+                  <span style={{ 
+                    fontSize: 10, 
+                    color: '#fff',
+                    background: '#1677ff',
+                    padding: '1px 5px',
+                    borderRadius: 3,
+                    marginRight: 4,
+                  }}>复用</span>
+                )}
                 <span>{impl.name}</span>
                 {impl.system && (
                   <span style={{ 
@@ -1868,6 +1879,16 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                   wordBreak: 'break-word',
                 }}
               >
+                {res.is_existing && (
+                  <span style={{ 
+                    fontSize: 10, 
+                    color: '#fff',
+                    background: '#1677ff',
+                    padding: '1px 5px',
+                    borderRadius: 3,
+                    marginRight: 4,
+                  }}>复用</span>
+                )}
                 <span>{res.name}</span>
                 {res.type && (
                   <span style={{ 

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Card, Typography, List, Spin, Empty, Space, Tag, Button, Modal, Input, Tabs, Tooltip, message as antdMessage } from 'antd'
-import { SyncOutlined, PlusCircleOutlined, SaveOutlined, CloseOutlined, NodeIndexOutlined, CodeOutlined, DatabaseOutlined, RobotOutlined } from '@ant-design/icons'
+import { SyncOutlined, PlusCircleOutlined, SaveOutlined, CloseOutlined, NodeIndexOutlined, CodeOutlined, DatabaseOutlined, RobotOutlined, EyeOutlined } from '@ant-design/icons'
 import {
   ReactFlow,
   Background,
@@ -15,6 +15,7 @@ import {
   applyNodeChanges,
   applyEdgeChanges,
   reconnectEdge,
+  useViewport,
   type NodeChange,
   type EdgeChange,
   type Connection,
@@ -104,6 +105,30 @@ const computeOptimalHandles = (
       return { sourceHandle: 'l-out', targetHandle: 'r-in' }
     }
   }
+}
+
+// 缩放倍率显示组件（需要在 ReactFlow 内部使用）
+const ZoomIndicator = () => {
+  const { zoom } = useViewport()
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        left: 60,
+        bottom: 15,
+        background: 'rgba(255, 255, 255, 0.9)',
+        padding: '4px 8px',
+        borderRadius: 4,
+        fontSize: 12,
+        color: '#666',
+        boxShadow: '0 1px 4px rgba(0,0,0,0.1)',
+        zIndex: 5,
+        fontFamily: 'monospace',
+      }}
+    >
+      {Math.round(zoom * 100)}%
+    </div>
+  )
 }
 
 const AllSidesNode = React.memo(({ data, selected, id }: any) => {
@@ -328,9 +353,28 @@ const AllSidesNode = React.memo(({ data, selected, id }: any) => {
               fontSize: 11,
               borderTopLeftRadius: 12,
               borderTopRightRadius: 12,
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
             }}
           >
-            {data.typeLabel}
+            <span>{data.typeLabel}</span>
+            <EyeOutlined 
+              style={{ 
+                cursor: 'pointer',
+                opacity: 0.6,
+                transition: 'opacity 0.2s',
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+              onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+              onClick={(e) => {
+                e.stopPropagation()
+                const event = new CustomEvent('showNodeDetail', {
+                  detail: { nodeId: id, nodeType }
+                })
+                window.dispatchEvent(event)
+              }}
+            />
           </div>
         )}
         <div
@@ -702,6 +746,44 @@ const BusinessLibraryPage: React.FC = () => {
       const drNodes = new Map<string, Node>()
       const implXMap = new Map<string, number>()
       const stepWidthMap = new Map<string, number>() // 记录每个步骤节点的宽度
+      
+      // 防止重叠的全局追踪变量
+      const implOccupiedRanges: Array<{ start: number; end: number }> = []
+      const drOccupiedRanges: Array<{ start: number; end: number }> = []
+      const implGap = 30
+      const drGap = 30
+      
+      // 检查并找到不重叠的位置（实现节点）
+      const findNonOverlappingImplX = (preferredX: number, width: number): number => {
+        let x = preferredX
+        let attempts = 0
+        const maxAttempts = 100
+        while (attempts < maxAttempts) {
+          const hasOverlap = implOccupiedRanges.some(range =>
+            !(x + width + implGap < range.start || x > range.end + implGap)
+          )
+          if (!hasOverlap) break
+          x += 50
+          attempts++
+        }
+        return x
+      }
+      
+      // 检查并找到不重叠的位置（数据资源节点）
+      const findNonOverlappingDrX = (preferredX: number, width: number): number => {
+        let x = preferredX
+        let attempts = 0
+        const maxAttempts = 100
+        while (attempts < maxAttempts) {
+          const hasOverlap = drOccupiedRanges.some(range =>
+            !(x + width + drGap < range.start || x > range.end + drGap)
+          )
+          if (!hasOverlap) break
+          x += 50
+          attempts++
+        }
+        return x
+      }
 
       // 第一遍：计算每个步骤节点的宽度（基于内容）
       const stepWidths: number[] = []
@@ -761,19 +843,26 @@ const BusinessLibraryPage: React.FC = () => {
 
         const implIds = stepImplMap.get(stepId) || []
         const implCount = implIds.length
+        // 计算该步骤下所有实现的总宽度用于居中
+        const implWidths = implIds.map(id => {
+          const impl = implById.get(id)
+          const implLabel = impl?.name || id
+          return Math.min(300, Math.max(150, 150 + implLabel.length * 10))
+        })
+        const totalImplWidth = implWidths.reduce((sum, w) => sum + w, 0) + (implCount - 1) * implGap
+        let implStartX = stepX + stepWidth / 2 - totalImplWidth / 2
+        
         implIds.forEach((implId, implIndex) => {
           if (implNodes.has(implId)) return
           const impl = implById.get(implId)
           if (!impl) return
           const implLabel = impl.name || implId
-          const implNameLen = implLabel.length
           // 实现节点宽度估算：随名称长度增长
-          const implWidth = Math.min(300, Math.max(150, 150 + implNameLen * 10))
-          const implOffsetX =
-            implCount > 1 ? (implIndex - (implCount - 1) / 2) * (implWidth + 40) : 0
-          // 实现节点居中对齐到步骤节点
-          const implX = stepX + stepWidth / 2 - implWidth / 2 + implOffsetX
-
+          const implWidth = implWidths[implIndex]
+          // 使用防重叠检测
+          const preferredX = implStartX
+          const finalImplX = findNonOverlappingImplX(preferredX, implWidth)
+          
           implNodes.set(implId, {
             id: `impl:${implId}`,
             data: {
@@ -785,7 +874,7 @@ const BusinessLibraryPage: React.FC = () => {
               system: impl.system,
             },
             position: {
-              x: implX,
+              x: finalImplX,
               y: implY,
             },
             type: 'allSides',
@@ -799,26 +888,36 @@ const BusinessLibraryPage: React.FC = () => {
               maxWidth: 300,
             },
           })
-          implXMap.set(implId, implX + implWidth / 2) // 记录实现节点的中心位置
+          // 记录占用区间
+          implOccupiedRanges.push({ start: finalImplX, end: finalImplX + implWidth })
+          implXMap.set(implId, finalImplX + implWidth / 2) // 记录实现节点的中心位置
+          implStartX = finalImplX + implWidth + implGap
         })
 
         implIds.forEach((implId) => {
           const dataLinks = implDataMap.get(implId) || []
           const dataCount = dataLinks.length
+          // 计算该实现下所有数据资源的总宽度用于居中
+          const drWidths = dataLinks.map(link => {
+            const dr = drById.get(link.resource_id)
+            const drLabel = dr?.name || link.resource_id
+            return Math.min(300, Math.max(150, 150 + drLabel.length * 10))
+          })
+          const totalDrWidth = drWidths.reduce((sum, w) => sum + w, 0) + (dataCount - 1) * drGap
+          const baseImplX = implXMap.get(implId) ?? (stepX + stepWidth / 2)
+          let drStartX = baseImplX - totalDrWidth / 2
+          
           dataLinks.forEach((link, drIndex) => {
             const resId = link.resource_id
             if (drNodes.has(resId)) return
             const dr = drById.get(resId)
             if (!dr) return
             const drLabel = dr.name || resId
-            const drNameLen = drLabel.length
-            // 数据资源节点宽度估算：随名称长度增长
-            const drWidth = Math.min(300, Math.max(150, 150 + drNameLen * 10))
-            const baseImplX = implXMap.get(implId) ?? (stepX + stepWidth / 2)
-            const drOffsetX =
-              dataCount > 1 ? (drIndex - (dataCount - 1) / 2) * (drWidth + 40) : 0
-            // 数据资源节点居中对齐到实现节点
-            const drX = baseImplX - drWidth / 2 + drOffsetX
+            // 数据资源节点宽度
+            const drWidth = drWidths[drIndex]
+            // 使用防重叠检测
+            const preferredX = drStartX
+            const finalDrX = findNonOverlappingDrX(preferredX, drWidth)
 
             drNodes.set(resId, {
               id: `dr:${resId}`,
@@ -831,7 +930,7 @@ const BusinessLibraryPage: React.FC = () => {
                 description: dr.description,
               },
               position: {
-                x: drX,
+                x: finalDrX,
                 y: dataY,
               },
               type: 'allSides',
@@ -845,18 +944,21 @@ const BusinessLibraryPage: React.FC = () => {
                 maxWidth: 300,
               },
             })
+            // 记录占用区间
+            drOccupiedRanges.push({ start: finalDrX, end: finalDrX + drWidth })
+            drStartX = finalDrX + drWidth + drGap
           })
         })
       })
 
       // 处理孤立的实现节点（没有关联到任何步骤的）
-      canvasData.implementations.forEach((impl, index) => {
+      canvasData.implementations.forEach((impl) => {
         if (!implNodes.has(impl.impl_id)) {
           const implLabel = impl.name || impl.impl_id
           const implNameLen = implLabel.length
           const implWidth = Math.min(300, Math.max(150, 150 + implNameLen * 10))
-          // 孤立实现节点放在右侧
-          const implX = currentX + index * (implWidth + minGap)
+          // 使用防重叠检测
+          const finalImplX = findNonOverlappingImplX(currentX, implWidth)
           
           implNodes.set(impl.impl_id, {
             id: `impl:${impl.impl_id}`,
@@ -868,7 +970,7 @@ const BusinessLibraryPage: React.FC = () => {
               type: impl.type,
               system: impl.system,
             },
-            position: { x: implX, y: implY },
+            position: { x: finalImplX, y: implY },
             type: 'allSides',
             style: {
               padding: 0,
@@ -880,18 +982,19 @@ const BusinessLibraryPage: React.FC = () => {
               maxWidth: 300,
             },
           })
-          implXMap.set(impl.impl_id, implX + implWidth / 2)
+          implOccupiedRanges.push({ start: finalImplX, end: finalImplX + implWidth })
+          implXMap.set(impl.impl_id, finalImplX + implWidth / 2)
         }
       })
 
       // 处理孤立的数据资源节点（没有关联到任何实现的）
-      canvasData.data_resources.forEach((dr, index) => {
+      canvasData.data_resources.forEach((dr) => {
         if (!drNodes.has(dr.resource_id)) {
           const drLabel = dr.name || dr.resource_id
           const drNameLen = drLabel.length
           const drWidth = Math.min(300, Math.max(150, 150 + drNameLen * 10))
-          // 孤立数据资源节点放在右侧
-          const drX = currentX + index * (drWidth + minGap)
+          // 使用防重叠检测
+          const finalDrX = findNonOverlappingDrX(currentX, drWidth)
           
           drNodes.set(dr.resource_id, {
             id: `dr:${dr.resource_id}`,
@@ -903,7 +1006,7 @@ const BusinessLibraryPage: React.FC = () => {
               resourceType: dr.type,
               description: dr.description,
             },
-            position: { x: drX, y: dataY },
+            position: { x: finalDrX, y: dataY },
             type: 'allSides',
             style: {
               padding: 0,
@@ -915,6 +1018,7 @@ const BusinessLibraryPage: React.FC = () => {
               maxWidth: 300,
             },
           })
+          drOccupiedRanges.push({ start: finalDrX, end: finalDrX + drWidth })
         }
       })
 
@@ -1248,18 +1352,29 @@ const BusinessLibraryPage: React.FC = () => {
       setHasChanges(false)
     }
     setSelectedProcessId(item.process_id)
+    // 点击卡片只切换业务，不弹出详情
+  }
+
+  // 显示业务详情（由眼睛图标点击触发）
+  const handleShowProcessDetail = (item: ProcessItem, e: React.MouseEvent) => {
+    e.stopPropagation()
     setSelectedNode({
       type: 'process',
       data: item,
     })
   }
 
+  // 点击节点只高亮，不弹出详情
   const handleNodeClick = (_: React.MouseEvent, node: Node) => {
     setHighlightNodeId(node.id)
+  }
+
+  // 显示节点详情（由眼睛图标点击触发）
+  const showNodeDetailById = useCallback((nodeId: string) => {
     if (!canvas) return
 
-    if (node.id.startsWith('step:')) {
-      const stepId = node.id.slice('step:'.length)
+    if (nodeId.startsWith('step:')) {
+      const stepId = nodeId.slice('step:'.length)
       const step = canvas.steps.find((s) => s.step_id === stepId)
       if (!step) return
 
@@ -1280,6 +1395,7 @@ const BusinessLibraryPage: React.FC = () => {
         dataResourceIds.has(d.resource_id),
       )
 
+      setHighlightNodeId(nodeId)
       setSelectedNode({
         type: 'step',
         data: step,
@@ -1289,8 +1405,8 @@ const BusinessLibraryPage: React.FC = () => {
       return
     }
 
-    if (node.id.startsWith('impl:')) {
-      const implId = node.id.slice('impl:'.length)
+    if (nodeId.startsWith('impl:')) {
+      const implId = nodeId.slice('impl:'.length)
       const impl = canvas.implementations.find((i) => i.impl_id === implId)
       if (!impl) return
 
@@ -1304,6 +1420,7 @@ const BusinessLibraryPage: React.FC = () => {
         dataResourceIds.includes(d.resource_id),
       )
 
+      setHighlightNodeId(nodeId)
       setSelectedNode({
         type: 'implementation',
         data: impl,
@@ -1313,8 +1430,8 @@ const BusinessLibraryPage: React.FC = () => {
       return
     }
 
-    if (node.id.startsWith('dr:')) {
-      const resourceId = node.id.slice('dr:'.length)
+    if (nodeId.startsWith('dr:')) {
+      const resourceId = nodeId.slice('dr:'.length)
       const dr = canvas.data_resources.find((d) => d.resource_id === resourceId)
       if (!dr) return
 
@@ -1330,6 +1447,7 @@ const BusinessLibraryPage: React.FC = () => {
       )?.step_id
       const step = stepId ? canvas.steps.find((s) => s.step_id === stepId) : undefined
 
+      setHighlightNodeId(nodeId)
       setSelectedNode({
         type: 'data',
         data: dr,
@@ -1337,7 +1455,20 @@ const BusinessLibraryPage: React.FC = () => {
         step,
       })
     }
-  }
+  }, [canvas])
+
+  // 监听 showNodeDetail 事件
+  useEffect(() => {
+    const handleShowNodeDetail = (e: CustomEvent<{ nodeId: string; nodeType: string }>) => {
+      // nodeId 已经是完整的节点 ID（如 step:xxx, impl:xxx, dr:xxx）
+      showNodeDetailById(e.detail.nodeId)
+    }
+    
+    window.addEventListener('showNodeDetail', handleShowNodeDetail as EventListener)
+    return () => {
+      window.removeEventListener('showNodeDetail', handleShowNodeDetail as EventListener)
+    }
+  }, [showNodeDetailById])
 
   // 拖拽处理函数
   const handleDragOver = useCallback((event: React.DragEvent) => {
@@ -2100,6 +2231,20 @@ const BusinessLibraryPage: React.FC = () => {
                                         {item.channel}
                                       </Tag>
                                     )}
+                                    <Tooltip title="查看详情">
+                                      <EyeOutlined
+                                        style={{
+                                          fontSize: 14,
+                                          color: isSelected ? '#1677ff' : '#8c8c8c',
+                                          cursor: 'pointer',
+                                          opacity: 0.6,
+                                          transition: 'opacity 0.2s',
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.opacity = '1')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.opacity = '0.6')}
+                                        onClick={(e) => handleShowProcessDetail(item, e)}
+                                      />
+                                    </Tooltip>
                                   </div>
                                   <Paragraph
                                     style={{
@@ -2310,6 +2455,9 @@ const BusinessLibraryPage: React.FC = () => {
                 nodes={displayNodes}
                 edges={displayEdges}
                 fitView
+                fitViewOptions={{ minZoom: 0.5, maxZoom: 0.5 }}
+                minZoom={0.1}
+                maxZoom={1.5}
                 nodeTypes={nodeTypes}
                 onNodesChange={onNodesChange}
                 onEdgesChange={onEdgesChange}
@@ -2325,6 +2473,7 @@ const BusinessLibraryPage: React.FC = () => {
               >
                 <Background />
                 <Controls />
+                <ZoomIndicator />
                 
                 {/* 空白画布引导提示 */}
                 {!nodes.length && (

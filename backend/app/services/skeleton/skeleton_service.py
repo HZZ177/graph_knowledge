@@ -46,6 +46,7 @@ from backend.app.schemas.canvas import (
     CanvasImplDataLink,
 )
 from backend.app.core.logger import logger
+from backend.app.models.resource_graph import Implementation, DataResource
 
 
 # ==================== 核心服务函数 ====================
@@ -139,6 +140,9 @@ async def generate_skeleton(
     # ========== 转换为画布结构 ==========
     skeleton = _parse_skeleton_output(enrich_output, request)
     canvas_data = convert_skeleton_to_canvas(skeleton)
+
+    # ========== 复用检测 ==========
+    canvas_data = match_existing_nodes(db, canvas_data)
 
     # 发送最终结果
     await websocket.send_text(json.dumps({
@@ -445,3 +449,71 @@ def convert_skeleton_to_canvas(skeleton: SkeletonAgentOutput) -> SaveProcessCanv
         impl_data_links=impl_data_links,
         impl_links=[],
     )
+
+
+# ==================== 复用检测 ====================
+
+def match_existing_nodes(db: Session, canvas_data: SaveProcessCanvasRequest) -> SaveProcessCanvasRequest:
+    """检测骨架中的 impl 和 data_resource 是否已存在于数据库
+    
+    对已存在的节点标记 is_existing=True 和 existing_id，
+    前端预览时可区分展示，保存时跳过创建。
+    
+    匹配策略：name 精确匹配（接口路径和表名是唯一的）
+    """
+    
+    # 1. 查询所有已有的 Implementation，建立 name -> id 映射
+    existing_impls = db.query(Implementation).all()
+    impl_name_to_id: Dict[str, str] = {impl.name: impl.impl_id for impl in existing_impls}
+    
+    # 2. 查询所有已有的 DataResource，建立 name -> id 映射
+    existing_resources = db.query(DataResource).all()
+    resource_name_to_id: Dict[str, str] = {res.name: res.resource_id for res in existing_resources}
+    
+    # 3. 检测 implementations
+    matched_impl_count = 0
+    new_impl_count = 0
+    # 记录骨架中 impl_id 到实际 id 的映射（用于更新关联关系）
+    impl_id_mapping: Dict[str, str] = {}
+    
+    for impl in canvas_data.implementations:
+        if impl.name and impl.name in impl_name_to_id:
+            # 已存在，标记复用
+            existing_id = impl_name_to_id[impl.name]
+            impl.is_existing = True
+            impl.existing_id = existing_id
+            impl_id_mapping[impl.impl_id] = existing_id
+            matched_impl_count += 1
+        else:
+            # 新节点
+            impl_id_mapping[impl.impl_id] = impl.impl_id
+            new_impl_count += 1
+    
+    # 4. 检测 data_resources
+    matched_resource_count = 0
+    new_resource_count = 0
+    # 记录骨架中 resource_id 到实际 id 的映射
+    resource_id_mapping: Dict[str, str] = {}
+    
+    for res in canvas_data.data_resources:
+        if res.name and res.name in resource_name_to_id:
+            # 已存在，标记复用
+            existing_id = resource_name_to_id[res.name]
+            res.is_existing = True
+            res.existing_id = existing_id
+            resource_id_mapping[res.resource_id] = existing_id
+            matched_resource_count += 1
+        else:
+            # 新节点
+            resource_id_mapping[res.resource_id] = res.resource_id
+            new_resource_count += 1
+    
+    # 注意：不修改连线中的 ID，保持原始 ID 用于前端预览
+    # 保存时 canvas_service.py 会根据 is_existing 和 existing_id 处理映射
+    
+    logger.info(
+        f"[复用检测] Implementation: {matched_impl_count} 复用, {new_impl_count} 新建; "
+        f"DataResource: {matched_resource_count} 复用, {new_resource_count} 新建"
+    )
+    
+    return canvas_data

@@ -67,6 +67,9 @@ export interface CanvasData {
     system?: string
     description?: string
     code_ref?: string
+    // 复用检测字段
+    is_existing?: boolean
+    existing_id?: string
   }>
   step_impl_links: Array<{
     step_id: string
@@ -78,6 +81,9 @@ export interface CanvasData {
     type?: string
     system?: string
     description?: string
+    // 复用检测字段
+    is_existing?: boolean
+    existing_id?: string
   }>
   impl_data_links: Array<{
     impl_id: string

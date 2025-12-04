@@ -231,29 +231,10 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
         if new_resource_id and res_name:
             resource_id_mapping[new_resource_id] = existing_res_name_to_id.get(res_name, new_resource_id)
     
-    # 使用映射后的实际ID
+    # 步骤ID集合（在步骤4、5之前就可以确定）
     actual_step_ids: Set[str] = set(step_id_mapping.values())
-    actual_impl_ids: Set[str] = set(impl_id_mapping.values())
-    actual_resource_ids: Set[str] = set(resource_id_mapping.values())
-    
-    # 构造节点ID列表JSON（使用映射后的ID）
-    canvas_node_ids_json = json.dumps({
-        "step_ids": list(actual_step_ids),
-        "impl_ids": list(actual_impl_ids),
-        "resource_ids": list(actual_resource_ids),
-    })
 
-    # 1. 创建或更新业务流程（包含节点ID列表）
-    repo.create_or_update_business(
-        process_id=process_id,
-        name=process_data.get("name"),
-        channel=process_data.get("channel"),
-        description=process_data.get("description"),
-        entrypoints=entrypoints_str,
-        canvas_node_ids=canvas_node_ids_json,
-    )
-
-    # 2. 创建或更新步骤（使用映射后的ID）
+    # 1. 创建或更新步骤（使用映射后的ID）
     for step_item in steps_data:
         orig_step_id = step_item.get("step_id")
         step_name = step_item.get("name")
@@ -267,7 +248,7 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
             step_type=step_item.get("step_type"),
         )
 
-    # 3. 重建流程边（使用映射后的step_id）
+    # 2. 重建流程边（使用映射后的step_id）
     repo.delete_process_edges(process_id)
     for edge_item in edges_data:
         orig_from_step_id = edge_item.get("from_step_id")
@@ -287,12 +268,26 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
             label=edge_item.get("label"),
         )
 
-    # 4. 创建或更新实现（使用预处理的映射）
+    # 3. 创建或更新实现（使用预处理的映射）
+    #    如果 is_existing=True，表示复用已有节点，跳过创建
+    impl_created_count = 0
+    impl_reused_count = 0
     for impl_item in implementations_data:
         new_impl_id = impl_item.get("impl_id")
         impl_name = impl_item.get("name")
         if not new_impl_id or not impl_name:
             continue
+        
+        # 检查是否为复用节点
+        is_existing = impl_item.get("is_existing", False)
+        existing_id = impl_item.get("existing_id")
+        
+        if is_existing and existing_id:
+            # 复用已有节点，更新 ID 映射，跳过创建
+            impl_id_mapping[new_impl_id] = existing_id
+            impl_reused_count += 1
+            continue
+        
         actual_impl_id = impl_id_mapping.get(new_impl_id, new_impl_id)
         repo.create_or_update_implementation(
             impl_id=actual_impl_id,
@@ -302,13 +297,30 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
             description=impl_item.get("description"),
             code_ref=impl_item.get("code_ref"),
         )
+        impl_created_count += 1
+    
+    logger.info(f"Implementation: {impl_created_count} 新建, {impl_reused_count} 复用")
 
-    # 5. 创建或更新数据资源（使用预处理的映射）
+    # 4. 创建或更新数据资源（使用预处理的映射）
+    #    如果 is_existing=True，表示复用已有节点，跳过创建
+    res_created_count = 0
+    res_reused_count = 0
     for res_item in data_resources_data:
         new_resource_id = res_item.get("resource_id")
         res_name = res_item.get("name")
         if not new_resource_id or not res_name:
             continue
+        
+        # 检查是否为复用节点
+        is_existing = res_item.get("is_existing", False)
+        existing_id = res_item.get("existing_id")
+        
+        if is_existing and existing_id:
+            # 复用已有节点，更新 ID 映射，跳过创建
+            resource_id_mapping[new_resource_id] = existing_id
+            res_reused_count += 1
+            continue
+        
         actual_resource_id = resource_id_mapping.get(new_resource_id, new_resource_id)
         repo.create_or_update_data_resource(
             resource_id=actual_resource_id,
@@ -318,6 +330,30 @@ def save_process_canvas(db: Session, process_id: str, payload: Dict[str, Any]) -
             location=res_item.get("location"),
             description=res_item.get("description"),
         )
+        res_created_count += 1
+    
+    logger.info(f"DataResource: {res_created_count} 新建, {res_reused_count} 复用")
+
+    # 重新计算实际ID集合（因为步骤4、5可能更新了映射）
+    actual_impl_ids: Set[str] = set(impl_id_mapping.values())
+    actual_resource_ids: Set[str] = set(resource_id_mapping.values())
+    
+    # 构造节点ID列表JSON（使用映射后的ID）
+    canvas_node_ids_json = json.dumps({
+        "step_ids": list(actual_step_ids),
+        "impl_ids": list(actual_impl_ids),
+        "resource_ids": list(actual_resource_ids),
+    })
+    
+    # 5. 创建或更新业务流程
+    repo.create_or_update_business(
+        process_id=process_id,
+        name=process_data.get("name"),
+        channel=process_data.get("channel"),
+        description=process_data.get("description"),
+        entrypoints=entrypoints_str,
+        canvas_node_ids=canvas_node_ids_json,
+    )
 
     # 6. 重建步骤-实现关联（使用映射后的ID）
     repo.delete_step_implementations(process_id, actual_step_ids)

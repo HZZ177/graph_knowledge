@@ -36,6 +36,9 @@ class CanvasImplementation(BaseModel):
     system: Optional[str] = None
     description: Optional[str] = None
     code_ref: Optional[str] = None
+    # 复用检测字段
+    is_existing: bool = False           # 是否为已存在节点
+    existing_id: Optional[str] = None   # 已存在节点的真实 ID
 
 
 class CanvasStepImplLink(BaseModel):
@@ -53,6 +56,9 @@ class CanvasDataResource(BaseModel):
     system: Optional[str] = None
     location: Optional[str] = None
     description: Optional[str] = None
+    # 复用检测字段
+    is_existing: bool = False           # 是否为已存在节点
+    existing_id: Optional[str] = None   # 已存在节点的真实 ID
 
 
 class CanvasImplDataLink(BaseModel):
