@@ -8,6 +8,7 @@
 """
 
 import json
+import re
 import uuid
 import time
 from typing import Any, Dict, Optional, List
@@ -251,6 +252,52 @@ def _generate_tool_summaries(tool_name: str, tool_input: dict, tool_output: str)
             elif "error" in output_data:
                 output_summary = "搜索失败"
     
+    # ========== 日志查询工具 ==========
+    elif tool_name == "search_logs":
+        # 输入摘要：服务名 + 关键词 + 时间范围
+        server_name = tool_input.get("server_name", "")
+        keyword = tool_input.get("keyword", "")
+        keyword2 = tool_input.get("keyword2", "")
+        start_time = tool_input.get("start_time", "")
+        end_time = tool_input.get("end_time", "")
+        
+        parts = []
+        if server_name:
+            parts.append(f"服务: {server_name}")
+        if keyword:
+            display_kw = keyword[:20] + "..." if len(keyword) > 20 else keyword
+            parts.append(f"关键词: {display_kw}")
+        if keyword2:
+            parts.append(f"+ {keyword2[:15]}")
+        if start_time and end_time:
+            # 只显示时间部分，去掉日期
+            start_short = start_time.split(" ")[-1] if " " in start_time else start_time
+            end_short = end_time.split(" ")[-1] if " " in end_time else end_time
+            parts.append(f"时间: {start_short}~{end_short}")
+        input_summary = " | ".join(parts) if parts else ""
+        
+        # 输出摘要：从纯文本中解析
+        # 格式: "[server] 共X条 第Y/Z页\n..."
+        if tool_output:
+            # 检查是否是错误响应（JSON格式）
+            if output_data and "error" in output_data:
+                output_summary = f"查询失败: {output_data.get('error', '')[:30]}"
+            else:
+                # 解析纯文本格式
+                match = re.search(r'共(\d+)条\s*第(\d+)/(\d+)页', tool_output)
+                if match:
+                    total = match.group(1)
+                    page = match.group(2)
+                    total_pages = match.group(3)
+                    output_summary = f"找到 {total} 条日志 (第{page}/{total_pages}页)"
+                elif "无日志" in tool_output or "(无日志)" in tool_output:
+                    output_summary = "未找到日志"
+                else:
+                    # 尝试统计行数
+                    lines = tool_output.strip().split("\n")
+                    log_lines = len([l for l in lines if l.strip() and not l.startswith("[")])
+                    output_summary = f"返回 {log_lines} 条日志" if log_lines > 0 else "查询完成"
+    
     # 默认处理
     if not input_summary and tool_input:
         # 取第一个参数作为摘要
@@ -276,6 +323,7 @@ async def streaming_chat(
     websocket: WebSocket,
     thread_id: Optional[str] = None,
     agent_type: str = "knowledge_qa",
+    agent_context: Optional[Dict[str, Any]] = None,
 ) -> str:
     """基于 LangChain 的流式问答
     
@@ -289,6 +337,7 @@ async def streaming_chat(
         websocket: WebSocket 连接，用于流式输出
         thread_id: 会话 ID，用于多轮对话。如果为空则创建新会话。
         agent_type: Agent 类型标识，默认为 "knowledge_qa"
+        agent_context: 动态上下文配置，用于注入到 Agent 和工具（如日志查询的业务线配置）
         
     Returns:
         完整的回答文本
@@ -329,10 +378,10 @@ async def streaming_chat(
         async with AsyncSqliteSaver.from_conn_string("llm_checkpoints.db") as checkpointer:
             # 从 AgentRegistry 获取 Agent（每次请求需重新绑定 checkpointer）
             registry = AgentRegistry.get_instance()
-            agent = registry.get_agent(agent_type, db, checkpointer)
+            agent = registry.get_agent(agent_type, db, checkpointer, agent_context)
             
-            # 获取运行时配置
-            config = get_agent_run_config(thread_id)
+            # 获取运行时配置（包含 agent_context，供工具使用）
+            config = get_agent_run_config(thread_id, agent_context)
             
             # 构造输入
             inputs = {

@@ -24,7 +24,7 @@ import {
   ReloadOutlined,
   RollbackOutlined,
 } from '@ant-design/icons'
-import { createChatClient, ChatClient, ToolCallInfo, fetchConversationHistory, generateConversationTitle, listConversations, deleteConversation, truncateConversation, createRegenerateClient, RegenerateClient, ChatMessage, BatchInfo, AgentType, fetchAgentTypes } from '../api/llm'
+import { createChatClient, ChatClient, ToolCallInfo, fetchConversationHistory, generateConversationTitle, listConversations, deleteConversation, truncateConversation, createRegenerateClient, RegenerateClient, ChatMessage, BatchInfo, AgentType, fetchAgentTypes, fetchLogQueryOptions, LogQueryOption } from '../api/llm'
 import { useTypewriter } from '../hooks/useTypewriter'
 import '../styles/ChatPage.css'
 import { showConfirm } from '../utils/confirm'
@@ -1318,6 +1318,30 @@ const ChatPage: React.FC = () => {
   const [currentAgentType, setCurrentAgentType] = useState<string>('knowledge_qa')
   const [isAgentDropdownOpen, setIsAgentDropdownOpen] = useState(false)
   
+  // 日志查询配置（仅 log_troubleshoot Agent 使用）
+  const [businessLines, setBusinessLines] = useState<LogQueryOption[]>([])
+  const [privateServers, setPrivateServers] = useState<LogQueryOption[]>([])
+  const [businessLine, setBusinessLine] = useState<string>('')
+  const [privateServer, setPrivateServer] = useState<string | null>(null)
+  
+  // 下拉框展开状态
+  const [isBusinessLineOpen, setIsBusinessLineOpen] = useState(false)
+  const [isPrivateServerOpen, setIsPrivateServerOpen] = useState(false)
+  
+  // 切换业务线时，如果不是私有化则清空私有化选择
+  const handleBusinessLineChange = (value: string) => {
+    setBusinessLine(value)
+    setIsBusinessLineOpen(false)
+    if (value !== '私有化') {
+      setPrivateServer(null)
+    }
+  }
+  
+  const handlePrivateServerChange = (value: string | null) => {
+    setPrivateServer(value)
+    setIsPrivateServerOpen(false)
+  }
+  
   // 实时状态
   const [currentTool, setCurrentTool] = useState<string | null>(null)
   const fullContentRef = useRef('') 
@@ -1427,19 +1451,48 @@ const ChatPage: React.FC = () => {
     loadAgentTypes()
   }, [])
   
-  // 点击外部关闭 Agent 下拉菜单
+  // 加载日志查询配置选项（仅在切换到日志排查 Agent 时加载）
+  useEffect(() => {
+    if (currentAgentType !== 'log_troubleshoot') return
+    if (businessLines.length > 0) return  // 已加载过则不重复请求
+    
+    const loadLogQueryOptions = async () => {
+      try {
+        const options = await fetchLogQueryOptions()
+        if (options?.businessLines) {
+          setBusinessLines(options.businessLines)
+          // 默认选中第一个业务线
+          if (options.businessLines.length > 0) {
+            setBusinessLine(options.businessLines[0].value)
+          }
+        }
+        if (options?.privateServers) {
+          setPrivateServers(options.privateServers)
+        }
+      } catch (e) {
+        console.error('加载日志查询配置失败', e)
+      }
+    }
+    loadLogQueryOptions()
+  }, [currentAgentType])
+  
+  // 点击外部关闭下拉菜单
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as HTMLElement
       if (!target.closest('.agent-dropdown-wrapper')) {
         setIsAgentDropdownOpen(false)
       }
+      if (!target.closest('.log-dropdown-wrapper')) {
+        setIsBusinessLineOpen(false)
+        setIsPrivateServerOpen(false)
+      }
     }
-    if (isAgentDropdownOpen) {
+    if (isAgentDropdownOpen || isBusinessLineOpen || isPrivateServerOpen) {
       document.addEventListener('click', handleClickOutside)
       return () => document.removeEventListener('click', handleClickOutside)
     }
-  }, [isAgentDropdownOpen])
+  }, [isAgentDropdownOpen, isBusinessLineOpen, isPrivateServerOpen])
 
   const upsertConversation = useCallback((tid: string, title: string, updatedAt: string) => {
     if (!tid) return
@@ -1563,8 +1616,22 @@ const ChatPage: React.FC = () => {
     const client = createChatClient()
     chatClientRef.current = client
 
+    // 构建请求参数
+    const requestPayload: any = {
+      question,
+      thread_id: threadId || undefined,
+      agent_type: currentAgentType,
+    }
+    // 日志排查 Agent 需要传递 log_query
+    if (currentAgentType === 'log_troubleshoot') {
+      requestPayload.log_query = {
+        businessLine,
+        privateServer: privateServer || null,
+      }
+    }
+    
     client.start(
-      { question, thread_id: threadId || undefined, agent_type: currentAgentType },
+      requestPayload,
       {
         onStart: (_rid, newThreadId) => {
           setThreadId(newThreadId)
@@ -1770,7 +1837,7 @@ const ChatPage: React.FC = () => {
         }
       }
     )
-  }, [inputValue, isLoading, threadId, currentAgentType, upsertConversation, appendToTypewriter, finishTypewriter, resetTypewriter, scrollToBottom])
+  }, [inputValue, isLoading, threadId, currentAgentType, businessLine, privateServer, upsertConversation, appendToTypewriter, finishTypewriter, resetTypewriter, scrollToBottom])
 
   const handleStop = () => {
     if (chatClientRef.current) {
@@ -2167,6 +2234,69 @@ const ChatPage: React.FC = () => {
                 </div>
               )}
             </div>
+            
+            {/* 日志排查配置选择器 - 仅 log_troubleshoot Agent 显示 */}
+            {currentAgentType === 'log_troubleshoot' && businessLines.length > 0 && (
+              <div className="log-query-selectors">
+                {/* 业务线选择器 */}
+                <div className="log-dropdown-wrapper">
+                  <button
+                    className="log-dropdown-trigger"
+                    onClick={() => {
+                      setIsBusinessLineOpen(!isBusinessLineOpen)
+                      setIsPrivateServerOpen(false)
+                    }}
+                  >
+                    <span className="log-trigger-name">{businessLine || '选择业务线'}</span>
+                    <DownOutlined className={`log-trigger-arrow ${isBusinessLineOpen ? 'open' : ''}`} />
+                  </button>
+                  {isBusinessLineOpen && (
+                    <div className="log-dropdown-menu">
+                      {businessLines.map(opt => (
+                        <div
+                          key={opt.value}
+                          className={`log-dropdown-item ${businessLine === opt.value ? 'selected' : ''}`}
+                          onClick={() => handleBusinessLineChange(opt.value)}
+                        >
+                          <span>{opt.label}</span>
+                          {businessLine === opt.value && <CheckCircleOutlined className="log-item-check" />}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                
+                {/* 私有化集团选择器 - 仅私有化业务线显示 */}
+                {businessLine === '私有化' && privateServers.length > 0 && (
+                  <div className="log-dropdown-wrapper">
+                    <button
+                      className="log-dropdown-trigger"
+                      onClick={() => {
+                        setIsPrivateServerOpen(!isPrivateServerOpen)
+                        setIsBusinessLineOpen(false)
+                      }}
+                    >
+                      <span className="log-trigger-name">{privateServer || '选择集团'}</span>
+                      <DownOutlined className={`log-trigger-arrow ${isPrivateServerOpen ? 'open' : ''}`} />
+                    </button>
+                    {isPrivateServerOpen && (
+                      <div className="log-dropdown-menu">
+                        {privateServers.map(opt => (
+                          <div
+                            key={opt.value}
+                            className={`log-dropdown-item ${privateServer === opt.value ? 'selected' : ''}`}
+                            onClick={() => handlePrivateServerChange(opt.value)}
+                          >
+                            <span>{opt.label}</span>
+                            {privateServer === opt.value && <CheckCircleOutlined className="log-item-check" />}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

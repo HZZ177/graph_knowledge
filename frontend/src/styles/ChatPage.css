@@ -1172,10 +1172,110 @@
   top: 16px;
   left: 24px;
   z-index: 100;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .agent-dropdown-wrapper {
   position: relative;
+}
+
+/* 日志查询配置选择器 - 与 Agent 选择器风格完全对齐 */
+.log-query-selectors {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.log-dropdown-wrapper {
+  position: relative;
+}
+
+.log-dropdown-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border: 1px solid rgba(255, 152, 0, 0.4);
+  border-radius: 20px;
+  background: var(--bg-color);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  color: var(--text-primary);
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+}
+
+.log-dropdown-trigger:hover {
+  border-color: rgba(255, 152, 0, 0.6);
+  box-shadow: 0 2px 6px rgba(255, 152, 0, 0.15);
+}
+
+.log-trigger-name {
+  font-weight: 500;
+}
+
+.log-trigger-arrow {
+  font-size: 10px;
+  color: var(--text-tertiary);
+  transition: transform 0.2s ease;
+}
+
+.log-trigger-arrow.open {
+  transform: rotate(180deg);
+}
+
+/* 下拉菜单 */
+.log-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 140px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  z-index: 1000;
+  overflow: hidden;
+  animation: logDropdownFadeIn 0.15s ease-out;
+}
+
+@keyframes logDropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.log-dropdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  font-size: 14px;
+  color: var(--text-primary);
+}
+
+.log-dropdown-item:hover {
+  background-color: var(--hover-bg);
+}
+
+.log-dropdown-item.selected {
+  background-color: rgba(255, 152, 0, 0.08);
+  color: #ff9800;
+}
+
+.log-item-check {
+  font-size: 14px;
+  color: #ff9800;
 }
 
 .agent-dropdown-trigger {
@@ -1183,7 +1283,7 @@
   align-items: center;
   gap: 6px;
   padding: 8px 14px;
-  border: 1px solid var(--border-color);
+  border: 1px solid rgba(255, 152, 0, 0.4);
   border-radius: 20px;
   background: var(--bg-color);
   cursor: pointer;
@@ -1195,8 +1295,8 @@
 }
 
 .agent-dropdown-trigger:hover {
-  border-color: var(--text-tertiary);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  border-color: rgba(255, 152, 0, 0.6);
+  box-shadow: 0 2px 6px rgba(255, 152, 0, 0.15);
 }
 
 .agent-trigger-name {

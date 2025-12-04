@@ -387,3 +387,24 @@ export async function fetchAgentTypes(): Promise<AgentType[]> {
   if (!resp.ok) throw new Error('获取 Agent 列表失败')
   return await resp.json()
 }
+
+/** 日志查询选项 */
+export interface LogQueryOption {
+  value: string
+  label: string
+}
+
+export interface LogQueryOptions {
+  businessLines: LogQueryOption[]
+  privateServers: LogQueryOption[]
+}
+
+/**
+ * 获取日志查询的可选配置（业务线、私有化集团）
+ */
+export async function fetchLogQueryOptions(): Promise<LogQueryOptions> {
+  const resp = await fetch(`${HTTP_BASE_PATH}/log-query/options`)
+  if (!resp.ok) throw new Error('获取日志查询配置失败')
+  const result = await resp.json()
+  return result.data
+}

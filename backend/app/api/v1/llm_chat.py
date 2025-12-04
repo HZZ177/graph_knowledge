@@ -71,6 +71,18 @@ async def websocket_chat(websocket: WebSocket):
             }, ensure_ascii=False))
             return
         
+        # 构建 agent_context（用于日志排查等需要动态配置的 Agent）
+        agent_context = None
+        if request.agent_type == "log_troubleshoot":
+            # 日志排查 Agent 必须提供 log_query 配置
+            if not request.log_query:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "error": "日志排查 Agent 需要选择业务线配置",
+                }, ensure_ascii=False))
+                return
+            agent_context = {"log_query": request.log_query.model_dump()}
+        
         # 调用流式问答服务（支持多轮对话 + 多 Agent 类型）
         await streaming_chat(
             db=db,
@@ -78,6 +90,7 @@ async def websocket_chat(websocket: WebSocket):
             websocket=websocket,
             thread_id=request.thread_id,
             agent_type=request.agent_type,
+            agent_context=agent_context,
         )
         
     except WebSocketDisconnect:
@@ -220,3 +233,17 @@ async def websocket_regenerate(websocket: WebSocket):
             await websocket.close()
         except:
             pass
+
+
+@router.get("/log-query/options")
+async def get_log_query_options():
+    """获取日志查询的可选配置
+    
+    返回业务线列表和私有化集团列表，用于前端下拉选择。
+    """
+    from backend.app.llm.langchain.tools.log import BusinessLine, PrivateServer
+    
+    return success_response(data={
+        "businessLines": [{"value": bl.value, "label": bl.value} for bl in BusinessLine],
+        "privateServers": [{"value": ps.value, "label": ps.value} for ps in PrivateServer],
+    })

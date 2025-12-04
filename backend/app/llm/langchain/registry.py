@@ -10,7 +10,7 @@
 
 import hashlib
 from threading import Lock
-from typing import Dict, Optional, TYPE_CHECKING
+from typing import Dict, Optional, Any, TYPE_CHECKING
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import (
@@ -24,6 +24,7 @@ from backend.app.llm.langchain.configs import (
     AGENT_CONFIGS,
     get_agent_config,
     get_knowledge_qa_system_prompt,
+    get_log_troubleshoot_system_prompt,
 )
 from backend.app.llm.factory import get_langchain_llm
 from backend.app.services.ai_model_service import AIModelService
@@ -68,15 +69,23 @@ class AgentRegistry:
                     logger.info("[AgentRegistry] 单例实例已创建")
         return cls._instance
     
-    def get_agent(self, agent_type: str, db: "Session", checkpointer=None) -> "CompiledGraph":
+    def get_agent(
+        self, 
+        agent_type: str, 
+        db: "Session", 
+        checkpointer=None,
+        agent_context: Optional[Dict[str, Any]] = None,
+    ) -> "CompiledGraph":
         """获取指定类型的 Agent
         
         缓存 LLM 实例和工具列表，每次请求重新编译 Agent 并绑定 checkpointer。
+        支持通过 agent_context 传递动态配置（如业务线、私有化集团等）。
         
         Args:
             agent_type: Agent 类型标识
             db: 数据库会话（用于读取 LLM 配置）
             checkpointer: 检查点存储（用于持久化对话历史）
+            agent_context: 动态上下文配置，用于注入到 System Prompt 和工具参数
             
         Returns:
             编译后的 CompiledGraph 实例
@@ -111,16 +120,23 @@ class AgentRegistry:
                     
                     logger.info(f"[AgentRegistry] LLM/Tools 缓存已就绪: {agent_type}, tools={len(self._tools_cache[agent_type])}, hash={current_hash[:16]}...")
         
-        # 每次请求都重新编译 Agent 并绑定 checkpointer
-        return self._create_agent(config, agent_type, checkpointer)
+        # 每次请求都重新编译 Agent 并绑定 checkpointer（支持动态 context）
+        return self._create_agent(config, agent_type, checkpointer, agent_context)
     
-    def _create_agent(self, config: AgentConfig, agent_type: str, checkpointer=None) -> "CompiledGraph":
+    def _create_agent(
+        self, 
+        config: AgentConfig, 
+        agent_type: str, 
+        checkpointer=None,
+        agent_context: Optional[Dict[str, Any]] = None,
+    ) -> "CompiledGraph":
         """创建 Agent（使用缓存的 LLM 和 Tools，绑定 checkpointer）
         
         Args:
             config: Agent 配置
             agent_type: Agent 类型标识
             checkpointer: 检查点存储
+            agent_context: 动态上下文配置，用于注入到 System Prompt
             
         Returns:
             编译后的 CompiledGraph
@@ -141,9 +157,12 @@ class AgentRegistry:
             ),
         ]
         
-        # 获取 System Prompt（knowledge_qa 使用动态生成的 prompt，包含工作区信息）
+        # 获取 System Prompt（根据 agent_type 动态生成）
         if agent_type == "knowledge_qa":
             system_prompt = get_knowledge_qa_system_prompt()
+        elif agent_type == "log_troubleshoot":
+            # 日志排查 Agent 需要注入动态上下文
+            system_prompt = get_log_troubleshoot_system_prompt(agent_context)
         else:
             system_prompt = config.system_prompt
         
@@ -227,18 +246,30 @@ class AgentRegistry:
         }
 
 
-def get_agent_run_config(thread_id: str) -> dict:
+def get_agent_run_config(
+    thread_id: str, 
+    agent_context: Optional[Dict[str, Any]] = None,
+) -> dict:
     """获取 Agent 运行时配置
     
     Args:
         thread_id: 会话 ID
+        agent_context: 动态上下文配置，会注入到 metadata 中供工具使用
         
     Returns:
         Agent 运行配置字典
     """
-    return {
+    config = {
         "configurable": {
             "thread_id": thread_id,
         },
         "recursion_limit": 150,
     }
+    
+    # 如果有 agent_context，注入到 metadata 中供工具使用
+    if agent_context:
+        config["metadata"] = {
+            "agent_context": agent_context,
+        }
+    
+    return config
