@@ -62,6 +62,7 @@ class ConversationOut(BaseModel):
     """会话元数据"""
     id: str
     title: Optional[str] = None
+    agent_type: Optional[str] = "knowledge_qa"
     created_at: datetime
     updated_at: datetime
     

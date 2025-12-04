@@ -64,6 +64,7 @@ interface RawHistoryMessage {
 interface ConversationSummary {
   threadId: string
   title: string
+  agentType?: string  // Agent 类型，用于恢复历史会话时切换 Agent
   updatedAt: string
 }
 
@@ -1424,6 +1425,7 @@ const ChatPage: React.FC = () => {
         const summaries: ConversationSummary[] = data.map(c => ({
           threadId: c.id,
           title: c.title || '新对话',
+          agentType: c.agent_type,
           updatedAt: c.updated_at,
         }))
         setConversations(summaries)
@@ -1494,7 +1496,7 @@ const ChatPage: React.FC = () => {
     }
   }, [isAgentDropdownOpen, isBusinessLineOpen, isPrivateServerOpen])
 
-  const upsertConversation = useCallback((tid: string, title: string, updatedAt: string) => {
+  const upsertConversation = useCallback((tid: string, title: string, updatedAt: string, agentType?: string) => {
     if (!tid) return
     setConversations(prev => {
       const existing = prev.find(c => c.threadId === tid)
@@ -1502,6 +1504,7 @@ const ChatPage: React.FC = () => {
       const item: ConversationSummary = {
         threadId: tid,
         title: title || existing?.title || '新对话',
+        agentType: agentType || existing?.agentType,
         updatedAt,
       }
       return [item, ...others]
@@ -1640,7 +1643,7 @@ const ChatPage: React.FC = () => {
           // 立即将对话添加到历史列表（不等 AI 回复完成）
           const isNewConversation = !threadId
           if (isNewConversation && newThreadId) {
-            upsertConversation(newThreadId, '新对话', new Date().toISOString())
+            upsertConversation(newThreadId, '新对话', new Date().toISOString(), currentAgentType)
           }
         },
         
@@ -1806,7 +1809,7 @@ const ChatPage: React.FC = () => {
             if (finalThreadId && isNewConversation) {
               generateConversationTitle(finalThreadId)
                 .then(title => {
-                  upsertConversation(finalThreadId, title, new Date().toISOString())
+                  upsertConversation(finalThreadId, title, new Date().toISOString(), currentAgentType)
                 })
                 .catch(e => console.warn('生成标题失败', e))
             }
@@ -2060,6 +2063,10 @@ const ChatPage: React.FC = () => {
     if (!conv.threadId) return
     setActiveConversationId(conv.threadId)
     setThreadId(conv.threadId)
+    // 恢复历史会话的 Agent 类型
+    if (conv.agentType) {
+      setCurrentAgentType(conv.agentType)
+    }
     setIsLoading(true)
     resetTypewriter()
 

@@ -19,5 +19,6 @@ class Conversation(Base):
     
     id = Column(String, primary_key=True, comment="Thread ID")
     title = Column(String, nullable=True, default="新对话", comment="会话标题")
+    agent_type = Column(String, nullable=True, default="knowledge_qa", comment="Agent 类型")
     created_at = Column(DateTime(timezone=True), default=utc_now)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)

@@ -331,6 +331,7 @@ export function createRegenerateClient(): RegenerateClient {
 export interface ConversationMetadata {
   id: string
   title: string
+  agent_type?: string  // Agent 类型，用于恢复历史会话时切换 Agent
   created_at: string
   updated_at: string
 }

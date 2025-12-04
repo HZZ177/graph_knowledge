@@ -351,10 +351,13 @@ async def streaming_chat(
     try:
         conv = db.query(Conversation).filter(Conversation.id == thread_id).first()
         if not conv:
-            conv = Conversation(id=thread_id, title="新对话")
+            conv = Conversation(id=thread_id, title="新对话", agent_type=agent_type)
             db.add(conv)
         else:
             conv.updated_at = datetime.now(timezone.utc)
+            # 如果 agent_type 变更，也更新（支持同一会话切换 agent）
+            if conv.agent_type != agent_type:
+                conv.agent_type = agent_type
         db.commit()
     except Exception as e:
         logger.error(f"保存会话元数据失败: {e}")
