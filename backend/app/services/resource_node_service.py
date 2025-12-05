@@ -287,6 +287,7 @@ def create_data_resource(db: Session, data: DataResourceCreate) -> DataResource:
         system=data.system,
         location=data.location,
         description=data.description,
+        ddl=data.ddl,
     )
     db.add(obj)
     db.commit()
@@ -860,3 +861,75 @@ def delete_implementation(db: Session, impl_id: str) -> bool:
     db.delete(obj)
     db.commit()
     return True
+
+
+def batch_create_implementations(
+    db: Session, items: List[ImplementationCreate]
+) -> dict:
+    """批量创建实现单元
+    
+    Args:
+        db: 数据库会话
+        items: 要创建的实现单元列表
+        
+    Returns:
+        包含成功、跳过、失败统计的字典
+    """
+    created_items = []
+    skipped_names = []
+    failed_items = []
+    
+    # 获取已存在的名称集合
+    existing_names = set(
+        name for (name,) in db.query(Implementation.name).all()
+    )
+    
+    # 调试日志
+    logger.debug(f"[BatchImport] 数据库中已有 {len(existing_names)} 个实现单元")
+    logger.debug(f"[BatchImport] 本次导入 {len(items)} 个")
+    if existing_names:
+        logger.debug(f"[BatchImport] 已存在示例: {list(existing_names)[:5]}")
+    if items:
+        logger.debug(f"[BatchImport] 导入示例: {[item.name for item in items[:5]]}")
+    
+    for item in items:
+        try:
+            # 检查是否已存在
+            if item.name in existing_names:
+                logger.debug(f"[BatchImport] 跳过(已存在): {item.name}")
+                skipped_names.append(item.name)
+                continue
+            
+            # 创建新记录
+            obj = Implementation(
+                name=item.name,
+                type=item.type,
+                system=item.system,
+                description=item.description,
+                code_ref=item.code_ref,
+            )
+            db.add(obj)
+            db.flush()  # 获取生成的 ID
+            created_items.append(obj)
+            existing_names.add(item.name)  # 添加到已存在集合，防止同批次重复
+            
+        except Exception as e:
+            failed_items.append({
+                "name": item.name,
+                "error": str(e)
+            })
+    
+    db.commit()
+    
+    # 刷新所有创建的对象
+    for obj in created_items:
+        db.refresh(obj)
+    
+    return {
+        "success_count": len(created_items),
+        "skip_count": len(skipped_names),
+        "failed_count": len(failed_items),
+        "created_items": created_items,
+        "skipped_names": skipped_names,
+        "failed_items": failed_items,
+    }

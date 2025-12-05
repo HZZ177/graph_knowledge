@@ -1653,7 +1653,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
         target: edge.to_step_id,
         sourceHandle: handles.sourceHandle,
         targetHandle: handles.targetHandle,
-        type: 'simplebezier',
+        type: 'bezier',
         markerEnd: { type: MarkerType.ArrowClosed },
         style: { stroke: '#1677ff', strokeWidth: 2 },
       })
@@ -1668,7 +1668,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
         target: link.impl_id,
         sourceHandle: handles.sourceHandle,
         targetHandle: handles.targetHandle,
-        type: 'simplebezier',
+        type: 'bezier',
         markerEnd: { type: MarkerType.ArrowClosed },
         style: { stroke: '#52c41a' },
       })
@@ -1683,7 +1683,7 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
         target: link.resource_id,
         sourceHandle: handles.sourceHandle,
         targetHandle: handles.targetHandle,
-        type: 'simplebezier',
+        type: 'bezier',
         markerEnd: { type: MarkerType.ArrowClosed },
         style: { stroke: '#faad14' },
       })
@@ -1823,6 +1823,16 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                   wordBreak: 'break-word',
                 }}
               >
+                {impl.system && (
+                  <span style={{ 
+                    fontSize: 10, 
+                    color: '#86868b',
+                    background: '#e5e5ea',
+                    padding: '1px 5px',
+                    borderRadius: 3,
+                    marginRight: 4,
+                  }}>{impl.system}</span>
+                )}
                 {impl.is_existing && (
                   <span style={{ 
                     fontSize: 10, 
@@ -1834,16 +1844,6 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                   }}>复用</span>
                 )}
                 <span>{impl.name}</span>
-                {impl.system && (
-                  <span style={{ 
-                    fontSize: 10, 
-                    color: '#86868b',
-                    background: '#e5e5ea',
-                    padding: '1px 5px',
-                    borderRadius: 3,
-                    marginLeft: 4,
-                  }}>{impl.system}</span>
-                )}
               </div>
             ))}
             {canvasData.implementations.length === 0 && (
@@ -1879,6 +1879,16 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                   wordBreak: 'break-word',
                 }}
               >
+                {res.type && (
+                  <span style={{ 
+                    fontSize: 10, 
+                    color: '#86868b',
+                    background: '#e5e5ea',
+                    padding: '1px 5px',
+                    borderRadius: 3,
+                    marginRight: 4,
+                  }}>{res.type}</span>
+                )}
                 {res.is_existing && (
                   <span style={{ 
                     fontSize: 10, 
@@ -1890,16 +1900,6 @@ const PreviewStep: React.FC<PreviewStepProps> = ({
                   }}>复用</span>
                 )}
                 <span>{res.name}</span>
-                {res.type && (
-                  <span style={{ 
-                    fontSize: 10, 
-                    color: '#86868b',
-                    background: '#e5e5ea',
-                    padding: '1px 5px',
-                    borderRadius: 3,
-                    marginLeft: 4,
-                  }}>{res.type}</span>
-                )}
               </div>
             ))}
             {canvasData.data_resources.length === 0 && (

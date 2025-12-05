@@ -12,3 +12,4 @@ langgraph>=0.2.0
 langgraph-checkpoint>=2.0.0
 langgraph-checkpoint-sqlite==3.0.0
 aiosqlite==0.21.0
+pymysql==1.1.1

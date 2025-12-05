@@ -7,6 +7,7 @@
 - graph: 图拓扑（Neo4j 图遍历）
 - code: 代码检索（MCP、文件操作、grep）
 - log: 日志查询（企业日志 API）
+- db: 数据库查询（SQL 查询）
 """
 
 # 实体发现类工具
@@ -54,6 +55,14 @@ from .log import (
     PrivateServer,
 )
 
+# 数据库查询类工具
+from .db import (
+    get_table_schema,
+    query_database,
+    get_db_tools,
+    DatabaseConfig,
+)
+
 
 # ============================================================
 # 工具列表导出
@@ -97,9 +106,9 @@ def get_all_chat_tools():
 def get_log_troubleshoot_tools():
     """获取日志排查 Agent 的工具集
     
-    共 17 个工具：1 个日志工具 + 16 个业务知识工具
+    共 19 个工具：1 个日志工具 + 16 个业务知识工具 + 2 个数据库工具
     """
-    return [search_logs] + get_all_chat_tools()
+    return [search_logs] + get_all_chat_tools() + get_db_tools()
 
 
 # 导出所有公开 API
@@ -122,12 +131,16 @@ __all__ = [
     "read_file_range",
     "grep_code",
     "search_logs",
+    "get_table_schema",
+    "query_database",
     # 配置类
     "LogQueryConfig",
     "BusinessLine",
     "LogServerName",
     "PrivateServer",
+    "DatabaseConfig",
     # 工厂函数
     "get_all_chat_tools",
     "get_log_troubleshoot_tools",
+    "get_db_tools",
 ]

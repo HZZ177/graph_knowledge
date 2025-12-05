@@ -59,20 +59,25 @@ DATA_ANALYSIS_PROMPT = """
 ==========【核心原则：严禁编造，必须有据】==========
 
 ★ systems：【严禁推测，且只能使用指定枚举】
-  - 只能填写以下三个系统之一：admin, owner-center, pay-center
+  - 只能填写以下三个系统之一：admin-vehicle-owner, owner-center, vehicle-pay-center
   - 只有在原始数据中明确出现这些系统名称时才能填写
   - 如果原始数据中没有系统信息，数组应为空[]
 
 ★ apis：【严禁推测】
   - 只能填写原始数据（抓包/日志）中明确出现的接口路径
   - path 必须是原始数据中的完整接口路径，禁止编造
-  - system 只能是以下三个之一：admin, owner-center, pay-center
+  - system 只能是以下三个之一：admin-vehicle-owner, owner-center, vehicle-pay-center
   - 如果原始数据中没有接口信息，数组应为空[]
+  - 【接口路径规范】：
+    * 不要包含协议和域名（去掉 https://xxx.com 部分）
+    * 路径不要以斜杠开头（使用 owner-center/xxx 而不是 /owner-center/xxx）
+    * 服务前缀只有：admin-vehicle-owner、owner-center、vehicle-pay-center
+    * 正确示例：owner-center/backend/pc-fix-order-query
 
 ★ data_resources：【严禁推测】
   - 只能填写原始数据中明确出现的表名、缓存键、队列名
   - type 只能是：table 或 redis
-  - system 只能是以下三个之一：admin, owner-center, pay-center
+  - system 只能是以下四个之一：C端, B端, 路侧, 封闭
   - 禁止根据业务描述猜测可能存在的表名
   - 如果原始数据中没有数据资源信息，数组应为空[]
 
@@ -197,7 +202,7 @@ Final Answer:
   - 必须从【原始技术数据】或【技术分析摘要】中找到明确的表名/资源名才能填写
   - name：必须是原始数据中明确出现的表名或资源名，禁止编造
   - type：只能是 table / redis
-  - system：只能是以下三个之一：admin, owner-center, pay-center
+  - system：只能是以下四个之一：C端, B端, 路侧, 封闭
   - 如果原始数据中没有任何明确的数据资源信息，data_resources数组应为空[]
 
 ★ 关联关系（step_impl_links, impl_data_links）：
@@ -269,4 +274,28 @@ Final Answer:
 3. edges中用步骤名称指定连接关系，按流程顺序排列
 4. step_impl_links和impl_data_links使用名称引用，不要使用ID
 5. 只有明确存在的实现和数据资源才能建立关联关系
+
+==========【接口命名规范】==========
+
+实现单元（implementations）的 name 字段必须严格遵循以下格式：
+
+**格式**：`{{METHOD}} {{service-prefix}}/{{path}}`
+
+**规范**：
+1. 不要包含协议和域名（去掉 https://xxx.com、http://xxx.com 部分）
+2. 路径不要以斜杠开头（使用 `owner-center/xxx` 而不是 `/owner-center/xxx`）
+3. 服务前缀只允许以下三种：
+   - `admin-vehicle-owner`
+   - `owner-center`  
+   - `vehicle-pay-center`
+
+**正确示例**：
+- `POST owner-center/backend/pc-fix-order-query`
+- `GET vehicle-pay-center/urlCode/unlicensedCarOut`
+- `PUT admin-vehicle-owner/api/user/bindCard`
+
+**错误示例**（禁止）：
+- `POST https://xxx.com/owner-center/xxx`（包含了域名）
+- `POST /owner-center/xxx`（以斜杠开头）
+- `POST api/xxx`（缺少服务前缀）
 """

@@ -11,6 +11,8 @@ from backend.app.schemas.resource_nodes import (
     ImplementationCreate,
     ImplementationOut,
     ImplementationUpdate,
+    ImplementationBatchCreate,
+    ImplementationBatchCreateResult,
     PaginatedBusinesses,
     PaginatedImplementations,
     PaginatedSteps,
@@ -516,6 +518,27 @@ def create_implementation(
     except ValueError as exc:
         return error_response(message=str(exc))
     return success_response(data=ImplementationOut.from_orm(obj), message="创建实现成功")
+
+
+@router.post("/batch_create_implementations", response_model=ImplementationBatchCreateResult)
+def batch_create_implementations(
+    payload: ImplementationBatchCreate = Body(...),
+    db: Session = Depends(get_db),
+) -> ImplementationBatchCreateResult:
+    """批量创建实现单元，已存在的会跳过。"""
+    result = resource_node_service.batch_create_implementations(db, payload.items)
+    data = ImplementationBatchCreateResult(
+        success_count=result["success_count"],
+        skip_count=result["skip_count"],
+        failed_count=result["failed_count"],
+        created_items=[ImplementationOut.from_orm(obj) for obj in result["created_items"]],
+        skipped_names=result["skipped_names"],
+        failed_items=result["failed_items"],
+    )
+    return success_response(
+        data=data,
+        message=f"批量导入完成：成功 {result['success_count']} 条，跳过 {result['skip_count']} 条"
+    )
 
 
 @router.get("/get_implementation", response_model=ImplementationOut)

@@ -22,6 +22,7 @@ import {
   BranchesOutlined,
   SearchOutlined,
   PlusOutlined,
+  ImportOutlined,
 } from '@ant-design/icons'
 
 import '../styles/ResourceLibraryPage.css'
@@ -42,6 +43,7 @@ import {
   BusinessNode,
   StepNode,
   ImplementationNode,
+  ImplementationCreatePayload,
   listBusinessesPaged,
   createBusiness,
   updateBusiness,
@@ -54,6 +56,7 @@ import {
   createImplementation,
   updateImplementation,
   deleteImplementation,
+  batchCreateImplementations,
   getBusinessGroupStats,
   getStepGroupStats,
   getImplementationGroupStats,
@@ -65,6 +68,7 @@ import {
 } from '../api/resourceNodes'
 
 import ResourceSidebar, { SidebarGroup, buildSingleLevelGroups, buildTwoLevelGroups } from '../components/ResourceSidebar'
+import OpenAPIImportModal from '../components/OpenAPIImportModal'
 
 // ============ 类型定义 ============
 
@@ -670,6 +674,9 @@ const ImplementationTab: React.FC = () => {
   const [expandedKeys, setExpandedKeys] = useState<string[]>([])
   const [groupLoading, setGroupLoading] = useState(false)
   const [systemOptions, setSystemOptions] = useState<string[]>([])
+  
+  // 导入弹窗状态
+  const [importModalOpen, setImportModalOpen] = useState(false)
 
   const fetchGroupStats = useCallback(async () => {
     setGroupLoading(true)
@@ -808,6 +815,19 @@ const ImplementationTab: React.FC = () => {
     }
   }
 
+  // 批量导入处理
+  const handleImport = async (payloads: ImplementationCreatePayload[]) => {
+    try {
+      const result = await batchCreateImplementations(payloads)
+      showSuccess(`导入完成：成功 ${result.success_count} 条，跳过 ${result.skip_count} 条`)
+      fetchList()
+      fetchGroupStats()
+    } catch (e) {
+      showError('导入失败')
+      throw e
+    }
+  }
+
   const groupTitle = (() => {
     if (selectedSystem === null) return '全部实现单元'
     const sysLabel = selectedSystem || '其他'
@@ -845,6 +865,7 @@ const ImplementationTab: React.FC = () => {
           <Space>
             <Button type="primary" onClick={handleSearch}>查询</Button>
             <Button onClick={handleReset}>重置</Button>
+            <Button icon={<ImportOutlined />} onClick={() => setImportModalOpen(true)}>导入</Button>
             <Button icon={<PlusOutlined />} onClick={handleStartCreate}>新增</Button>
           </Space>
         </div>
@@ -908,9 +929,9 @@ const ImplementationTab: React.FC = () => {
                     <Form.Item label="名称" name="name" rules={[{ required: true, message: '请输入名称' }]}><Input /></Form.Item>
                     <Form.Item label="所属系统" name="system" rules={[{ required: true, message: '请选择系统' }]}>
                       <Select placeholder="选择系统" allowClear>
-                        <Select.Option value="admin">admin</Select.Option>
+                        <Select.Option value="admin-vehicle-owner">admin-vehicle-owner</Select.Option>
                         <Select.Option value="owner-center">owner-center</Select.Option>
-                        <Select.Option value="pay-center">pay-center</Select.Option>
+                        <Select.Option value="vehicle-pay-center">vehicle-pay-center</Select.Option>
                       </Select>
                     </Form.Item>
                     <Form.Item label="类型" name="type" rules={[{ required: true, message: '请选择类型' }]}>
@@ -933,6 +954,13 @@ const ImplementationTab: React.FC = () => {
           <Pagination size="small" current={page} pageSize={pageSize} total={total} showSizeChanger onChange={(p, ps) => { setPage(p); setPageSize(ps) }} />
         </div>
       </div>
+
+      {/* OpenAPI 导入弹窗 */}
+      <OpenAPIImportModal
+        open={importModalOpen}
+        onCancel={() => setImportModalOpen(false)}
+        onImport={handleImport}
+      />
     </div>
   )
 }
@@ -945,6 +973,7 @@ interface DataResourceFormValues {
   system?: string
   location?: string
   description?: string
+  ddl?: string
 }
 
 const DataResourceTab: React.FC = () => {
@@ -1019,6 +1048,7 @@ const DataResourceTab: React.FC = () => {
       system: selectedItem.system ?? undefined,
       location: selectedItem.location ?? undefined,
       description: selectedItem.description ?? undefined,
+      ddl: selectedItem.ddl ?? undefined,
     })
   }, [selectedItem, isCreateMode, form])
 
@@ -1066,10 +1096,10 @@ const DataResourceTab: React.FC = () => {
     try {
       const values = await form.validateFields()
       if (isCreateMode) {
-        await createDataResource({ name: values.name, type: values.type, system: values.system, location: values.location, description: values.description })
+        await createDataResource({ name: values.name, type: values.type, system: values.system, location: values.location, description: values.description, ddl: values.ddl })
         showSuccess('创建成功')
       } else if (selectedItem) {
-        await updateDataResource(selectedItem.resource_id, { name: values.name, type: values.type, system: values.system, location: values.location, description: values.description })
+        await updateDataResource(selectedItem.resource_id, { name: values.name, type: values.type, system: values.system, location: values.location, description: values.description, ddl: values.ddl })
         showSuccess('保存成功')
       }
       setMode('view')
@@ -1087,7 +1117,7 @@ const DataResourceTab: React.FC = () => {
       if (items.length > 0) setSelectedId(items[0].resource_id)
     } else if (isEditMode) {
       setMode('view')
-      if (selectedItem) form.setFieldsValue({ name: selectedItem.name, type: selectedItem.type ?? undefined, system: selectedItem.system ?? undefined, location: selectedItem.location ?? undefined, description: selectedItem.description ?? undefined })
+      if (selectedItem) form.setFieldsValue({ name: selectedItem.name, type: selectedItem.type ?? undefined, system: selectedItem.system ?? undefined, location: selectedItem.location ?? undefined, description: selectedItem.description ?? undefined, ddl: selectedItem.ddl ?? undefined })
     }
   }
 
@@ -1203,9 +1233,10 @@ const DataResourceTab: React.FC = () => {
                     <Form.Item label="名称" name="name" rules={[{ required: true, message: '请输入名称' }]}><Input /></Form.Item>
                     <Form.Item label="所属系统" name="system" rules={[{ required: true, message: '请选择系统' }]}>
                       <Select placeholder="选择系统" allowClear>
-                        <Select.Option value="admin">admin</Select.Option>
-                        <Select.Option value="owner-center">owner-center</Select.Option>
-                        <Select.Option value="pay-center">pay-center</Select.Option>
+                        <Select.Option value="C端">C端</Select.Option>
+                        <Select.Option value="B端">B端</Select.Option>
+                        <Select.Option value="路侧">路侧</Select.Option>
+                        <Select.Option value="封闭">封闭</Select.Option>
                       </Select>
                     </Form.Item>
                     <Form.Item label="类型" name="type" rules={[{ required: true, message: '请选择类型' }]}>
@@ -1215,7 +1246,14 @@ const DataResourceTab: React.FC = () => {
                       </Select>
                     </Form.Item>
                     <Form.Item label="物理位置" name="location"><Input placeholder="如 member_db.user_card" /></Form.Item>
-                    <Form.Item label="描述" name="description"><Input.TextArea rows={3} /></Form.Item>
+                    <Form.Item label="描述" name="description"><Input.TextArea rows={2} /></Form.Item>
+                    <Form.Item label="DDL" name="ddl" tooltip="库表结构定义（CREATE TABLE 语句）">
+                      <Input.TextArea 
+                        rows={6} 
+                        placeholder="CREATE TABLE t_user (&#10;  id BIGINT PRIMARY KEY,&#10;  name VARCHAR(100) COMMENT '用户名',&#10;  ...&#10;);" 
+                        style={{ fontFamily: 'monospace', fontSize: 12 }}
+                      />
+                    </Form.Item>
                   </Form>
                 </Space>
               </Card>

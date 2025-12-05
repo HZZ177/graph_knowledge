@@ -118,6 +118,7 @@ class DataResource(Base):
     system = Column(String, nullable=True, comment="数据资源所在系统")
     location = Column(String, nullable=True, comment="物理或逻辑位置标识")
     description = Column(Text, nullable=True, comment="数据资源说明")
+    ddl = Column(Text, nullable=True, comment="库表 DDL 结构定义（CREATE TABLE 语句）")
 
     implementations = relationship(
         "ImplementationDataResource", back_populates="data_resource"

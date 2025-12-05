@@ -7,6 +7,7 @@ export interface DataResource {
   system?: string
   location?: string
   description?: string
+  ddl?: string
 }
 
 // 分组统计类型

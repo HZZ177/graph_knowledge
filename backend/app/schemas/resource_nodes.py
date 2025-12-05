@@ -7,7 +7,10 @@ from pydantic import BaseModel, field_validator
 StepTypeEnum = Literal["inner", "outer"]
 ImplementationTypeEnum = Literal["api", "function", "job"]
 DataResourceTypeEnum = Literal["table", "redis"]
-SystemEnum = Literal["admin", "owner-center", "pay-center"]
+# 实现单元的系统枚举（微服务名称）
+ImplSystemEnum = Literal["admin-vehicle-owner", "owner-center", "vehicle-pay-center"]
+# 数据资源的系统枚举（业务线分类）
+DataResourceSystemEnum = Literal["C端", "B端", "路侧", "封闭"]
 
 
 class BusinessBase(BaseModel):
@@ -75,7 +78,7 @@ class PaginatedSteps(BaseModel):
 class ImplementationBase(BaseModel):
     name: str
     type: Optional[ImplementationTypeEnum] = None
-    system: Optional[SystemEnum] = None
+    system: Optional[ImplSystemEnum] = None
     description: Optional[str] = None
     code_ref: Optional[str] = None
 
@@ -87,7 +90,7 @@ class ImplementationCreate(ImplementationBase):
 class ImplementationUpdate(BaseModel):
     name: Optional[str] = None
     type: Optional[ImplementationTypeEnum] = None
-    system: Optional[SystemEnum] = None
+    system: Optional[ImplSystemEnum] = None
     description: Optional[str] = None
     code_ref: Optional[str] = None
 
@@ -104,6 +107,21 @@ class PaginatedImplementations(BaseModel):
     page_size: int
     total: int
     items: List[ImplementationOut]
+
+
+class ImplementationBatchCreate(BaseModel):
+    """批量创建实现单元的请求"""
+    items: List[ImplementationCreate]
+
+
+class ImplementationBatchCreateResult(BaseModel):
+    """批量创建结果"""
+    success_count: int
+    skip_count: int  # 已存在跳过的数量
+    failed_count: int
+    created_items: List[ImplementationOut]
+    skipped_names: List[str]  # 跳过的名称列表
+    failed_items: List[dict]  # 失败的项及原因
 
 
 class StepImplementationLinkBase(BaseModel):

@@ -198,6 +198,26 @@ export async function deleteImplementation(implId: string) {
   await http.post('/resource-nodes/delete_implementation', { impl_id: implId })
 }
 
+// 批量创建实现单元
+export interface ImplementationBatchCreateResult {
+  success_count: number
+  skip_count: number
+  failed_count: number
+  created_items: ImplementationNode[]
+  skipped_names: string[]
+  failed_items: { name: string; error: string }[]
+}
+
+export async function batchCreateImplementations(
+  items: ImplementationCreatePayload[]
+): Promise<ImplementationBatchCreateResult> {
+  const { data } = await http.post<ImplementationBatchCreateResult>(
+    '/resource-nodes/batch_create_implementations',
+    { items }
+  )
+  return data
+}
+
 export async function createStepImplementationLink(
   stepId: string,
   implId: string,

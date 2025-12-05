@@ -60,7 +60,7 @@ const layoutGraph = (nodes: Node[], edges: Edge[]) => {
 
   const layoutedEdges: Edge[] = edges.map((edge) => ({
     ...edge,
-    type: edge.type || 'simplebezier',
+    type: edge.type || 'bezier',
     markerEnd: { type: MarkerType.ArrowClosed },
   }))
 
@@ -1711,7 +1711,7 @@ const BusinessLibraryPage: React.FC = () => {
         target: newNode.id,
         sourceHandle: quickAddModal.sourceHandle,
         targetHandle,
-        type: 'simplebezier',
+        type: 'bezier',
         markerEnd: { type: MarkerType.ArrowClosed },
         data: { kind: edgeKind },
         style: {
