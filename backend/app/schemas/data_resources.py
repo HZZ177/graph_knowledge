@@ -130,3 +130,20 @@ class AccessChainItem(BaseModel):
     step_name: Optional[str] = None
     process_id: Optional[str] = None
     process_name: Optional[str] = None
+
+
+# ============ 批量导入相关 ============
+
+class DataResourceBatchCreate(BaseModel):
+    """批量创建数据资源的请求体"""
+    items: List[DataResourceCreate]
+
+
+class DataResourceBatchCreateResult(BaseModel):
+    """批量创建数据资源的结果"""
+    success_count: int
+    skip_count: int
+    failed_count: int
+    created_items: List[DataResourceOut]
+    skipped_names: List[str]
+    failed_items: List[dict]  # {"name": "...", "error": "..."}

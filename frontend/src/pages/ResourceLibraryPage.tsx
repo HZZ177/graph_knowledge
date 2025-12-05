@@ -37,6 +37,7 @@ import {
   deleteDataResource,
   getDataResourceGroupStats,
   DataResourceGroupStats,
+  batchCreateDataResources,
 } from '../api/dataResources'
 
 import {
@@ -69,6 +70,7 @@ import {
 
 import ResourceSidebar, { SidebarGroup, buildSingleLevelGroups, buildTwoLevelGroups } from '../components/ResourceSidebar'
 import OpenAPIImportModal from '../components/OpenAPIImportModal'
+import DDLImportModal from '../components/DDLImportModal'
 
 // ============ 类型定义 ============
 
@@ -994,6 +996,9 @@ const DataResourceTab: React.FC = () => {
   const [expandedKeys, setExpandedKeys] = useState<string[]>([])
   const [groupLoading, setGroupLoading] = useState(false)
   const [systemOptions, setSystemOptions] = useState<string[]>([])
+  
+  // 导入弹窗状态
+  const [importModalOpen, setImportModalOpen] = useState(false)
 
   const fetchGroupStats = useCallback(async () => {
     setGroupLoading(true)
@@ -1133,6 +1138,19 @@ const DataResourceTab: React.FC = () => {
     }
   }
 
+  // 批量导入处理
+  const handleImport = async (payloads: any[]) => {
+    try {
+      const result = await batchCreateDataResources(payloads)
+      showSuccess(`导入完成：成功 ${result.success_count} 条，跳过 ${result.skip_count} 条`)
+      fetchList()
+      fetchGroupStats()
+    } catch (e) {
+      showError('导入失败')
+      throw e
+    }
+  }
+
   const groupTitle = (() => {
     if (selectedSystem === null) return '全部数据资源'
     const sysLabel = selectedSystem || '其他'
@@ -1170,6 +1188,7 @@ const DataResourceTab: React.FC = () => {
           <Space>
             <Button type="primary" onClick={handleSearch}>查询</Button>
             <Button onClick={handleReset}>重置</Button>
+            <Button icon={<ImportOutlined />} onClick={() => setImportModalOpen(true)}>导入</Button>
             <Button icon={<PlusOutlined />} onClick={handleStartCreate}>新增</Button>
           </Space>
         </div>
@@ -1200,7 +1219,9 @@ const DataResourceTab: React.FC = () => {
                       {item.system && <Tag color="orange" style={{ fontSize: 10 }}>{item.system}</Tag>}
                       {item.type && <Tag style={{ fontSize: 10 }}>{DATA_TYPE_LABELS[item.type] || item.type}</Tag>}
                     </Space>
-                    <div style={{ fontSize: 11, color: '#6b7280' }}>{item.location || item.description || '暂无描述'}</div>
+                    <div style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                      {item.description || '暂无描述'}
+                    </div>
                     <div style={{ marginTop: 'auto', textAlign: 'right', paddingTop: 4 }}>
                       <Popconfirm title="确认删除？" onConfirm={(e) => { e?.stopPropagation(); handleDelete(item) }} onCancel={(e) => e?.stopPropagation()}>
                         <Typography.Text type="secondary" style={{ fontSize: 11, color: '#f97316' }} onClick={(e) => e.stopPropagation()}>删除</Typography.Text>
@@ -1265,6 +1286,13 @@ const DataResourceTab: React.FC = () => {
           <Pagination size="small" current={page} pageSize={pageSize} total={total} showSizeChanger onChange={(p, ps) => { setPage(p); setPageSize(ps) }} />
         </div>
       </div>
+
+      {/* DDL 导入弹窗 */}
+      <DDLImportModal
+        open={importModalOpen}
+        onCancel={() => setImportModalOpen(false)}
+        onImport={handleImport}
+      />
     </div>
   )
 }

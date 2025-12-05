@@ -61,7 +61,7 @@ class DatabaseConfig:
     # 与日志工具的 BusinessLine 枚举对应
     BUSINESS_LINE_DB_MAP: Dict[str, str] = {
         "永策测试": "yongcepro_test",
-        "永策C+路侧分区": "yongcepro_test",
+        # "永策C+路侧分区": "yongcepro_test",
         # 私有化集团映射（后续扩展）
         # "人居乐": "renjule",
         # "库尔勒": "kuerle",
@@ -145,10 +145,12 @@ class SQLValidator:
         Returns:
             (is_valid, error_message)
         """
+        logger.debug(f"[SQLValidator] 开始校验 SQL, 长度={len(sql)}, 白名单表数={len(allowed_tables)}")
         sql_upper = sql.upper().strip()
         
         # 1. 必须以 SELECT 开头
         if not sql_upper.startswith('SELECT'):
+            logger.warning(f"[SQLValidator] 校验失败: SQL 不是以 SELECT 开头, sql={sql[:100]}")
             return False, "仅允许 SELECT 查询语句"
         
         # 2. 检查禁止的关键字
@@ -156,14 +158,17 @@ class SQLValidator:
             # 使用单词边界匹配，避免误判
             pattern = r'\b' + keyword + r'\b'
             if re.search(pattern, sql_upper):
+                logger.warning(f"[SQLValidator] 校验失败: 包含禁止关键字 {keyword}, sql={sql[:100]}")
                 return False, f"禁止使用 {keyword} 语句"
         
         # 3. 检查是否包含注释（防止注入）
         if '--' in sql or '/*' in sql:
+            logger.warning(f"[SQLValidator] 校验失败: SQL 包含注释, sql={sql[:100]}")
             return False, "SQL 中不允许包含注释"
         
         # 4. 检查分号（防止多语句注入）
         if ';' in sql.rstrip(';'):  # 允许末尾的分号
+            logger.warning(f"[SQLValidator] 校验失败: SQL 包含多个分号, sql={sql[:100]}")
             return False, "SQL 中不允许包含多条语句"
         
         # 5. 提取涉及的表名并校验
@@ -171,20 +176,26 @@ class SQLValidator:
         table_pattern = r'(?:FROM|JOIN)\s+`?(\w+)`?'
         tables_in_sql = re.findall(table_pattern, sql_upper)
         
+        logger.debug(f"[SQLValidator] SQL 中涉及的表: {tables_in_sql}")
+        
         for table in tables_in_sql:
             table_lower = table.lower()
             # 检查黑名单
             if table_lower in [t.lower() for t in DatabaseConfig.BLOCKED_TABLES]:
+                logger.warning(f"[SQLValidator] 校验失败: 尝试访问黑名单表 {table}")
                 return False, f"禁止访问表: {table}"
             # 检查白名单（如果提供）
             if allowed_tables and table_lower not in [t.lower() for t in allowed_tables]:
+                logger.warning(f"[SQLValidator] 校验失败: 表 {table} 不在白名单中")
                 return False, f"表 {table} 不在可查询范围内"
         
         # 6. 检查 JOIN 数量
         join_count = len(re.findall(r'\bJOIN\b', sql_upper))
         if join_count > DatabaseConfig.MAX_JOIN_TABLES:
+            logger.warning(f"[SQLValidator] 校验失败: JOIN 数量 {join_count} 超过限制 {DatabaseConfig.MAX_JOIN_TABLES}")
             return False, f"JOIN 表数量超过限制（最多 {DatabaseConfig.MAX_JOIN_TABLES} 个）"
         
+        logger.info(f"[SQLValidator] 校验通过, 涉及表={tables_in_sql}, JOIN数={join_count}")
         return True, ""
     
     @classmethod
@@ -198,6 +209,7 @@ class SQLValidator:
         if limit_match:
             current_limit = int(limit_match.group(1))
             if current_limit > max_rows:
+                logger.info(f"[SQLValidator] 调整 LIMIT: {current_limit} -> {max_rows}")
                 # 替换为最大限制
                 sql = re.sub(
                     r'\bLIMIT\s+\d+',
@@ -205,7 +217,10 @@ class SQLValidator:
                     sql,
                     flags=re.IGNORECASE
                 )
+            else:
+                logger.debug(f"[SQLValidator] LIMIT 已存在且合规: {current_limit}")
         else:
+            logger.info(f"[SQLValidator] 添加 LIMIT {max_rows}")
             # 添加 LIMIT
             sql = f"{sql.rstrip(';')} LIMIT {max_rows}"
         
@@ -230,12 +245,18 @@ class DatabaseExecutor:
                 cursor = conn.cursor()
                 ...
         """
+        import time
+        
+        logger.info(f"[DatabaseExecutor] 准备连接数据库: database={database}")
         config = DatabaseConfig.get_connection(database)
         if not config:
+            logger.error(f"[DatabaseExecutor] 数据库配置未找到: {database}")
             raise ValueError(f"数据库 {database} 未配置")
         
         conn = None
+        start_time = time.time()
         try:
+            logger.debug(f"[DatabaseExecutor] 连接参数: host={config['host']}, port={config['port']}, db={config['database']}")
             conn = pymysql.connect(
                 host=config['host'],
                 port=config['port'],
@@ -248,15 +269,17 @@ class DatabaseExecutor:
                 connect_timeout=10,
                 cursorclass=DictCursor,
             )
-            logger.info(f"[DatabaseExecutor] 成功连接数据库: {database}")
+            connect_time = time.time() - start_time
+            logger.info(f"[DatabaseExecutor] 成功连接数据库: database={database}, 耗时={connect_time:.3f}s")
             yield conn
         except pymysql.Error as e:
-            logger.error(f"[DatabaseExecutor] 连接数据库失败: {database}, error={e}")
+            logger.error(f"[DatabaseExecutor] 连接数据库失败: database={database}, error={e}, error_code={e.args[0] if e.args else 'N/A'}")
             raise
         finally:
             if conn:
                 conn.close()
-                logger.debug(f"[DatabaseExecutor] 关闭数据库连接: {database}")
+                total_time = time.time() - start_time
+                logger.debug(f"[DatabaseExecutor] 关闭数据库连接: database={database}, 总耗时={total_time:.3f}s")
     
     @classmethod
     def execute(cls, sql: str, database: str) -> List[Dict[str, Any]]:
@@ -270,15 +293,28 @@ class DatabaseExecutor:
         Returns:
             查询结果列表，每行为一个字典
         """
+        import time
+        
+        logger.info(f"[DatabaseExecutor] 开始执行 SQL: database={database}")
+        logger.debug(f"[DatabaseExecutor] SQL 内容: {sql}")
+        
         with cls.get_connection(database) as conn:
             cursor = conn.cursor()
+            exec_start = time.time()
             try:
                 cursor.execute(sql)
+                exec_time = time.time() - exec_start
+                logger.info(f"[DatabaseExecutor] SQL 执行完成, 耗时={exec_time:.3f}s")
+                
+                fetch_start = time.time()
                 results = cursor.fetchall()
+                fetch_time = time.time() - fetch_start
+                logger.info(f"[DatabaseExecutor] 数据获取完成: rows={len(results)}, 耗时={fetch_time:.3f}s")
                 
                 # 将结果转换为可序列化的格式
+                serialize_start = time.time()
                 serializable_results = []
-                for row in results:
+                for idx, row in enumerate(results):
                     serializable_row = {}
                     for key, value in row.items():
                         # 处理特殊类型（日期、Decimal 等）
@@ -292,11 +328,31 @@ class DatabaseExecutor:
                             serializable_row[key] = value
                     serializable_results.append(serializable_row)
                 
-                logger.info(f"[DatabaseExecutor] 查询成功: database={database}, rows={len(serializable_results)}")
+                serialize_time = time.time() - serialize_start
+                total_time = time.time() - exec_start
+                
+                logger.info(
+                    f"[DatabaseExecutor] 查询成功: database={database}, "
+                    f"rows={len(serializable_results)}, "
+                    f"总耗时={total_time:.3f}s ("
+                    f"执行={exec_time:.3f}s, "
+                    f"获取={fetch_time:.3f}s, "
+                    f"序列化={serialize_time:.3f}s)"
+                )
+                
+                # 记录结果样例（仅debug级别）
+                if serializable_results:
+                    logger.debug(f"[DatabaseExecutor] 结果样例（第1行）: {serializable_results[0]}")
+                
                 return serializable_results
                 
             except pymysql.Error as e:
-                logger.error(f"[DatabaseExecutor] SQL 执行失败: {e}, sql={sql}")
+                logger.error(
+                    f"[DatabaseExecutor] SQL 执行失败: "
+                    f"error={e}, "
+                    f"error_code={e.args[0] if e.args else 'N/A'}, "
+                    f"sql={sql[:200]}"
+                )
                 raise
             finally:
                 cursor.close()
@@ -323,24 +379,32 @@ def get_table_schema(table_name: str) -> str:
     
     注意：只有在明确知道要查询的表名时才调用此工具。
     """
+    logger.info(f"[get_table_schema] 开始查询表结构: table_name={table_name}")
+    
     try:
         db = SessionLocal()
         try:
             # 精确匹配表名
+            logger.debug(f"[get_table_schema] 查询数据资源表: table_name={table_name}")
             resource = db.query(DataResource).filter(DataResource.name == table_name).first()
             
             if not resource:
+                logger.warning(f"[get_table_schema] 未找到表: table_name={table_name}, 尝试模糊匹配")
                 # 尝试模糊匹配给出建议
                 fuzzy_results = db.query(DataResource).filter(
                     DataResource.name.ilike(f'%{table_name}%')
                 ).limit(5).all()
                 
                 suggestions = [r.name for r in fuzzy_results]
+                logger.info(f"[get_table_schema] 模糊匹配结果: {suggestions}")
+                
                 return json.dumps({
                     "error": f"未找到表 {table_name}，该表可能尚未在系统中注册",
                     "suggestions": suggestions if suggestions else None,
                     "hint": "请确认表名是否正确，或联系管理员添加表结构信息"
                 }, ensure_ascii=False)
+            
+            logger.info(f"[get_table_schema] 找到表: name={resource.name}, system={resource.system}, type={resource.type}")
             
             # 构建返回结果
             result = {
@@ -349,15 +413,21 @@ def get_table_schema(table_name: str) -> str:
             }
             
             if resource.ddl:
+                logger.debug(f"[get_table_schema] DDL 长度: {len(resource.ddl)} 字符")
                 result["ddl"] = resource.ddl
                 # 尝试从 DDL 中解析字段列表（简化展示）
                 columns = _parse_columns_from_ddl(resource.ddl)
                 if columns:
+                    logger.info(f"[get_table_schema] 解析到 {len(columns)} 个字段")
                     result["columns"] = columns
+                else:
+                    logger.warning(f"[get_table_schema] DDL 解析失败，未提取到字段")
             else:
+                logger.warning(f"[get_table_schema] 表 {table_name} 没有 DDL 信息")
                 result["ddl"] = None
                 result["warning"] = "该表尚未配置 DDL 结构定义，无法进行数据查询。请先在数据资源中补充表结构信息。"
             
+            logger.info(f"[get_table_schema] 返回结果: table={resource.name}, has_ddl={bool(resource.ddl)}, col_count={len(result.get('columns', []))}")
             return json.dumps(result, ensure_ascii=False)
             
         finally:
@@ -453,36 +523,49 @@ def query_database(
     - 敏感字段（手机号、身份证等）自动脱敏
     - 禁止访问系统敏感表
     """
+    logger.info(f"[query_database] ========== 开始执行数据库查询 ==========")
+    logger.info(f"[query_database] 查询目的: {reason}")
+    logger.debug(f"[query_database] SQL 预览: {sql[:200]}..." if len(sql) > 200 else f"[query_database] SQL: {sql}")
+    
     # 1. 从 config.metadata 获取用户在 UI 选择的业务线配置
     if not config:
+        logger.error(f"[query_database] 缺少运行时配置")
         return json.dumps({"error": "系统错误：缺少运行时配置"}, ensure_ascii=False)
     
     try:
+        logger.debug(f"[query_database] 解析业务线配置")
         metadata = config.get("metadata", {}) or {}
         log_query = metadata.get("agent_context", {}).get("log_query", {})
         business_line = log_query.get("businessLine")
         private_server = log_query.get("privateServer")
         
+        logger.info(f"[query_database] 业务线配置: business_line={business_line}, private_server={private_server}")
+        
         if not business_line:
+            logger.warning(f"[query_database] 未选择业务线")
             return json.dumps({
                 "error": "请在界面左上角选择业务线配置",
                 "hint": "数据库查询需要根据业务线确定连接哪个数据库"
             }, ensure_ascii=False)
     except Exception as e:
+        logger.error(f"[query_database] 获取业务线配置失败: {e}", exc_info=True)
         return json.dumps({"error": f"获取业务线配置失败: {e}"}, ensure_ascii=False)
     
     # 2. 根据业务线获取数据库 key
+    logger.debug(f"[query_database] 根据业务线获取数据库: {business_line}")
     database = DatabaseConfig.get_database_by_business_line(business_line, private_server)
     if not database:
+        logger.error(f"[query_database] 业务线 '{business_line}' 未配置数据库")
         return json.dumps({
             "error": f"业务线 '{business_line}' 暂未配置数据库连接",
             "hint": "请联系管理员配置该业务线的数据库连接"
         }, ensure_ascii=False)
     
-    logger.info(f"[query_database] business_line={business_line}, database={database}, reason={reason}")
+    logger.info(f"[query_database] 确定数据库: business_line={business_line}, database={database}")
     
     try:
         # 3. 获取所有已注册的表作为白名单（不再按 system 过滤，因为是同一个库）
+        logger.debug(f"[query_database] 加载表白名单")
         db = SessionLocal()
         try:
             allowed_tables = [
@@ -490,12 +573,15 @@ def query_database(
                 .filter(DataResource.type == 'table')
                 .all()
             ]
+            logger.info(f"[query_database] 白名单表数量: {len(allowed_tables)}")
         finally:
             db.close()
         
         # 4. SQL 安全校验
+        logger.info(f"[query_database] 开始 SQL 安全校验")
         is_valid, error_msg = SQLValidator.validate(sql, allowed_tables)
         if not is_valid:
+            logger.warning(f"[query_database] SQL 校验失败: {error_msg}")
             return json.dumps({
                 "error": "SQL 校验失败",
                 "detail": error_msg,
@@ -503,21 +589,32 @@ def query_database(
             }, ensure_ascii=False)
         
         # 5. 确保 LIMIT 限制
+        logger.debug(f"[query_database] 检查 LIMIT 子句")
         sql = SQLValidator.ensure_limit(sql)
         
         # 6. 检查数据库连接配置
         if not DatabaseConfig.get_connection(database):
+            logger.error(f"[query_database] 数据库 {database} 未配置连接")
             return json.dumps({
                 "error": f"数据库 {database} 未配置连接",
                 "hint": "请在 DatabaseConfig.CONNECTIONS 中添加数据库连接配置"
             }, ensure_ascii=False)
         
         # 7. 记录审计日志
-        logger.info(f"[query_database] EXECUTE: database={database}, sql={sql}")
+        logger.info(f"[query_database] 审计: reason='{reason}', business_line={business_line}, database={database}")
+        logger.info(f"[query_database] 执行 SQL: {sql}")
         
         # 8. 执行查询
         try:
             results = DatabaseExecutor.execute(sql, database)
+            
+            logger.info(
+                f"[query_database] 查询成功: "
+                f"business_line={business_line}, "
+                f"database={database}, "
+                f"rows={len(results)}"
+            )
+            logger.info(f"[query_database] ========== 查询完成 ==========")
             
             return json.dumps({
                 "business_line": business_line,
@@ -528,7 +625,7 @@ def query_database(
             }, ensure_ascii=False)
             
         except pymysql.Error as e:
-            logger.error(f"[query_database] 数据库执行失败: {e}")
+            logger.error(f"[query_database] 数据库执行失败: {e}", exc_info=True)
             return json.dumps({
                 "error": "数据库查询执行失败",
                 "detail": str(e),
@@ -537,6 +634,7 @@ def query_database(
             
     except Exception as e:
         logger.error(f"[query_database] 执行失败: {e}", exc_info=True)
+        logger.error(f"[query_database] ========== 查询失败 ==========")
         return json.dumps({"error": str(e)}, ensure_ascii=False)
 
 

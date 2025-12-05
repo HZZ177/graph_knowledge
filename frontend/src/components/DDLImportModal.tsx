@@ -14,66 +14,55 @@ import {
   Spin,
 } from 'antd'
 import { InboxOutlined, SearchOutlined } from '@ant-design/icons'
-import type { UploadFile, UploadProps } from 'antd'
-import type { ImplementationCreatePayload } from '../api/resourceNodes'
+import type { UploadProps } from 'antd'
+import type { DataResourceCreatePayload } from '../api/dataResources'
 
 const { Dragger } = Upload
 const { Text } = Typography
 
-// OpenAPI 解析出的接口项
-interface ParsedApiItem {
+// 解析出的DDL项
+interface ParsedDDLItem {
   key: string
-  method: string
-  path: string
-  name: string  // method + path
+  name: string
+  type: string
+  system: string
+  location: string
   description: string
+  ddl: string
 }
 
-// OpenAPI JSON 结构（简化）
-interface OpenAPISpec {
-  openapi?: string
-  info?: { title?: string; version?: string }
-  servers?: Array<{ url?: string; description?: string }>
-  paths?: Record<string, Record<string, {
-    description?: string
-    summary?: string
-    operationId?: string
-    tags?: string[]
-  }>>
-}
-
-interface OpenAPIImportModalProps {
+interface DDLImportModalProps {
   open: boolean
   onCancel: () => void
-  onImport: (items: ImplementationCreatePayload[]) => Promise<void>
+  onImport: (items: DataResourceCreatePayload[]) => Promise<void>
 }
 
-const IMPL_SYSTEMS = [
-  { value: 'admin-vehicle-owner', label: 'admin-vehicle-owner' },
-  { value: 'owner-center', label: 'owner-center' },
-  { value: 'vehicle-pay-center', label: 'vehicle-pay-center' },
+const SYSTEM_OPTIONS = [
+  { value: 'C端', label: 'C端' },
+  { value: 'B端', label: 'B端' },
+  { value: '路侧', label: '路侧' },
+  { value: '封闭', label: '封闭' },
 ]
 
-const IMPL_TYPES = [
-  { value: 'api', label: '接口' },
-  // { value: 'function', label: '内部方法' },
-  // { value: 'job', label: '定时任务' },
+const TYPE_OPTIONS = [
+  { value: 'table', label: '库表' },
+  { value: 'redis', label: 'Redis' },
 ]
 
-export default function OpenAPIImportModal({
+export default function DDLImportModal({
   open,
   onCancel,
   onImport,
-}: OpenAPIImportModalProps) {
+}: DDLImportModalProps) {
   // 步骤：1 = 选择文件，2 = 预览选择
   const [step, setStep] = useState<1 | 2>(1)
   
   // 配置
-  const [system, setSystem] = useState<string>('owner-center')
-  const [implType, setImplType] = useState<string>('api')
+  const [system, setSystem] = useState<string>('C端')
+  const [resourceType, setResourceType] = useState<string>('table')
   
   // 解析结果
-  const [parsedItems, setParsedItems] = useState<ParsedApiItem[]>([])
+  const [parsedItems, setParsedItems] = useState<ParsedDDLItem[]>([])
   const [selectedKeys, setSelectedKeys] = useState<string[]>([])
   const [searchText, setSearchText] = useState('')
   const [pageSize, setPageSize] = useState(10)
@@ -98,63 +87,33 @@ export default function OpenAPIImportModal({
     onCancel()
   }, [resetState, onCancel])
 
-  // 解析 OpenAPI JSON
-  const parseOpenAPI = useCallback((content: string): ParsedApiItem[] => {
+  // 解析JSON格式的DDL文件
+  const parseJSON = useCallback((content: string, defaultSystem: string, defaultType: string): ParsedDDLItem[] => {
     try {
-      const spec: OpenAPISpec = JSON.parse(content)
-      const items: ParsedApiItem[] = []
+      const data = JSON.parse(content)
       
-      if (!spec.paths) {
-        message.warning('OpenAPI 文件中没有找到 paths 定义')
+      // 支持两种格式：
+      // 1. 数组格式：[{name, ddl, ...}, ...]
+      // 2. 对象格式：{tables: [{name, ddl, ...}, ...]}
+      let items = Array.isArray(data) ? data : (data.tables || data.resources || [])
+      
+      if (!Array.isArray(items) || items.length === 0) {
+        message.warning('JSON 文件中没有找到有效的数据资源定义')
         return []
       }
       
-      // 从 servers[0].url 提取服务前缀（最后一节路径）
-      let servicePrefix = ''
-      if (spec.servers && spec.servers[0]?.url) {
-        try {
-          const url = new URL(spec.servers[0].url)
-          // 获取路径部分，如 /vehicle-pay-center
-          const pathname = url.pathname
-          if (pathname && pathname !== '/') {
-            // 移除开头的斜杠，保留路径如 vehicle-pay-center
-            servicePrefix = pathname.startsWith('/') ? pathname.slice(1) : pathname
-          }
-        } catch {
-          // URL 解析失败，尝试直接提取最后一节
-          const urlStr = spec.servers[0].url
-          const lastSlashIdx = urlStr.lastIndexOf('/')
-          if (lastSlashIdx > 0 && lastSlashIdx < urlStr.length - 1) {
-            servicePrefix = urlStr.slice(lastSlashIdx + 1)
-          }
+      return items.map((item: any, index: number) => {
+        const name = item.name || item.table_name || `未命名_${index}`
+        return {
+          key: name,
+          name,
+          type: item.type || defaultType,
+          system: item.system || item.table_schema || defaultSystem,
+          location: item.location || (item.table_schema ? `${item.table_schema}.${name}` : ''),
+          description: item.description || item.table_comment || '',
+          ddl: item.ddl || '',
         }
-      }
-      
-      // 遍历 paths
-      Object.entries(spec.paths).forEach(([path, methods]) => {
-        Object.entries(methods).forEach(([method, detail]) => {
-          // 跳过非 HTTP 方法的字段（如 parameters）
-          if (!['get', 'post', 'put', 'delete', 'patch', 'head', 'options'].includes(method.toLowerCase())) {
-            return
-          }
-          
-          const methodUpper = method.toUpperCase()
-          // 拼接服务前缀和路径
-          const fullPath = servicePrefix ? `${servicePrefix}${path}` : path
-          const name = `${methodUpper} ${fullPath}`
-          const description = detail.description || detail.summary || ''
-          
-          items.push({
-            key: name,
-            method: methodUpper,
-            path: fullPath,
-            name,
-            description,
-          })
-        })
       })
-      
-      return items
     } catch (e) {
       message.error('JSON 解析失败，请检查文件格式')
       return []
@@ -165,7 +124,7 @@ export default function OpenAPIImportModal({
   const uploadProps: UploadProps = {
     name: 'file',
     multiple: false,
-    accept: '.json',
+    accept: '.json,.sql',
     showUploadList: false,
     beforeUpload: (file) => {
       setParsing(true)
@@ -173,13 +132,20 @@ export default function OpenAPIImportModal({
       const reader = new FileReader()
       reader.onload = (e) => {
         const content = e.target?.result as string
-        const items = parseOpenAPI(content)
+        let items: ParsedDDLItem[] = []
+        
+        // 根据文件扩展名判断格式
+        if (file.name.endsWith('.json')) {
+          items = parseJSON(content, system, resourceType)
+        } else {
+          message.error('目前仅支持 JSON 格式文件')
+        }
         
         if (items.length > 0) {
           setParsedItems(items)
           setSelectedKeys(items.map(i => i.key))  // 默认全选
           setStep(2)
-          message.success(`成功解析 ${items.length} 个接口`)
+          message.success(`成功解析 ${items.length} 个数据资源`)
         }
         
         setParsing(false)
@@ -200,11 +166,12 @@ export default function OpenAPIImportModal({
     const lower = searchText.toLowerCase()
     return parsedItems.filter(
       item => item.name.toLowerCase().includes(lower) || 
-              item.description.toLowerCase().includes(lower)
+              item.description.toLowerCase().includes(lower) ||
+              item.location.toLowerCase().includes(lower)
     )
   }, [parsedItems, searchText])
 
-  // 全选/取消全选（针对过滤后的列表）
+  // 全选/取消全选
   const handleSelectAll = useCallback((checked: boolean) => {
     if (checked) {
       const newKeys = new Set(selectedKeys)
@@ -216,7 +183,7 @@ export default function OpenAPIImportModal({
     }
   }, [filteredItems, selectedKeys])
 
-  // 当前过滤列表的选中状态
+  // 选中状态
   const filteredSelectedKeys = useMemo(() => {
     const filteredKeySet = new Set(filteredItems.map(i => i.key))
     return selectedKeys.filter(k => filteredKeySet.has(k))
@@ -230,7 +197,7 @@ export default function OpenAPIImportModal({
   // 确认导入
   const handleImport = useCallback(async () => {
     if (selectedKeys.length === 0) {
-      message.warning('请至少选择一个接口')
+      message.warning('请至少选择一个数据资源')
       return
     }
     
@@ -238,11 +205,13 @@ export default function OpenAPIImportModal({
     
     try {
       const selectedItems = parsedItems.filter(item => selectedKeys.includes(item.key))
-      const payloads: ImplementationCreatePayload[] = selectedItems.map(item => ({
+      const payloads: DataResourceCreatePayload[] = selectedItems.map(item => ({
         name: item.name,
-        type: implType,
-        system: system,
+        type: item.type,
+        system: item.system,
+        location: item.location || undefined,
         description: item.description || undefined,
+        ddl: item.ddl || undefined,
       }))
       
       await onImport(payloads)
@@ -252,7 +221,7 @@ export default function OpenAPIImportModal({
     } finally {
       setImporting(false)
     }
-  }, [selectedKeys, parsedItems, system, implType, onImport, handleCancel])
+  }, [selectedKeys, parsedItems, onImport, handleCancel])
 
   // 返回上一步
   const handleBack = useCallback(() => {
@@ -265,24 +234,17 @@ export default function OpenAPIImportModal({
   // 表格列定义
   const columns = [
     {
-      title: '方法',
-      dataIndex: 'method',
-      width: 80,
-      render: (method: string) => {
-        const colors: Record<string, string> = {
-          GET: 'green',
-          POST: 'blue',
-          PUT: 'orange',
-          DELETE: 'red',
-          PATCH: 'purple',
-        }
-        return <Tag color={colors[method] || 'default'}>{method}</Tag>
-      },
+      title: '表名',
+      dataIndex: 'name',
+      width: 200,
+      ellipsis: true,
     },
     {
-      title: '路径',
-      dataIndex: 'path',
+      title: '位置',
+      dataIndex: 'location',
+      width: 180,
       ellipsis: true,
+      render: (loc: string) => loc || <Text type="secondary">-</Text>,
     },
     {
       title: '描述',
@@ -290,15 +252,21 @@ export default function OpenAPIImportModal({
       ellipsis: true,
       render: (desc: string) => desc || <Text type="secondary">无描述</Text>,
     },
+    {
+      title: 'DDL长度',
+      dataIndex: 'ddl',
+      width: 100,
+      render: (ddl: string) => ddl ? `${ddl.length} 字符` : '-',
+    },
   ]
 
   return (
     <Modal
-      title="导入实现单元 - OpenAPI"
+      title="导入数据资源 - DDL"
       open={open}
       onCancel={handleCancel}
-      width={800}
-      styles={{ body: { height: 520 } }}
+      width={900}
+      styles={{ body: { minHeight: 480 } }}
       footer={
         step === 1 ? null : (
           <Space>
@@ -317,24 +285,24 @@ export default function OpenAPIImportModal({
       destroyOnClose
     >
       {step === 1 ? (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: 16 }}>
+        <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           {/* 配置区 */}
           <Space size="large">
             <Space>
-              <Text>所属系统：</Text>
+              <Text>默认系统：</Text>
               <Select
                 value={system}
                 onChange={setSystem}
-                options={IMPL_SYSTEMS}
-                style={{ width: 150 }}
+                options={SYSTEM_OPTIONS}
+                style={{ width: 120 }}
               />
             </Space>
             <Space>
-              <Text>类型：</Text>
+              <Text>默认类型：</Text>
               <Select
-                value={implType}
-                onChange={setImplType}
-                options={IMPL_TYPES}
+                value={resourceType}
+                onChange={setResourceType}
+                options={TYPE_OPTIONS}
                 style={{ width: 120 }}
               />
             </Space>
@@ -342,43 +310,46 @@ export default function OpenAPIImportModal({
           
           {/* 说明文本 */}
           <div style={{ 
-            padding: '16px 20px', 
+            padding: '12px 16px', 
             background: '#f0f9ff', 
             border: '1px solid #bae6fd',
             borderRadius: 6
           }}>
-            <Text strong style={{ display: 'block', marginBottom: 10, fontSize: 14 }}>支持的OpenAPI格式：</Text>
-            <div style={{ fontSize: 13, color: '#666', lineHeight: 1.8 }}>
-              <div>• 目前仅支持 <Text code>OpenAPI 3.x</Text> 规范的 JSON 格式文件</div>
-              <div>• 自动解析接口路径、请求方法和描述信息</div>
-              <div>• 支持批量导入，重名接口自动跳过</div>
-            </div>
+            <Text strong style={{ display: 'block', marginBottom: 8 }}>支持的JSON格式：</Text>
+            <pre style={{ margin: 0, fontSize: 12, color: '#666' }}>
+{`[
+  {
+    "name": "t_user_card",
+    "type": "table",
+    "system": "C端",
+    "location": "member_db.t_user_card",
+    "description": "用户卡券表",
+    "ddl": "CREATE TABLE t_user_card (...)"
+  }
+]`}
+            </pre>
           </div>
           
           {/* 文件上传区 */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
-            <Spin spinning={parsing} tip="解析中..." style={{ flex: 1 }}>
-              <Dragger {...uploadProps} style={{ height: '100%', display: 'flex', alignItems: 'center' }}>
-                <div style={{ padding: '40px 0' }}>
-                  <p className="ant-upload-drag-icon">
-                    <InboxOutlined />
-                  </p>
-                  <p className="ant-upload-text">点击或拖拽 OpenAPI JSON 文件到此区域</p>
-                  <p className="ant-upload-hint">
-                    支持 OpenAPI 3.x 格式的 JSON 文件（如 openapi.json）
-                  </p>
-                </div>
-              </Dragger>
-            </Spin>
-          </div>
-        </div>
+          <Spin spinning={parsing} tip="解析中...">
+            <Dragger {...uploadProps} style={{ padding: '20px 0' }}>
+              <p className="ant-upload-drag-icon">
+                <InboxOutlined />
+              </p>
+              <p className="ant-upload-text">点击或拖拽 JSON 文件到此区域</p>
+              <p className="ant-upload-hint">
+                支持 JSON 格式的数据资源定义文件
+              </p>
+            </Dragger>
+          </Spin>
+        </Space>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%', minHeight: 460 }}>
           {/* 配置显示 */}
           <Space>
             <Tag>系统: {system}</Tag>
-            <Tag>类型: 接口</Tag>
-            <Tag color="blue">共解析 {parsedItems.length} 个接口</Tag>
+            <Tag>类型: {resourceType === 'table' ? '库表' : 'Redis'}</Tag>
+            <Tag color="blue">共解析 {parsedItems.length} 个资源</Tag>
           </Space>
           
           {/* 搜索和全选 */}
@@ -391,7 +362,7 @@ export default function OpenAPIImportModal({
               全选当前列表
             </Checkbox>
             <Input
-              placeholder="搜索接口..."
+              placeholder="搜索数据资源..."
               prefix={<SearchOutlined />}
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
@@ -400,7 +371,7 @@ export default function OpenAPIImportModal({
             />
           </Space>
           
-          {/* 接口列表 */}
+          {/* 资源列表 */}
           <Table
             rowSelection={{
               selectedRowKeys: selectedKeys,

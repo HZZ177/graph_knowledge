@@ -196,3 +196,23 @@ export async function listSteps(processId?: string) {
   })
   return data
 }
+
+// 批量创建数据资源
+export interface DataResourceBatchCreateResult {
+  success_count: number
+  skip_count: number
+  failed_count: number
+  created_items: DataResource[]
+  skipped_names: string[]
+  failed_items: { name: string; error: string }[]
+}
+
+export async function batchCreateDataResources(
+  items: DataResourceCreatePayload[]
+): Promise<DataResourceBatchCreateResult> {
+  const { data } = await http.post<DataResourceBatchCreateResult>(
+    '/resource-nodes/batch_create_data_resources',
+    { items }
+  )
+  return data
+}

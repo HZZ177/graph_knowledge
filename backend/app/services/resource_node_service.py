@@ -933,3 +933,76 @@ def batch_create_implementations(
         "skipped_names": skipped_names,
         "failed_items": failed_items,
     }
+
+
+def batch_create_data_resources(
+    db: Session, items: List
+) -> dict:
+    """批量创建数据资源
+    
+    Args:
+        db: 数据库会话
+        items: 要创建的数据资源列表（DataResourceCreate类型）
+        
+    Returns:
+        包含成功、跳过、失败统计的字典
+    """
+    from backend.app.models.resource_graph import DataResource
+    
+    created_items = []
+    skipped_names = []
+    failed_items = []
+    
+    # 获取已存在的名称集合
+    existing_names = set(
+        name for (name,) in db.query(DataResource.name).all()
+    )
+    
+    logger.debug(f"[BatchImport] 数据库中已有 {len(existing_names)} 个数据资源")
+    logger.debug(f"[BatchImport] 本次导入 {len(items)} 个")
+    
+    for item in items:
+        try:
+            # 检查是否已存在
+            if item.name in existing_names:
+                logger.debug(f"[BatchImport] 跳过(已存在): {item.name}")
+                skipped_names.append(item.name)
+                continue
+            
+            # 创建新记录
+            obj = DataResource(
+                name=item.name,
+                type=item.type,
+                system=item.system,
+                location=item.location,
+                description=item.description,
+                ddl=item.ddl,
+            )
+            db.add(obj)
+            db.flush()  # 获取生成的 ID
+            created_items.append(obj)
+            existing_names.add(item.name)  # 添加到已存在集合，防止同批次重复
+            
+        except Exception as e:
+            logger.error(f"[BatchImport] 创建失败 {item.name}: {e}")
+            failed_items.append({
+                "name": item.name,
+                "error": str(e)
+            })
+    
+    db.commit()
+    
+    # 刷新所有创建的对象
+    for obj in created_items:
+        db.refresh(obj)
+    
+    logger.info(f"[BatchImport] 完成: 成功 {len(created_items)}, 跳过 {len(skipped_names)}, 失败 {len(failed_items)}")
+    
+    return {
+        "success_count": len(created_items),
+        "skip_count": len(skipped_names),
+        "failed_count": len(failed_items),
+        "created_items": created_items,
+        "skipped_names": skipped_names,
+        "failed_items": failed_items,
+    }

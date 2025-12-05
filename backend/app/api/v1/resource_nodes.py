@@ -49,6 +49,8 @@ from backend.app.schemas.data_resources import (
     DataResourceUpdatePayload,
     ImplementationDataLinkIdRequest,
     ImplementationDataLinkUpdatePayload,
+    DataResourceBatchCreate,
+    DataResourceBatchCreateResult,
 )
 from backend.app.services import resource_node_service
 from backend.app.core.utils import success_response, error_response
@@ -110,6 +112,27 @@ def create_data_resource(
     except ValueError as exc:  # 资源已存在
         return error_response(message=str(exc))
     return success_response(data=DataResourceOut.from_orm(obj), message="创建数据资源成功")
+
+
+@router.post("/batch_create_data_resources", response_model=DataResourceBatchCreateResult)
+def batch_create_data_resources(
+    payload: DataResourceBatchCreate = Body(...),
+    db: Session = Depends(get_db),
+) -> DataResourceBatchCreateResult:
+    """批量创建数据资源，已存在的会跳过。"""
+    result = resource_node_service.batch_create_data_resources(db, payload.items)
+    data = DataResourceBatchCreateResult(
+        success_count=result["success_count"],
+        skip_count=result["skip_count"],
+        failed_count=result["failed_count"],
+        created_items=[DataResourceOut.from_orm(obj) for obj in result["created_items"]],
+        skipped_names=result["skipped_names"],
+        failed_items=result["failed_items"],
+    )
+    return success_response(
+        data=data,
+        message=f"批量导入完成：成功 {result['success_count']} 条，跳过 {result['skip_count']} 条"
+    )
 
 
 @router.get("/get_access_chains", response_model=List[AccessChainItem])
