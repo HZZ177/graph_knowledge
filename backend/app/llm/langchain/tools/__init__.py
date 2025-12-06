@@ -104,11 +104,40 @@ def get_all_chat_tools():
 
 
 def get_log_troubleshoot_tools():
-    """获取日志排查 Agent 的工具集
+    """获取日志排查 Agent 的工具集（精简版）
     
-    共 19 个工具：1 个日志工具 + 16 个业务知识工具 + 2 个数据库工具
+    共 12 个工具：
+    - 日志查询: 1 个 (search_logs)
+    - 代码检索: 5 个 (search_code_context, grep_code, list_directory, read_file, read_file_range)
+    - 业务理解: 4 个 (search_businesses, get_business_context, search_implementations, get_implementation_context)
+    - 数据库查询: 2 个 (get_table_schema, query_database)
+    
+    对比完整版，移除的工具（日志排查场景低频/冗余）：
+    - search_steps, search_data_resources, get_resource_context (业务细节工具)
+    - get_implementation_business_usages, get_resource_business_usages (影响面分析)
+    - get_neighbors, get_path_between_entities (图拓扑遍历)
     """
-    return [search_logs] + get_all_chat_tools() + get_db_tools()
+    return [
+        # 日志查询
+        search_logs,
+        
+        # 代码检索（完整保留）
+        search_code_context,
+        grep_code,
+        list_directory,
+        read_file,
+        read_file_range,
+        
+        # 业务理解（保留核心）
+        search_businesses,
+        get_business_context,
+        search_implementations,
+        get_implementation_context,
+        
+        # 数据库查询
+        get_table_schema,
+        query_database,
+    ]
 
 
 # 导出所有公开 API
