@@ -4,6 +4,7 @@
 """
 
 import json
+import uuid
 from fastapi import APIRouter, Body, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
@@ -14,7 +15,7 @@ from backend.app.services.skeleton.skeleton_service import generate_skeleton
 from backend.app.services.canvas_service import save_process_canvas
 from backend.app.services.graph_sync_service import sync_process
 from backend.app.core.utils import success_response, error_response
-from backend.app.core.logger import logger
+from backend.app.core.logger import logger, trace_id_var
 
 
 router = APIRouter(prefix="/llm", tags=["skeleton"])
@@ -37,6 +38,13 @@ async def websocket_generate_skeleton(websocket: WebSocket):
     - error: 错误信息
     """
     await websocket.accept()
+    
+    # 设置traceid到ContextVar，以便在agent和tools中传播
+    trace_id = websocket.query_params.get("trace_id") or \
+               websocket.headers.get("X-Trace-Id") or \
+               uuid.uuid4().hex
+    token = trace_id_var.set(trace_id)
+    
     logger.info("WebSocket 连接已建立 - 骨架生成")
     
     db: Session = SessionLocal()
@@ -77,6 +85,7 @@ async def websocket_generate_skeleton(websocket: WebSocket):
         except Exception:
             pass
     finally:
+        trace_id_var.reset(token)
         db.close()
         try:
             await websocket.close()

@@ -5,6 +5,7 @@
 """
 
 import json
+import uuid
 from typing import List
 from fastapi import APIRouter, Body, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
@@ -24,7 +25,7 @@ from backend.app.services.chat.history_service import (
     generate_conversation_title,
 )
 from backend.app.core.utils import success_response, error_response
-from backend.app.core.logger import logger
+from backend.app.core.logger import logger, trace_id_var
 
 
 router = APIRouter(prefix="/llm", tags=["chat"])
@@ -52,6 +53,13 @@ async def websocket_chat(websocket: WebSocket):
        - {"type": "error", "error": "..."}
     """
     await websocket.accept()
+    
+    # 设置traceid到ContextVar，以便在agent和tools中传播
+    trace_id = websocket.query_params.get("trace_id") or \
+               websocket.headers.get("X-Trace-Id") or \
+               uuid.uuid4().hex
+    token = trace_id_var.set(trace_id)
+    
     logger.info("WebSocket 连接已建立 - 知识图谱问答")
     
     db: Session = SessionLocal()
@@ -106,6 +114,7 @@ async def websocket_chat(websocket: WebSocket):
         except:
             pass
     finally:
+        trace_id_var.reset(token)
         db.close()
         try:
             await websocket.close()
@@ -187,6 +196,13 @@ async def websocket_regenerate(websocket: WebSocket):
     2. 服务端流式推送与 chat/ws 相同格式的消息
     """
     await websocket.accept()
+    
+    # 设置traceid到ContextVar，以便在agent和tools中传播
+    trace_id = websocket.query_params.get("trace_id") or \
+               websocket.headers.get("X-Trace-Id") or \
+               uuid.uuid4().hex
+    token = trace_id_var.set(trace_id)
+    
     logger.info("WebSocket 连接已建立 - 重新生成")
     
     db: Session = SessionLocal()
@@ -228,6 +244,7 @@ async def websocket_regenerate(websocket: WebSocket):
         except:
             pass
     finally:
+        trace_id_var.reset(token)
         db.close()
         try:
             await websocket.close()
