@@ -16,10 +16,20 @@ export interface ChatMessage {
   tool_calls?: Array<{ name: string; args: Record<string, unknown> }>  // 仅 assistant 调用工具时
 }
 
+/** 文件附件 */
+export interface FileAttachment {
+  file_id: string
+  url: string
+  type: 'image' | 'document' | 'audio' | 'video' | 'unknown'
+  filename: string
+  content_type: string
+}
+
 export interface ChatRequest {
   question: string
   thread_id?: string  // 会话 ID，为空则创建新会话
   agent_type?: string  // Agent 类型，默认 "knowledge_qa"
+  attachments?: FileAttachment[]  // 文件附件列表（多模态支持）
 }
 
 /** Agent 类型信息 */

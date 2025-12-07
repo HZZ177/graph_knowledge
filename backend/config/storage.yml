@@ -1,0 +1,60 @@
+# 文件存储配置
+# 说明：不同环境可以复制此文件并修改相应配置
+
+storage:
+  # 当前使用的提供商（切换这里即可更改存储方式）
+  provider: "minio"  # 可选: s3 / aliyun_oss / qiniu / minio
+  
+  # 文件限制
+  max_file_size: 10485760  # 10MB
+  allowed_extensions:
+    - jpg
+    - jpeg
+    - png
+    - webp
+    - gif
+    - pdf
+    - txt
+    - md
+    - log
+    - json
+    - py
+    - js
+    - ts
+    - java
+    - cpp
+    - c
+    - go
+  
+  # 文件清理策略（天）
+  file_retention_days: 7  # 未关联对话的临时文件保留7天
+  
+  # AWS S3 配置
+  s3:
+    bucket: "my-app-files"
+    region: "us-west-2"
+    access_key: "your-access-key"
+    secret_key: "your-secret-key"
+    endpoint: null  # 使用默认 AWS endpoint，或自定义如 MinIO
+  
+  # 阿里云 OSS 配置
+  aliyun_oss:
+    bucket: "my-app-files"
+    endpoint: "https://oss-cn-hangzhou.aliyuncs.com"
+    access_key: "your-access-key"
+    secret_key: "your-secret-key"
+  
+  # 七牛云配置
+  qiniu:
+    bucket: "my-app-files"
+    access_key: "your-access-key"
+    secret_key: "your-secret-key"
+    domain: "https://cdn.example.com"  # 七牛云 CDN 域名
+  
+  # MinIO 配置（本地开发/测试 - 推荐）
+  minio:
+    bucket: "graph-knowledge-files"
+    endpoint: "http://localhost:9000"
+    access_key: "minioadmin"
+    secret_key: "minioadmin"
+    secure: false  # HTTP 使用 false，HTTPS 使用 true

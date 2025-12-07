@@ -13,6 +13,7 @@
     "@xyflow/react": "^12.3.2",
     "antd": "^5.12.2",
     "axios": "^1.7.0",
+    "browser-image-compression": "^2.0.2",
     "dagre": "^0.8.5",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

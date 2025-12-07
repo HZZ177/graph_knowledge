@@ -23,11 +23,16 @@ import {
   MenuUnfoldOutlined,
   ReloadOutlined,
   RollbackOutlined,
+  PlusOutlined,
 } from '@ant-design/icons'
-import { createChatClient, ChatClient, ToolCallInfo, fetchConversationHistory, generateConversationTitle, listConversations, deleteConversation, truncateConversation, createRegenerateClient, RegenerateClient, ChatMessage, BatchInfo, AgentType, fetchAgentTypes, fetchLogQueryOptions, LogQueryOption } from '../api/llm'
+import { createChatClient, ChatClient, ToolCallInfo, fetchConversationHistory, generateConversationTitle, listConversations, deleteConversation, truncateConversation, createRegenerateClient, RegenerateClient, ChatMessage, BatchInfo, AgentType, fetchAgentTypes, fetchLogQueryOptions, LogQueryOption, FileAttachment } from '../api/llm'
 import { useTypewriter } from '../hooks/useTypewriter'
+import { useFileUpload } from '../hooks/useFileUpload'
+import { formatFileSize } from '../api/files'
 import '../styles/ChatPage.css'
 import { showConfirm } from '../utils/confirm'
+import { Upload, Tag, Image, Spin } from 'antd'
+import { PaperClipOutlined, CloseCircleOutlined, FileOutlined } from '@ant-design/icons'
 
 // ==========================================
 // Interfaces
@@ -97,37 +102,82 @@ const MemoizedMarkdown = React.memo<MemoizedMarkdownProps>(({ source, fontSize =
   return prevProps.source === nextProps.source && prevProps.fontSize === nextProps.fontSize
 })
 
-// 1. 欢迎屏幕
-const WelcomeScreen: React.FC<{ onSuggestionClick: (q: string) => void }> = ({ onSuggestionClick }) => {
-  const suggestions = [
-    'C端封闭的开卡流程是怎样的？',
-    '订单相关的接口有哪些？',
-    '用户表被哪些服务使用？',
-    '微信公众号登录时的校验逻辑是怎么走的？',
-  ]
+// 1. Agent 配置
+const agentWelcomeConfig: Record<string, {
+  icon: string
+  title: string
+  subtitle: string
+  suggestions: string[]
+}> = {
+  knowledge_qa: {
+    icon: '🤖',
+    title: '业务知识助手',
+    subtitle: '探索业务流程、接口实现和数据资源，基于实时图谱提供准确洞察',
+    suggestions: [
+      'C端封闭的开卡流程是怎样的？',
+      '订单相关的接口有哪些？',
+      '用户表被哪些服务使用？',
+      '微信公众号登录时的校验逻辑是怎么走的？',
+    ]
+  },
+  log_troubleshoot: {
+    icon: '🔍',
+    title: '日志排查助手',
+    subtitle: '智能分析业务日志，快速定位问题根因，提供排查建议',
+    suggestions: [
+      '最近有哪些错误日志？',
+      '支付接口的超时问题如何排查？',
+      '用户登录失败的常见原因有哪些？',
+      '数据库连接异常如何定位？',
+    ]
+  },
+  code_review: {
+    icon: '📝',
+    title: '代码审查助手',
+    subtitle: '分析代码质量，发现潜在问题，提供优化建议',
+    suggestions: [
+      '这段代码有什么潜在问题？',
+      '如何优化这个函数的性能？',
+      '代码中是否存在安全隐患？',
+      '有没有更优雅的实现方式？',
+    ]
+  }
+}
+
+// 2. 欢迎屏幕（动态适配 Agent）
+const WelcomeScreen: React.FC<{ 
+  onSuggestionClick: (q: string) => void
+  agentType: string
+  businessLine?: string
+  privateServer?: string | null
+}> = ({ onSuggestionClick, agentType, businessLine, privateServer }) => {
+  const config = agentWelcomeConfig[agentType] || agentWelcomeConfig.knowledge_qa
 
   return (
     <div className="welcome-screen">
-      <div className="welcome-logo">
-        <RobotOutlined />
-      </div>
-      <h1 className="welcome-title">业务知识助手</h1>
-      <p className="welcome-subtitle">
-        我可以帮你探索业务流程、接口实现和数据资源。
-        <br />基于实时图谱数据，提供准确的技术洞察。
-      </p>
-      <div className="suggestion-grid">
-        {suggestions.map((q, i) => (
-          <button key={i} className="suggestion-card" onClick={() => onSuggestionClick(q)}>
-            <span className="suggestion-text">{q}</span>
-          </button>
-        ))}
-      </div>
+      <h1 className="welcome-title">{config.title}</h1>
+      
+      {/* 日志排查助手显示当前配置 */}
+      {agentType === 'log_troubleshoot' && businessLine && (
+        <div className="welcome-config">
+          <span className="welcome-config-label">当前业务线：</span>
+          <span className="welcome-config-value">{businessLine}</span>
+          {businessLine === '私有化' && privateServer && (
+            <>
+              <span className="welcome-config-separator">·</span>
+              <span className="welcome-config-label">私有化集团：</span>
+              <span className="welcome-config-value">{privateServer}</span>
+            </>
+          )}
+        </div>
+      )}
+      
+      <p className="welcome-subtitle">{config.subtitle}</p>
     </div>
   )
 }
 
-// 2. 通用可展开内容组件（动态测量高度，实现平滑动画）
+// 3. 通用可展开内容组件（动态测量高度，实现平滑动画）
 interface ExpandableContentProps {
   isExpanded: boolean
   className?: string
@@ -1329,6 +1379,9 @@ const ChatPage: React.FC = () => {
   const [isBusinessLineOpen, setIsBusinessLineOpen] = useState(false)
   const [isPrivateServerOpen, setIsPrivateServerOpen] = useState(false)
   
+  // 文件工具弹窗状态
+  const [isFileToolsOpen, setIsFileToolsOpen] = useState(false)
+  
   // 切换业务线时，如果不是私有化则清空私有化选择
   const handleBusinessLineChange = (value: string) => {
     setBusinessLine(value)
@@ -1371,6 +1424,17 @@ const ChatPage: React.FC = () => {
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const userScrolledUpRef = useRef(false)
   const lastScrollTopRef = useRef(0)
+  
+  // 文件上传 Hook
+  const { 
+    uploadedFiles, 
+    uploading, 
+    handleUpload, 
+    removeFile, 
+    clearFiles,
+    enableDragDrop,
+    enablePaste,
+  } = useFileUpload()
 
   // 滚动到底部（只在用户未主动上滑时执行）
   const scrollToBottom = useCallback((force = false) => {
@@ -1489,12 +1553,15 @@ const ChatPage: React.FC = () => {
         setIsBusinessLineOpen(false)
         setIsPrivateServerOpen(false)
       }
+      if (!target.closest('.file-tools-wrapper')) {
+        setIsFileToolsOpen(false)
+      }
     }
-    if (isAgentDropdownOpen || isBusinessLineOpen || isPrivateServerOpen) {
+    if (isAgentDropdownOpen || isBusinessLineOpen || isPrivateServerOpen || isFileToolsOpen) {
       document.addEventListener('click', handleClickOutside)
       return () => document.removeEventListener('click', handleClickOutside)
     }
-  }, [isAgentDropdownOpen, isBusinessLineOpen, isPrivateServerOpen])
+  }, [isAgentDropdownOpen, isBusinessLineOpen, isPrivateServerOpen, isFileToolsOpen])
 
   const upsertConversation = useCallback((tid: string, title: string, updatedAt: string, agentType?: string) => {
     if (!tid) return
@@ -1574,17 +1641,31 @@ const ChatPage: React.FC = () => {
       inputRef.current.style.height = Math.min(inputRef.current.scrollHeight, 200) + 'px'
     }
   }, [inputValue])
+  
+  // 启用拖拽和粘贴上传
+  useEffect(() => {
+    const cleanupDragDrop = enableDragDrop()
+    const cleanupPaste = enablePaste()
+    
+    return () => {
+      cleanupDragDrop()
+      cleanupPaste()
+    }
+  }, [enableDragDrop, enablePaste])
 
   // 发送消息逻辑
   const sendMessage = useCallback(async (content?: string) => {
     const question = (content || inputValue).trim()
-    if (!question || isLoading) return
+    
+    // 允许无文本但有附件的情况
+    if (!question && uploadedFiles.length === 0) return
+    if (isLoading) return
 
     // 1. 添加 User 消息
     const userMessage: DisplayMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
-      content: question,
+      content: question || '请分析这些文件',
     }
     
     // 2. 添加 Assistant 占位消息 (Loading 状态)
@@ -1599,6 +1680,7 @@ const ChatPage: React.FC = () => {
 
     setMessages(prev => [...prev, userMessage, assistantMessage])
     setInputValue('')
+    clearFiles()  // 清空附件列表
     setIsLoading(true)
     resetTypewriter()
     fullContentRef.current = ''
@@ -1621,10 +1703,22 @@ const ChatPage: React.FC = () => {
 
     // 构建请求参数
     const requestPayload: any = {
-      question,
+      question: question || '请分析这些文件',
       thread_id: threadId || undefined,
       agent_type: currentAgentType,
     }
+    
+    // 添加文件附件
+    if (uploadedFiles.length > 0) {
+      requestPayload.attachments = uploadedFiles.map(file => ({
+        file_id: file.id,
+        url: file.url,
+        type: file.type,
+        filename: file.filename,
+        content_type: file.contentType,
+      }))
+    }
+    
     // 日志排查 Agent 需要传递 log_query
     if (currentAgentType === 'log_troubleshoot') {
       requestPayload.log_query = {
@@ -2202,7 +2296,7 @@ const ChatPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="chat-main">
+      <div className={`chat-main ${messages.length === 0 ? 'empty-chat' : ''}`}>
         {/* Agent 选择器 - 对话区域左上角 */}
         {agentTypes.length > 0 && (
           <div className="agent-selector-header">
@@ -2310,7 +2404,13 @@ const ChatPage: React.FC = () => {
         <div className="chat-message-list" ref={messageListRef} onScroll={handleScroll}>
           <div className="chat-content-width">
             {messages.length === 0 ? (
-              <WelcomeScreen onSuggestionClick={(q) => sendMessage(q)} />
+              <WelcomeScreen 
+                key={`${currentAgentType}-${businessLine || ''}-${privateServer || ''}`}
+                onSuggestionClick={(q) => sendMessage(q)} 
+                agentType={currentAgentType}
+                businessLine={businessLine}
+                privateServer={privateServer}
+              />
             ) : (
               <>
                 {messages.map((msg, idx) => {
@@ -2353,11 +2453,109 @@ const ChatPage: React.FC = () => {
         </div>
 
         <div className="input-area-wrapper">
+          {/* 文件预览区域 */}
+          {uploadedFiles.length > 0 && (
+            <div style={{ padding: '8px 16px', borderBottom: '1px solid #e8e8e8', background: '#fafafa' }}>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                {uploadedFiles.map(file => (
+                  <div key={file.id} style={{ position: 'relative' }}>
+                    {file.type === 'image' ? (
+                      <div style={{ position: 'relative' }}>
+                        <Image
+                          src={file.url}
+                          width={80}
+                          height={80}
+                          style={{ objectFit: 'cover', borderRadius: '4px' }}
+                          preview={{
+                            mask: <div style={{ fontSize: 12 }}>预览</div>
+                          }}
+                        />
+                        <CloseCircleOutlined
+                          style={{
+                            position: 'absolute',
+                            top: -6,
+                            right: -6,
+                            fontSize: 18,
+                            color: '#ff4d4f',
+                            background: '#fff',
+                            borderRadius: '50%',
+                            cursor: 'pointer',
+                          }}
+                          onClick={() => removeFile(file.id)}
+                        />
+                      </div>
+                    ) : (
+                      <Tag
+                        closable
+                        onClose={() => removeFile(file.id)}
+                        icon={<FileOutlined />}
+                        style={{ margin: 0, padding: '4px 8px' }}
+                      >
+                        {file.filename.length > 20 ? file.filename.slice(0, 17) + '...' : file.filename}
+                        <span style={{ marginLeft: 4, color: '#999', fontSize: 11 }}>
+                          ({formatFileSize(file.size)})
+                        </span>
+                      </Tag>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
           <div className="input-container">
+            {/* 左侧文件工具按钮 */}
+            <div className="file-tools-wrapper">
+              <button
+                className="file-tools-btn"
+                onClick={() => setIsFileToolsOpen(!isFileToolsOpen)}
+                disabled={isLoading}
+                title="添加内容"
+              >
+                {uploading ? (
+                  <Spin size="small" />
+                ) : (
+                  <PlusOutlined style={{ fontSize: 18 }} />
+                )}
+              </button>
+              
+              {/* 文件工具弹窗 */}
+              {isFileToolsOpen && (
+                <div className="file-tools-menu">
+                  <Upload
+                    customRequest={({ file }) => {
+                      handleUpload(file as File)
+                      setIsFileToolsOpen(false)
+                    }}
+                    showUploadList={false}
+                    accept="image/*,.pdf,.txt,.md,.log,.json,.py,.js,.ts,.java,.cpp,.c,.go"
+                    disabled={isLoading || uploading}
+                  >
+                    <div className="file-tools-item">
+                      <PaperClipOutlined className="file-tools-item-icon" />
+                      <div className="file-tools-item-content">
+                        <span className="file-tools-item-name">上传附件</span>
+                        <span className="file-tools-item-desc">支持图片、文档、代码文件等</span>
+                      </div>
+                    </div>
+                  </Upload>
+                  
+                  {/* 后续可扩展更多功能 */}
+                  {/* <div className="file-tools-item" onClick={() => { ... }}>
+                    <FileTextOutlined className="file-tools-item-icon" />
+                    <div className="file-tools-item-content">
+                      <span className="file-tools-item-name">新建文档</span>
+                      <span className="file-tools-item-desc">创建临时文档</span>
+                    </div>
+                  </div> */}
+                </div>
+              )}
+            </div>
+            
             <textarea
               ref={inputRef}
               className="chat-textarea"
-              placeholder="输入问题，开始探索"
+              placeholder="输入问题，开始探索（支持拖拽/粘贴图片）"
               value={inputValue}
               onChange={e => setInputValue(e.target.value)}
               onKeyDown={e => {
@@ -2378,7 +2576,7 @@ const ChatPage: React.FC = () => {
                 <button 
                   className="send-btn" 
                   onClick={() => sendMessage()}
-                  disabled={!inputValue.trim()}
+                  disabled={!inputValue.trim() && uploadedFiles.length === 0}
                 >
                   <ArrowUpOutlined style={{ fontSize: 20, fontWeight: 'bold' }} />
                 </button>

@@ -29,12 +29,22 @@ class LogQueryContext(BaseModel):
     privateServer: Optional[str] = None  # 私有化集团（可选）
 
 
+class FileAttachment(BaseModel):
+    """文件附件"""
+    file_id: str  # 文件 ID
+    url: str  # 访问 URL
+    type: str  # 文件类型: image / document / audio
+    filename: str  # 原始文件名
+    content_type: str  # MIME 类型
+
+
 class StreamChatRequest(BaseModel):
     """流式问答 WebSocket 请求"""
     question: str
     thread_id: Optional[str] = None  # 会话 ID，为空则创建新会话
     agent_type: str = "knowledge_qa"  # Agent 类型，默认为知识问答
     log_query: Optional[LogQueryContext] = None  # 日志查询上下文（日志排查 Agent 专用）
+    attachments: Optional[List[FileAttachment]] = None  # 文件附件列表（多模态支持）
 
 
 class AgentTypeOut(BaseModel):

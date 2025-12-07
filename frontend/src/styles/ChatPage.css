@@ -39,6 +39,69 @@
   display: flex;
   flex-direction: column;
   overflow-x: hidden;
+  transition: justify-content 0.3s ease;
+}
+
+/* 空对话状态 - 输入框居中显示（参考 Grok/ChatGPT） */
+.chat-main.empty-chat {
+  justify-content: flex-start;
+}
+
+.chat-main.empty-chat .chat-message-list {
+  position: absolute;
+  bottom: calc(50% + 80px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20px;
+}
+
+.chat-main.empty-chat .chat-content-width {
+  width: 100%;
+  max-width: var(--max-width);
+}
+
+.chat-main.empty-chat .welcome-screen {
+  height: auto;
+  padding: 0;
+  margin-bottom: 0;
+  /* 上半部分整体做一次淡入动画，包含标题 + 配置信息 + 正文 */
+  animation: fadeIn 0.6s ease-out both;
+}
+
+.chat-main.empty-chat .welcome-title {
+  font-size: 26px;
+  margin-bottom: 12px;
+}
+
+.chat-main.empty-chat .welcome-config {
+  margin-top: 10px;
+  margin-bottom: 14px;
+}
+
+.chat-main.empty-chat .welcome-subtitle {
+  font-size: 15px;
+  max-width: 600px;
+  margin-bottom: 0;
+}
+
+.chat-main.empty-chat .input-area-wrapper {
+  padding: 0 20px;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.chat-main.empty-chat .agent-selector-header {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  right: 20px;
+  z-index: 10;
 }
 
 /* 侧边栏布局 */
@@ -409,66 +472,90 @@
   justify-content: center;
   height: 100%;
   text-align: center;
-  animation: fadeIn 0.6s ease-out;
-}
-
-.welcome-logo {
-  width: 60px;
-  height: 60px;
-  background: var(--text-primary);
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 32px;
-  margin-bottom: 24px;
-  box-shadow: var(--shadow-md);
 }
 
 .welcome-title {
-  font-size: 28px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 600;
   color: var(--text-primary);
-  margin-bottom: 12px;
-  letter-spacing: -0.5px;
+  margin-bottom: 10px;
+  letter-spacing: -0.3px;
 }
 
 .welcome-subtitle {
-  font-size: 16px;
+  font-size: 14px;
   color: var(--text-secondary);
-  margin-bottom: 40px;
-  max-width: 500px;
+  margin-bottom: 28px;
+  max-width: 560px;
   line-height: 1.5;
 }
 
 .suggestion-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
   width: 100%;
-  max-width: 700px;
+  max-width: 640px;
+  animation: fadeIn 0.6s ease-out 0.3s both;
 }
 
 .suggestion-card {
-  padding: 16px;
+  padding: 12px 16px;
   background: var(--bg-secondary);
-  border: 1px solid transparent;
-  border-radius: 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
   text-align: left;
   cursor: pointer;
   transition: all 0.2s ease;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
 }
 
 .suggestion-card:hover {
-  background: #f0f0f0;
+  background: #f5f5f5;
+  border-color: #d0d0d0;
   transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.suggestion-card:active {
+  transform: translateY(0);
 }
 
 .suggestion-text {
   font-size: 14px;
   color: var(--text-primary);
   font-weight: 500;
+  line-height: 1.4;
+}
+
+/* 欢迎屏幕配置信息（日志排查） */
+.welcome-config {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.welcome-config-label {
+  color: var(--text-secondary);
+  font-weight: 400;
+}
+
+.welcome-config-value {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.welcome-config-separator {
+  color: var(--text-secondary);
+  margin: 0 4px;
+  font-weight: 300;
 }
 
 /* 消息项 */
@@ -833,7 +920,7 @@
   border: 1px solid var(--border-color);
   padding: 8px;
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   pointer-events: auto;
   transition: box-shadow 0.2s, border-color 0.2s;
 }
@@ -866,7 +953,6 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  padding-bottom: 4px;
   padding-right: 4px;
 }
 
@@ -948,10 +1034,10 @@
   color: var(--text-primary);
 }
 
-/* 动画 */
+/* 动画：统一使用透明度渐入，避免位移带来的抖动 */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 @keyframes slideUp {
@@ -1391,5 +1477,140 @@
   font-size: 18px;
   color: var(--accent-color);
   flex-shrink: 0;
+}
+
+/* ========== 文件工具按钮和弹窗 ========== */
+.file-tools-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  padding-left: 4px;
+}
+
+.file-tools-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.file-tools-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-primary);
+}
+
+.file-tools-btn:active {
+  transform: scale(0.95);
+}
+
+.file-tools-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 文件工具弹窗 */
+.file-tools-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  min-width: 280px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  z-index: 1000;
+  overflow: hidden;
+  /* 动画 */
+  animation: dropdownSlideUp 0.2s ease-out;
+  transform-origin: bottom left;
+}
+
+/* 让 Upload 组件完全填充 */
+.file-tools-menu .ant-upload-wrapper {
+  display: block;
+  width: 100%;
+}
+
+.file-tools-menu .ant-upload {
+  display: block;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.file-tools-menu .ant-upload .ant-upload-btn {
+  padding: 0;
+}
+
+@keyframes dropdownSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.file-tools-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+  width: 100%;
+  box-sizing: border-box;
+  text-align: left;
+}
+
+.file-tools-item:last-child {
+  border-bottom: none;
+}
+
+.file-tools-item:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.file-tools-item-icon {
+  font-size: 18px;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.file-tools-item:hover .file-tools-item-icon {
+  color: var(--text-primary);
+}
+
+.file-tools-item-content {
+  flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  /* 不需要右侧勾选图标的空间，完全占满 */
+}
+
+.file-tools-item-name {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+  line-height: 1.2;
+}
+
+.file-tools-item-desc {
+  display: block;
+  font-size: 12px;
+  color: var(--text-secondary);
+  line-height: 1.4;
 }
 

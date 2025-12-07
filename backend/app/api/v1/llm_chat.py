@@ -91,7 +91,7 @@ async def websocket_chat(websocket: WebSocket):
                 return
             agent_context = {"log_query": request.log_query.model_dump()}
         
-        # 调用流式问答服务（支持多轮对话 + 多 Agent 类型）
+        # 调用流式问答服务（支持多轮对话 + 多 Agent 类型 + 多模态）
         await streaming_chat(
             db=db,
             question=request.question,
@@ -99,6 +99,7 @@ async def websocket_chat(websocket: WebSocket):
             thread_id=request.thread_id,
             agent_type=request.agent_type,
             agent_context=agent_context,
+            attachments=[att.model_dump() for att in (request.attachments or [])],
         )
         
     except WebSocketDisconnect:

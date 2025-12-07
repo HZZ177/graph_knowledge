@@ -324,12 +324,14 @@ async def streaming_chat(
     thread_id: Optional[str] = None,
     agent_type: str = "knowledge_qa",
     agent_context: Optional[Dict[str, Any]] = None,
+    attachments: Optional[List[Dict[str, Any]]] = None,
 ) -> str:
-    """基于 LangChain 的流式问答
+    """基于 LangChain 的流式问答（支持多模态）
     
     使用 LangChain Agent + 工具实现自然语言问答。
     支持多轮对话，通过 thread_id 管理会话历史。
     支持多 Agent 类型，通过 agent_type 切换不同的 Agent。
+    支持多模态输入（图片、文档等附件）。
     
     Args:
         db: 数据库会话
@@ -338,6 +340,7 @@ async def streaming_chat(
         thread_id: 会话 ID，用于多轮对话。如果为空则创建新会话。
         agent_type: Agent 类型标识，默认为 "knowledge_qa"
         agent_context: 动态上下文配置，用于注入到 Agent 和工具（如日志查询的业务线配置）
+        attachments: 文件附件列表（多模态支持）
         
     Returns:
         完整的回答文本
@@ -363,7 +366,10 @@ async def streaming_chat(
         logger.error(f"保存会话元数据失败: {e}")
         # 不阻断主流程
     
-    logger.info(f"[Chat] 开始处理问题: {question[:100]}..., request_id={request_id}, thread_id={thread_id}, agent_type={agent_type}")
+    # 记录附件信息
+    from backend.app.services.chat.multimodal import extract_attachments_summary
+    attachments_summary = extract_attachments_summary(attachments)
+    logger.info(f"[Chat] 开始处理问题: {question[:100]}..., request_id={request_id}, thread_id={thread_id}, agent_type={agent_type}, 附件={attachments_summary}")
     
     # 在 try 外初始化，便于 except 块访问
     full_response = ""
@@ -386,10 +392,29 @@ async def streaming_chat(
             # 获取运行时配置（包含 agent_context，供工具使用）
             config = get_agent_run_config(thread_id, agent_context)
             
+            # 构造多模态消息
+            from backend.app.services.chat.multimodal import build_multimodal_message
+            human_message = build_multimodal_message(question, attachments)
+            
             # 构造输入
             inputs = {
-                "messages": [HumanMessage(content=question)]
+                "messages": [human_message]
             }
+            
+            # 如果有附件，关联文件到对话
+            if attachments:
+                from backend.app.models.file_upload import FileUpload
+                for att in attachments:
+                    file_id = att.get('file_id')
+                    if file_id:
+                        try:
+                            file_record = db.query(FileUpload).filter(FileUpload.id == file_id).first()
+                            if file_record and not file_record.conversation_id:
+                                file_record.conversation_id = thread_id
+                                db.commit()
+                                logger.info(f"[Chat] 文件关联到对话: {file_record.filename} -> {thread_id}")
+                        except Exception as e:
+                            logger.warning(f"[Chat] 文件关联失败: {e}")
             
             # 流式执行
             tool_calls_info: List[Dict[str, Any]] = []
