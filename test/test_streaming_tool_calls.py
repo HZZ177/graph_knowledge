@@ -57,7 +57,7 @@ def get_llm_from_db(streaming: bool, use_patched: bool = False):
     
     # 选择使用原生还是修复版
     if use_patched:
-        from backend.app.llm.patched_chat_openai import PatchedChatOpenAI as LLMClass
+        from backend.app.llm.adapters import PatchedChatOpenAI as LLMClass
         print(f"使用: PatchedChatOpenAI (修复 index)")
     else:
         LLMClass = ChatOpenAI

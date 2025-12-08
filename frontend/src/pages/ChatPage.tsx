@@ -31,8 +31,9 @@ import { useFileUpload } from '../hooks/useFileUpload'
 import { formatFileSize } from '../api/files'
 import '../styles/ChatPage.css'
 import { showConfirm } from '../utils/confirm'
-import { Upload, Tag, Image, Spin } from 'antd'
-import { PaperClipOutlined, CloseCircleOutlined, FileOutlined } from '@ant-design/icons'
+import { Upload, Image, Spin } from 'antd'
+import { PaperClipOutlined, CloseCircleOutlined, CloseOutlined, FileOutlined } from '@ant-design/icons'
+import FileAttachmentCard from '../components/FileAttachmentCard'
 
 // ==========================================
 // Interfaces
@@ -56,6 +57,7 @@ interface DisplayMessage {
   isThinking?: boolean // 是否正在思考（等待工具返回）
   currentToolName?: string // 当前正在调用的工具名称
   toolSummaries?: Map<string, ToolSummaryInfo> // 该消息关联的工具摘要，key 为 "toolName:toolId"
+  attachments?: FileAttachment[] // 用户消息的附件（图片、文档等）
 }
 
 // 后端返回的原始消息格式
@@ -64,6 +66,7 @@ interface RawHistoryMessage {
   content: string
   tool_calls?: Array<{ name: string; args?: Record<string, unknown> }>
   tool_name?: string
+  attachments?: FileAttachment[]  // 用户消息的附件
 }
 
 interface ConversationSummary {
@@ -702,6 +705,7 @@ const convertRawMessagesToDisplay = (
         id: `user-${i}-${threadId}`,
         role: 'user',
         content: m.content,
+        attachments: m.attachments,  // 保留附件信息
       })
     } else if (m.role === 'assistant') {
       if (aiMessageStartIndex === -1) {
@@ -1160,6 +1164,9 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({ message, isLoading
   
   // 用户消息使用 Markdown 渲染（和 AI 消息一致）
   if (isUser) {
+    const imageAttachments = message.attachments?.filter(a => a.type === 'image') || []
+    const otherAttachments = message.attachments?.filter(a => a.type !== 'image') || []
+    
     return (
       <div className={`message-item user`}>
         <div className="message-header">
@@ -1170,7 +1177,30 @@ const MessageItem: React.FC<MessageItemProps> = React.memo(({ message, isLoading
         </div>
         <div className="message-bubble-wrapper">
           <div className="message-bubble">
-            <MemoizedMarkdown source={message.content} />
+            {/* 显示图片附件 */}
+            {imageAttachments.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: message.content ? '8px' : 0 }}>
+                {imageAttachments.map(att => (
+                  <Image
+                    key={att.file_id}
+                    src={att.url}
+                    width={120}
+                    style={{ borderRadius: '8px', objectFit: 'cover' }}
+                    preview={{ mask: <div style={{ fontSize: 11 }}>预览</div> }}
+                  />
+                ))}
+              </div>
+            )}
+            {/* 显示其他附件（文档等） */}
+            {otherAttachments.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: message.content ? '12px' : 0 }}>
+                {otherAttachments.map(att => (
+                  <FileAttachmentCard key={att.file_id} attachment={att} />
+                ))}
+              </div>
+            )}
+            {/* 消息文本 */}
+            {message.content && <MemoizedMarkdown source={message.content} />}
           </div>
           {onRollback && !isLoading && (
             <div className="message-actions-external">
@@ -1427,11 +1457,14 @@ const ChatPage: React.FC = () => {
   
   // 文件上传 Hook
   const { 
-    uploadedFiles, 
+    uploadedFiles,
+    pendingFiles,
     uploading, 
     handleUpload, 
-    removeFile, 
+    removeFile,
+    removePendingFile,
     clearFiles,
+    setFiles,
     enableDragDrop,
     enablePaste,
   } = useFileUpload()
@@ -1661,11 +1694,20 @@ const ChatPage: React.FC = () => {
     if (!question && uploadedFiles.length === 0) return
     if (isLoading) return
 
-    // 1. 添加 User 消息
+    // 1. 添加 User 消息（包含附件）
+    const userAttachments: FileAttachment[] = uploadedFiles.map(file => ({
+      file_id: file.id,
+      url: file.url,
+      type: file.type as 'image' | 'document' | 'audio' | 'video' | 'unknown',
+      filename: file.filename,
+      content_type: file.contentType,
+    }))
+    
     const userMessage: DisplayMessage = {
       id: `user-${Date.now()}`,
       role: 'user',
       content: question || '请分析这些文件',
+      attachments: userAttachments.length > 0 ? userAttachments : undefined,
     }
     
     // 2. 添加 Assistant 占位消息 (Loading 状态)
@@ -2126,7 +2168,9 @@ const ChatPage: React.FC = () => {
     const idx = messages.findIndex(m => m.id === messageId)
     if (idx === -1 || messages[idx].role !== 'user') return
     
-    const userContent = messages[idx].content
+    const userMessage = messages[idx]
+    const userContent = userMessage.content
+    const userAttachments = userMessage.attachments
     
     // 计算要保留的对话对数（该用户消息之前有多少个用户消息）
     let keepPairs = 0
@@ -2149,9 +2193,24 @@ const ChatPage: React.FC = () => {
     setMessages(prev => prev.slice(0, idx))
     // 将内容填充到输入框，让用户可以修改后发送
     setInputValue(userContent)
+    // 恢复附件到输入框
+    if (userAttachments && userAttachments.length > 0) {
+      // 将 FileAttachment 转换为 UploadedFile 格式
+      const restoredFiles = userAttachments.map(att => ({
+        id: att.file_id || `restored-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        url: att.url,
+        filename: att.filename,
+        size: 0,  // 历史记录中没有大小信息
+        type: att.type as 'image' | 'document' | 'audio' | 'video' | 'unknown',
+        contentType: att.content_type,
+      }))
+      setFiles(restoredFiles)
+    } else {
+      clearFiles()
+    }
     // 聚焦输入框
     setTimeout(() => inputRef.current?.focus(), 50)
-  }, [messages, isLoading, threadId])
+  }, [messages, isLoading, threadId, setFiles, clearFiles])
 
   const handleSelectConversation = useCallback(async (conv: ConversationSummary) => {
     if (!conv.threadId) return
@@ -2453,57 +2512,162 @@ const ChatPage: React.FC = () => {
         </div>
 
         <div className="input-area-wrapper">
-          {/* 文件预览区域 */}
-          {uploadedFiles.length > 0 && (
-            <div style={{ padding: '8px 16px', borderBottom: '1px solid #e8e8e8', background: '#fafafa' }}>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                {uploadedFiles.map(file => (
-                  <div key={file.id} style={{ position: 'relative' }}>
-                    {file.type === 'image' ? (
-                      <div style={{ position: 'relative' }}>
-                        <Image
-                          src={file.url}
-                          width={80}
-                          height={80}
-                          style={{ objectFit: 'cover', borderRadius: '4px' }}
-                          preview={{
-                            mask: <div style={{ fontSize: 12 }}>预览</div>
-                          }}
+          <div className="input-container" style={{ flexDirection: 'column', alignItems: 'stretch' }}>
+            {/* 文件预览区域 - 在输入框内部上方 */}
+            {(uploadedFiles.length > 0 || pendingFiles.length > 0) && (
+              <div style={{ 
+                display: 'flex', 
+                flexWrap: 'wrap', 
+                gap: '6px',
+                padding: '8px 8px 6px 8px',  /* 左右都和按钮对齐 */
+              }}>
+                {/* 上传中的文件 */}
+                {pendingFiles.map(file => (
+                  <div 
+                    key={file.id}
+                    title={file.file.name}
+                    className="file-thumbnail-wrapper"
+                    style={{ 
+                      position: 'relative',
+                      width: '48px',
+                      height: '48px',
+                      marginRight: '8px',
+                      marginTop: '8px',
+                    }}
+                  >
+                    <div style={{
+                      width: '100%',
+                      height: '100%',
+                      borderRadius: '8px',
+                      border: '1px solid #e0e0e0',
+                      background: '#f5f5f5',
+                      overflow: 'hidden',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      cursor: 'pointer',
+                    }}>
+                      {file.previewUrl ? (
+                        <img 
+                          src={file.previewUrl} 
+                          alt={file.file.name}
+                          style={{ 
+                            width: '100%', 
+                            height: '100%', 
+                            objectFit: 'cover',
+                            opacity: file.status === 'uploading' ? 0.7 : 1,
+                          }} 
                         />
-                        <CloseCircleOutlined
-                          style={{
-                            position: 'absolute',
-                            top: -6,
-                            right: -6,
-                            fontSize: 18,
-                            color: '#ff4d4f',
-                            background: '#fff',
-                            borderRadius: '50%',
-                            cursor: 'pointer',
-                          }}
-                          onClick={() => removeFile(file.id)}
-                        />
-                      </div>
-                    ) : (
-                      <Tag
-                        closable
-                        onClose={() => removeFile(file.id)}
-                        icon={<FileOutlined />}
-                        style={{ margin: 0, padding: '4px 8px' }}
-                      >
-                        {file.filename.length > 20 ? file.filename.slice(0, 17) + '...' : file.filename}
-                        <span style={{ marginLeft: 4, color: '#999', fontSize: 11 }}>
-                          ({formatFileSize(file.size)})
-                        </span>
-                      </Tag>
-                    )}
+                      ) : (
+                        <FileOutlined style={{ fontSize: 18, color: '#999' }} />
+                      )}
+                      {/* 上传进度 - 白色圆环 loading 动画 */}
+                      {file.status === 'uploading' && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'rgba(0,0,0,0.3)',
+                          borderRadius: '8px',
+                        }}>
+                          <div className="upload-spinner" />
+                        </div>
+                      )}
+                      {/* 错误状态 */}
+                      {file.status === 'error' && (
+                        <div style={{
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'rgba(255,77,79,0.15)',
+                          borderRadius: '8px',
+                        }}>
+                          <CloseCircleOutlined style={{ fontSize: 14, color: '#ff4d4f' }} />
+                        </div>
+                      )}
+                    </div>
+                    {/* 删除按钮 - 在边线上，hover 时显示 */}
+                    <div
+                      className="file-thumbnail-close"
+                      onClick={(e) => { e.stopPropagation(); removePendingFile(file.id) }}
+                    >
+                      <CloseOutlined style={{ fontSize: 10, color: '#666' }} />
+                    </div>
                   </div>
                 ))}
+                
+                {/* 已上传的文件 - 图片用缩略图，文档用卡片 */}
+                {uploadedFiles.map(file => (
+                  file.type === 'image' ? (
+                    <div 
+                      key={file.id}
+                      title={file.filename}
+                      className="file-thumbnail-wrapper"
+                      style={{ 
+                        position: 'relative',
+                        width: '48px',
+                        height: '48px',
+                        marginRight: '8px',
+                        marginTop: '8px',
+                      }}
+                    >
+                      <div style={{
+                        width: '100%',
+                        height: '100%',
+                        borderRadius: '8px',
+                        border: '1px solid #e0e0e0',
+                        background: '#f5f5f5',
+                        overflow: 'hidden',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                      }}>
+                        <Image
+                          src={file.url}
+                          width={48}
+                          height={48}
+                          style={{ objectFit: 'cover', cursor: 'pointer' }}
+                          preview={{ mask: null }}
+                        />
+                      </div>
+                      <div
+                        className="file-thumbnail-close"
+                        onClick={(e) => { e.stopPropagation(); removeFile(file.id) }}
+                      >
+                        <CloseOutlined style={{ fontSize: 10, color: '#666' }} />
+                      </div>
+                    </div>
+                  ) : (
+                    <FileAttachmentCard 
+                      key={file.id}
+                      attachment={{
+                        file_id: file.id,
+                        url: file.url,
+                        type: file.type as 'document',
+                        filename: file.filename,
+                        content_type: file.contentType,
+                        size: file.size,
+                      }}
+                      pending
+                      onRemove={() => removeFile(file.id)}
+                    />
+                  )
+                ))}
               </div>
-            </div>
-          )}
-          
-          <div className="input-container">
+            )}
+            
+            {/* 输入行 */}
+            <div style={{ display: 'flex', alignItems: 'center', width: '100%' }}>
             {/* 左侧文件工具按钮 */}
             <div className="file-tools-wrapper">
               <button
@@ -2512,11 +2676,7 @@ const ChatPage: React.FC = () => {
                 disabled={isLoading}
                 title="添加内容"
               >
-                {uploading ? (
-                  <Spin size="small" />
-                ) : (
-                  <PlusOutlined style={{ fontSize: 18 }} />
-                )}
+                <PlusOutlined style={{ fontSize: 18 }} />
               </button>
               
               {/* 文件工具弹窗 */}
@@ -2581,6 +2741,7 @@ const ChatPage: React.FC = () => {
                   <ArrowUpOutlined style={{ fontSize: 20, fontWeight: 'bold' }} />
                 </button>
               )}
+            </div>
             </div>
           </div>
         </div>

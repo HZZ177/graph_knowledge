@@ -6,7 +6,7 @@
 - 生成会话标题
 """
 
-from typing import Dict, Any, List
+from typing import Dict, List
 import uuid
 
 from sqlalchemy.orm import Session
@@ -14,7 +14,7 @@ from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 from langchain_core.messages import HumanMessage, AIMessage
 
 from backend.app.llm.factory import get_lite_task_llm
-from backend.app.models.conversation import Conversation
+from backend.app.models.chat import Conversation
 from backend.app.core.logger import logger
 from backend.app.llm.langchain.agent import get_agent_config
 
@@ -153,6 +153,7 @@ async def get_thread_history(thread_id: str) -> list:
         - content: 消息内容
         - tool_name: 工具名称（仅 tool 类型）
         - tool_calls: 工具调用信息（仅 assistant 调用工具时）
+        - attachments: 文件附件（仅用户消息，从多模态 content 解析）
     """
     try:
         # 为每次查询单独打开 AsyncSqliteSaver 上下文
@@ -169,15 +170,37 @@ async def get_thread_history(thread_id: str) -> list:
                 content = getattr(msg, "content", "")
                 
                 if msg_type == "human":
-                    result.append({"role": "user", "content": content})
+                    # 优先从 additional_kwargs 获取原始附件信息
+                    additional_kwargs = getattr(msg, "additional_kwargs", {}) or {}
+                    original_attachments = additional_kwargs.get("original_attachments", [])
+                    
+                    if original_attachments:
+                        # 有原始附件信息，直接使用
+                        logger.info(f"[HistoryService] 从 additional_kwargs 恢复 {len(original_attachments)} 个原始附件")
+                        # 解析 content 获取纯文本（过滤掉解析后的文档内容）
+                        text_content = _extract_user_question(content)
+                        msg_data = {"role": "user", "content": text_content}
+                        msg_data["attachments"] = original_attachments
+                        result.append(msg_data)
+                    else:
+                        # 没有原始附件信息，回退到从 content 解析（兼容旧消息）
+                        logger.info(f"[HistoryService] Human message content type: {type(content)}")
+                        text_content, attachments = _parse_multimodal_content(content)
+                        logger.info(f"[HistoryService] Parsed: text_len={len(text_content) if text_content else 0}, attachments_count={len(attachments)}")
+                        msg_data = {"role": "user", "content": text_content}
+                        if attachments:
+                            msg_data["attachments"] = attachments
+                        result.append(msg_data)
                 elif msg_type == "ai":
                     # 检查是否有工具调用
                     tool_calls = getattr(msg, "tool_calls", None)
+                    # AI 消息 content 也可能是数组（多模态），提取文本
+                    text_content = _extract_text_from_content(content)
                     if tool_calls:
                         # 有工具调用的 AI 消息
                         result.append({
                             "role": "assistant",
-                            "content": content,
+                            "content": text_content,
                             "tool_calls": [
                                 {"name": tc.get("name", ""), "args": tc.get("args", {})}
                                 for tc in tool_calls
@@ -185,13 +208,13 @@ async def get_thread_history(thread_id: str) -> list:
                         })
                     else:
                         # 普通 AI 消息
-                        result.append({"role": "assistant", "content": content})
+                        result.append({"role": "assistant", "content": text_content})
                 elif msg_type == "tool":
                     # 工具返回消息
                     tool_name = getattr(msg, "name", "unknown")
                     result.append({
                         "role": "tool",
-                        "content": content,
+                        "content": content if isinstance(content, str) else str(content),
                         "tool_name": tool_name
                     })
             
@@ -200,6 +223,107 @@ async def get_thread_history(thread_id: str) -> list:
     except Exception as e:
         logger.error(f"[HistoryService] 获取会话历史失败: {e}")
         return []
+
+
+def _parse_multimodal_content(content) -> tuple:
+    """解析多模态 content，提取文本和附件
+    
+    Args:
+        content: HumanMessage 的 content，可能是字符串或数组
+        
+    Returns:
+        (text_content, attachments) 元组
+    """
+    if isinstance(content, str):
+        return content, []
+    
+    if not isinstance(content, list):
+        return str(content), []
+    
+    text_parts = []
+    attachments = []
+    
+    for item in content:
+        if not isinstance(item, dict):
+            continue
+            
+        item_type = item.get("type", "")
+        
+        if item_type == "text":
+            text = item.get("text", "")
+            # 过滤掉附件引用文本（以 "[附件:" 开头）
+            if text and not text.strip().startswith("[附件:"):
+                text_parts.append(text)
+        
+        elif item_type == "image_url":
+            image_url = item.get("image_url", {})
+            url = image_url.get("url", "") if isinstance(image_url, dict) else ""
+            if url:
+                # 从 URL 提取文件名
+                filename = url.split("/")[-1].split("?")[0] if "/" in url else "image"
+                attachments.append({
+                    "file_id": "",  # 历史记录中没有 file_id
+                    "url": url,
+                    "type": "image",
+                    "filename": filename,
+                    "content_type": "image/png"  # 默认
+                })
+    
+    return "".join(text_parts), attachments
+
+
+def _extract_text_from_content(content) -> str:
+    """从 content 中提取纯文本
+    
+    Args:
+        content: 消息的 content，可能是字符串或数组
+        
+    Returns:
+        文本内容
+    """
+    if isinstance(content, str):
+        return content
+    
+    if not isinstance(content, list):
+        return str(content)
+    
+    text_parts = []
+    for item in content:
+        if isinstance(item, dict) and item.get("type") == "text":
+            text_parts.append(item.get("text", ""))
+    
+    return "".join(text_parts)
+
+
+def _extract_user_question(content) -> str:
+    """从 content 中提取用户的原始问题（过滤掉解析后的文档内容）
+    
+    Args:
+        content: HumanMessage 的 content，可能是字符串或数组
+        
+    Returns:
+        用户的原始问题文本
+    """
+    if isinstance(content, str):
+        return content
+    
+    if not isinstance(content, list):
+        return str(content)
+    
+    text_parts = []
+    for item in content:
+        if not isinstance(item, dict):
+            continue
+        
+        if item.get("type") == "text":
+            text = item.get("text", "")
+            # 过滤掉文档内容（以 "--- 文档:" 开头的块）
+            if text and not text.strip().startswith("--- 文档:") and not text.strip().startswith("\n\n--- 文档:"):
+                # 也过滤掉附件引用和文档解析失败的提示
+                if not text.strip().startswith("[附件:") and not text.strip().startswith("[文档"):
+                    text_parts.append(text)
+    
+    return "".join(text_parts).strip()
 
 
 async def get_raw_messages(thread_id: str) -> list:

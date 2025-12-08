@@ -93,7 +93,8 @@
   left: 0;
   right: 0;
   top: 50%;
-  transform: translateY(-50%);
+  /* 使用 margin-top 负值来模拟居中，但扩展时只向下 */
+  margin-top: -30px;
 }
 
 .chat-main.empty-chat .agent-selector-header {
@@ -1614,3 +1615,51 @@
   line-height: 1.4;
 }
 
+/* 文件缩略图容器 */
+.file-thumbnail-wrapper {
+  position: relative;
+}
+
+/* 删除按钮 - 默认隐藏 */
+.file-thumbnail-close {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+/* hover 时显示删除按钮 */
+.file-thumbnail-wrapper:hover .file-thumbnail-close {
+  opacity: 1;
+}
+
+.file-thumbnail-close:hover {
+  background: #d0d0d0;
+}
+
+/* 上传 loading 动画 - 白色圆环旋转 */
+.upload-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: upload-spin 0.8s linear infinite;
+}
+
+@keyframes upload-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

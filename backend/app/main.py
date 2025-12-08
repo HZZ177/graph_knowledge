@@ -20,7 +20,7 @@ from backend.app.db.sqlite import Base, engine, SessionLocal
 from backend.app.db.init_db import init_db
 from backend.app.core.middleware import trace_id_middleware
 from backend.app.core.logger import logger
-from backend.app.models import ai_models, conversation, file_upload  # noqa: F401  确保 ai_models, conversations, file_uploads 表被创建
+from backend.app.models import ai_models, chat as chat_models  # noqa: F401  确保 ai_models 表被创建
 from backend.mcp.ace_code_engine import warmup_ace_mcp
 from backend.app.llm.langchain.registry import AgentRegistry
 from backend.app.core.ripgrep import ensure_ripgrep_installed
@@ -55,7 +55,7 @@ async def lifespan(app: FastAPI):
 
     # 初始化文件存储服务
     try:
-        from backend.app.services.file_storage import init_storage_service
+        from backend.app.services.chat.storage import init_storage_service
         init_storage_service(storage_yml_path)
         logger.info("[Lifespan] 文件存储服务初始化完成")
     except Exception as e:

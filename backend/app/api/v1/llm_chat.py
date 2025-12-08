@@ -11,9 +11,9 @@ from fastapi import APIRouter, Body, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
 
 from backend.app.db.sqlite import get_db, SessionLocal
-from backend.app.schemas.llm import StreamChatRequest, ConversationHistoryResponse, ConversationOut, AgentTypeOut
+from backend.app.schemas.chat import StreamChatRequest, ConversationHistoryResponse, ConversationOut, AgentTypeOut
 from backend.app.llm.langchain.configs import list_agent_configs
-from backend.app.models.conversation import Conversation
+from backend.app.models.chat import Conversation
 from backend.app.services.chat.chat_service import (
     streaming_chat,
     streaming_regenerate,

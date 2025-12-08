@@ -96,6 +96,14 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
+// ==================== 统一响应格式 ====================
+
+interface ApiResponse<T = unknown> {
+  code: number
+  message: string
+  data: T
+}
+
 // ==================== API Functions ====================
 
 /**
@@ -110,12 +118,13 @@ export async function uploadFile(file: File): Promise<UploadedFile> {
     body: formData,
   })
   
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.detail || '文件上传失败')
+  const result: ApiResponse<FileUploadResponse> = await response.json()
+  
+  if (result.code !== 200) {
+    throw new Error(result.message || '文件上传失败')
   }
   
-  const data: FileUploadResponse = await response.json()
+  const data = result.data
   
   return {
     id: data.file_id,
@@ -133,12 +142,13 @@ export async function uploadFile(file: File): Promise<UploadedFile> {
 export async function getFileInfo(fileId: string): Promise<FileInfoResponse> {
   const response = await fetch(`${API_BASE_PATH}/files/${fileId}`)
   
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.detail || '获取文件信息失败')
+  const result: ApiResponse<FileInfoResponse> = await response.json()
+  
+  if (result.code !== 200) {
+    throw new Error(result.message || '获取文件信息失败')
   }
   
-  return await response.json()
+  return result.data
 }
 
 /**
@@ -149,9 +159,10 @@ export async function deleteFile(fileId: string): Promise<void> {
     method: 'DELETE',
   })
   
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.detail || '删除文件失败')
+  const result: ApiResponse = await response.json()
+  
+  if (result.code !== 200) {
+    throw new Error(result.message || '删除文件失败')
   }
 }
 
@@ -165,10 +176,11 @@ export async function listFiles(conversationId?: string): Promise<FileInfoRespon
   
   const response = await fetch(url)
   
-  if (!response.ok) {
-    const error = await response.json()
-    throw new Error(error.detail || '获取文件列表失败')
+  const result: ApiResponse<FileInfoResponse[]> = await response.json()
+  
+  if (result.code !== 200) {
+    throw new Error(result.message || '获取文件列表失败')
   }
   
-  return await response.json()
+  return result.data
 }

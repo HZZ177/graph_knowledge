@@ -3,7 +3,7 @@
 
 storage:
   # 当前使用的提供商（切换这里即可更改存储方式）
-  provider: "minio"  # 可选: s3 / aliyun_oss / qiniu / minio
+  provider: "openlist_s3"  # 可选: s3 / aliyun_oss / qiniu / minio / openlist_s3
   
   # 文件限制
   max_file_size: 10485760  # 10MB
@@ -58,3 +58,11 @@ storage:
     access_key: "minioadmin"
     secret_key: "minioadmin"
     secure: false  # HTTP 使用 false，HTTPS 使用 true
+  
+  # OpenList REST API 配置（使用 OpenList 原生 API，兼容性更好）
+  openlist_s3:
+    endpoint: "https://openlist.heshouyi.com"  # OpenList 主站地址
+    upload_path: "/hsy/OSS/chat-files"  # 上传目录（在 /hsy/OSS 存储下创建 chat-files 子目录）
+    username: "admin"  # OpenList 用户名
+    password: "19981208@qwer"  # OpenList 密码
+    token: ""  # 或者直接填写 API Token（优先使用）

@@ -1,0 +1,165 @@
+/**
+ * 文件附件卡片样式
+ */
+
+.file-attachment-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #f0f2f5 100%);
+  border: 1px solid #e8e8e8;
+  border-radius: 10px;
+  transition: all 0.2s ease;
+  min-width: 180px;
+  max-width: 280px;
+  position: relative;
+  overflow: hidden;
+}
+
+.file-attachment-card:hover {
+  background: linear-gradient(135deg, #f0f2f5 0%, #e6e8eb 100%);
+  border-color: #d0d0d0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* pending 模式（待发送） */
+.file-attachment-card.pending {
+  cursor: default;
+  background: #fff;
+  border-style: dashed;
+}
+
+.file-attachment-card.pending:hover {
+  transform: none;
+  box-shadow: none;
+}
+
+/* 文件图标 */
+.file-attachment-card .file-icon {
+  font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+}
+
+/* 文件信息 */
+.file-attachment-card .file-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.file-attachment-card .file-name {
+  font-size: 13px;
+  font-weight: 500;
+  color: #333;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.4;
+}
+
+.file-attachment-card .file-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.file-attachment-card .file-type {
+  font-size: 11px;
+  color: #666;
+  background: rgba(0, 0, 0, 0.05);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.file-attachment-card .file-size {
+  font-size: 11px;
+  color: #999;
+}
+
+/* 下载按钮 */
+.file-attachment-card .file-download-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  font-size: 14px;
+  color: #666;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.file-attachment-card .file-download-btn:hover {
+  background: #1890ff;
+  color: #fff;
+}
+
+.file-attachment-card .file-download-btn:active {
+  transform: scale(0.95);
+}
+
+/* 删除按钮（pending 模式） */
+.file-attachment-card .file-remove {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  color: #999;
+  background: rgba(0, 0, 0, 0.05);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.file-attachment-card .file-remove:hover {
+  background: #ff4d4f;
+  color: #fff;
+}
+
+/* 暗色主题适配 */
+@media (prefers-color-scheme: dark) {
+  .file-attachment-card {
+    background: linear-gradient(135deg, #2a2a2a 0%, #1f1f1f 100%);
+    border-color: #404040;
+  }
+  
+  .file-attachment-card:hover {
+    background: linear-gradient(135deg, #333 0%, #2a2a2a 100%);
+    border-color: #505050;
+  }
+  
+  .file-attachment-card .file-icon {
+    background: rgba(255, 255, 255, 0.1);
+  }
+  
+  .file-attachment-card .file-name {
+    color: #e0e0e0;
+  }
+  
+  .file-attachment-card .file-type {
+    background: rgba(255, 255, 255, 0.1);
+    color: #aaa;
+  }
+  
+  .file-attachment-card .file-size {
+    color: #888;
+  }
+}

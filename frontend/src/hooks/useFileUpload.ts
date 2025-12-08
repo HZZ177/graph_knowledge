@@ -21,12 +21,25 @@ export interface UseFileUploadOptions {
   allowedTypes?: string[]  // 允许的文件类型，默认 undefined（无限制）
 }
 
+// 上传中的文件（带本地预览）
+export interface PendingFile {
+  id: string  // 临时 ID
+  file: File
+  previewUrl: string  // 本地预览 URL
+  progress: number  // 上传进度 0-100
+  status: 'pending' | 'uploading' | 'done' | 'error'
+  error?: string
+}
+
 export interface UseFileUploadReturn {
   uploadedFiles: UploadedFile[]
+  pendingFiles: PendingFile[]  // 上传中的文件
   uploading: boolean
   handleUpload: (file: File) => Promise<void>
   removeFile: (fileId: string) => Promise<void>
+  removePendingFile: (id: string) => void  // 移除上传中的文件
   clearFiles: () => void
+  setFiles: (files: UploadedFile[]) => void  // 设置已上传文件（用于回溯恢复附件）
   enableDragDrop: () => () => void
   disableDragDrop: () => void
   enablePaste: () => () => void
@@ -44,6 +57,7 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
   const opts = { ...DEFAULT_OPTIONS, ...options }
   
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([])
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const [uploading, setUploading] = useState(false)
   
   /**
@@ -112,21 +126,51 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
       return
     }
     
+    // 生成临时 ID 和预览 URL
+    const tempId = `pending-${Date.now()}-${Math.random().toString(36).slice(2)}`
+    const previewUrl = file.type.startsWith('image/') ? URL.createObjectURL(file) : ''
+    
+    // 添加到上传中列表
+    const pendingFile: PendingFile = {
+      id: tempId,
+      file,
+      previewUrl,
+      progress: 0,
+      status: 'uploading',
+    }
+    setPendingFiles(prev => [...prev, pendingFile])
     setUploading(true)
     
     try {
       // 压缩图片
       const processedFile = await compressImageIfNeeded(file)
       
+      // 更新进度（压缩完成 30%）
+      setPendingFiles(prev => prev.map(f => 
+        f.id === tempId ? { ...f, progress: 30 } : f
+      ))
+      
       // 上传文件
       const uploadedFile = await uploadFile(processedFile)
       
-      // 添加到列表
+      // 更新进度（上传完成 100%）
+      setPendingFiles(prev => prev.map(f => 
+        f.id === tempId ? { ...f, progress: 100, status: 'done' } : f
+      ))
+      
+      // 从 pending 移除，添加到 uploaded
+      setPendingFiles(prev => prev.filter(f => f.id !== tempId))
       setUploadedFiles(prev => [...prev, uploadedFile])
       
-      message.success(`文件上传成功: ${uploadedFile.filename}`)
+      // 释放预览 URL
+      if (previewUrl) URL.revokeObjectURL(previewUrl)
+      
     } catch (error) {
       console.error('[FileUpload] 上传失败:', error)
+      // 更新状态为错误
+      setPendingFiles(prev => prev.map(f => 
+        f.id === tempId ? { ...f, status: 'error', error: error instanceof Error ? error.message : '上传失败' } : f
+      ))
       message.error(`文件上传失败: ${error instanceof Error ? error.message : '未知错误'}`)
     } finally {
       setUploading(false)
@@ -134,17 +178,30 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
   }, [validateFile, compressImageIfNeeded])
   
   /**
-   * 删除文件
+   * 移除上传中的文件
+   */
+  const removePendingFile = useCallback((id: string) => {
+    setPendingFiles(prev => {
+      const file = prev.find(f => f.id === id)
+      if (file?.previewUrl) {
+        URL.revokeObjectURL(file.previewUrl)
+      }
+      return prev.filter(f => f.id !== id)
+    })
+  }, [])
+  
+  /**
+   * 删除文件（UI 立即移除，服务器异步删除）
    */
   const removeFile = useCallback(async (fileId: string) => {
-    try {
-      await deleteFile(fileId)
-      setUploadedFiles(prev => prev.filter(f => f.id !== fileId))
-      message.success('文件已删除')
-    } catch (error) {
-      console.error('[FileUpload] 删除失败:', error)
-      message.error('文件删除失败')
-    }
+    // 立即从 UI 移除，不阻塞
+    setUploadedFiles(prev => prev.filter(f => f.id !== fileId))
+    
+    // 异步删除服务器文件（不等待结果）
+    deleteFile(fileId).catch(error => {
+      console.error('[FileUpload] 服务器文件删除失败:', error)
+      // 不提示用户，静默处理
+    })
   }, [])
   
   /**
@@ -226,12 +283,22 @@ export function useFileUpload(options: UseFileUploadOptions = {}): UseFileUpload
     // 实际的清理逻辑在 enablePaste 返回的 cleanup 函数中
   }, [])
   
+  /**
+   * 设置已上传文件列表（用于回溯恢复附件）
+   */
+  const setFiles = useCallback((files: UploadedFile[]) => {
+    setUploadedFiles(files)
+  }, [])
+  
   return {
     uploadedFiles,
+    pendingFiles,
     uploading,
     handleUpload,
     removeFile,
+    removePendingFile,
     clearFiles,
+    setFiles,
     enableDragDrop,
     disableDragDrop,
     enablePaste,

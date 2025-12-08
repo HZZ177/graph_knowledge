@@ -156,6 +156,189 @@ class QiniuProvider(IStorageProvider):
             return False
 
 
+# ========== OpenList REST API ==========
+
+class OpenListS3Provider(IStorageProvider):
+    """OpenList REST API 实现
+    
+    使用 OpenList 的 REST API（而非 S3 接口）上传文件，兼容性更好。
+    API:
+    - PUT /api/fs/put - 上传文件
+    - POST /api/fs/get - 获取文件信息
+    - POST /api/fs/remove - 删除文件
+    """
+    
+    def __init__(self, config: dict):
+        import httpx
+        
+        self.base_url = config['endpoint'].rstrip('/')  # OpenList 主站地址
+        self.upload_path = config.get('upload_path', '/chat-files')  # 上传目录
+        self.token = config.get('token', '')  # API Token
+        self.username = config.get('username', '')
+        self.password = config.get('password', '')
+        
+        logger.info(f"[OpenListAPI] 初始化: base_url={self.base_url}, username={self.username}, has_token={bool(self.token)}")
+        
+        # 创建 HTTP 客户端
+        self.client = httpx.Client(timeout=60.0, verify=False)
+        
+        # 如果没有 token 但有用户名密码，则登录获取 token
+        if not self.token and self.username and self.password:
+            logger.info(f"[OpenListAPI] 开始登录...")
+            self._login()
+        elif not self.token:
+            logger.warning(f"[OpenListAPI] 未配置 token 或用户名密码，可能无法上传文件")
+        
+        logger.info(f"[OpenListAPI] 初始化完成: has_token={bool(self.token)}")
+    
+    def _login(self):
+        """登录获取 token"""
+        try:
+            logger.debug(f"[OpenListAPI] 登录请求: {self.base_url}/api/auth/login")
+            resp = self.client.post(
+                f"{self.base_url}/api/auth/login",
+                json={"username": self.username, "password": self.password},
+                headers={"Content-Type": "application/json"}
+            )
+            logger.debug(f"[OpenListAPI] 登录响应状态: {resp.status_code}")
+            data = resp.json()
+            logger.debug(f"[OpenListAPI] 登录响应: code={data.get('code')}, message={data.get('message')}")
+            
+            if data.get('code') == 200:
+                token = data['data']['token']
+                # 确保 token 是完整格式
+                self.token = token
+                logger.info(f"[OpenListAPI] 登录成功，token长度: {len(self.token)}")
+            else:
+                logger.error(f"[OpenListAPI] 登录失败: {data}")
+                raise RuntimeError(f"OpenList 登录失败: {data.get('message')}")
+        except Exception as e:
+            logger.error(f"[OpenListAPI] 登录异常: {type(e).__name__}: {e}")
+            import traceback
+            logger.error(f"[OpenListAPI] 登录堆栈:\n{traceback.format_exc()}")
+            raise
+    
+    def _get_headers(self):
+        """获取请求头"""
+        headers = {}
+        if self.token:
+            # OpenList 使用 Bearer token 格式
+            headers['Authorization'] = self.token if self.token.startswith('Bearer ') else self.token
+        return headers
+    
+    def _is_token_expired(self, data: dict) -> bool:
+        """检测响应是否表示 token 过期"""
+        # OpenList token 过期的可能错误码/消息
+        code = data.get('code')
+        message = str(data.get('message', '')).lower()
+        
+        # 常见的 token 过期标识
+        if code in [401, 403]:
+            return True
+        if 'token' in message and ('expired' in message or 'invalid' in message or '过期' in message or '无效' in message):
+            return True
+        if 'login' in message or '登录' in message:
+            return True
+        
+        return False
+    
+    def _refresh_token(self):
+        """刷新 token（重新登录）"""
+        if self.username and self.password:
+            logger.info(f"[OpenListAPI] Token 过期，尝试重新登录...")
+            self._login()
+            logger.info(f"[OpenListAPI] Token 刷新成功")
+        else:
+            raise RuntimeError("Token 过期且无法刷新（未配置用户名密码）")
+    
+    async def upload(self, file_bytes: bytes, file_key: str, content_type: str) -> str:
+        """上传文件到 OpenList（支持 token 过期自动刷新）"""
+        import asyncio
+        from urllib.parse import quote
+        
+        # 完整路径
+        full_path = f"{self.upload_path}/{file_key}"
+        
+        # 最多重试一次（token 过期时刷新后重试）
+        for attempt in range(2):
+            try:
+                # OpenList PUT /api/fs/put 接口
+                # 需要在 URL 参数或 Header 中指定路径
+                headers = self._get_headers()
+                headers['Content-Type'] = 'application/octet-stream'
+                headers['File-Path'] = quote(full_path, safe='/')
+                
+                # 使用同步请求（在异步上下文中）
+                resp = await asyncio.to_thread(
+                    self.client.put,
+                    f"{self.base_url}/api/fs/put",
+                    content=file_bytes,
+                    headers=headers
+                )
+                
+                data = resp.json()
+                
+                # 检查是否 token 过期
+                if data.get('code') != 200:
+                    if attempt == 0 and self._is_token_expired(data):
+                        self._refresh_token()
+                        continue  # 重试
+                    raise RuntimeError(f"上传失败: {data.get('message')}")
+                
+                # 构造下载 URL（OpenList 的公开下载链接格式）
+                encoded_path = quote(full_path, safe='/')
+                url = f"{self.base_url}/d{encoded_path}"
+                
+                logger.debug(f"[OpenListAPI] 上传成功: {full_path}")
+                return url
+                
+            except RuntimeError:
+                raise
+            except Exception as e:
+                logger.error(f"[OpenListAPI] 上传失败: {type(e).__name__}: {e}")
+                raise
+        
+        raise RuntimeError("上传失败：重试次数超限")
+    
+    async def delete(self, file_key: str) -> bool:
+        """删除文件（支持 token 过期自动刷新）"""
+        import asyncio
+        
+        full_path = f"{self.upload_path}/{file_key}"
+        
+        # 最多重试一次（token 过期时刷新后重试）
+        for attempt in range(2):
+            try:
+                headers = self._get_headers()
+                headers['Content-Type'] = 'application/json'
+                
+                resp = await asyncio.to_thread(
+                    self.client.post,
+                    f"{self.base_url}/api/fs/remove",
+                    json={"names": [full_path.split('/')[-1]], "dir": '/'.join(full_path.split('/')[:-1])},
+                    headers=headers
+                )
+                
+                data = resp.json()
+                
+                # 检查是否 token 过期
+                if data.get('code') != 200:
+                    if attempt == 0 and self._is_token_expired(data):
+                        self._refresh_token()
+                        continue  # 重试
+                    logger.warning(f"[OpenListAPI] OSS删除失败: {data.get('message')}")
+                    return False
+                
+                logger.debug(f"[OpenListAPI] OSS删除成功: {full_path}")
+                return True
+                
+            except Exception as e:
+                logger.error(f"[OpenListAPI] 文件删除失败: {e}")
+                return False
+        
+        return False
+
+
 # ========== MinIO ==========
 
 class MinIOProvider(IStorageProvider):

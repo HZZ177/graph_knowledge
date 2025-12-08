@@ -15,11 +15,10 @@ from typing import Any, Dict, Optional, List
 
 from sqlalchemy.orm import Session
 from starlette.websockets import WebSocket
-from langchain_core.messages import HumanMessage, AIMessage
 from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
 
 from datetime import datetime, timezone
-from backend.app.models.conversation import Conversation
+from backend.app.models.chat import Conversation
 from backend.app.llm.langchain.registry import (
     AgentRegistry,
     get_agent_run_config,
@@ -392,9 +391,9 @@ async def streaming_chat(
             # 获取运行时配置（包含 agent_context，供工具使用）
             config = get_agent_run_config(thread_id, agent_context)
             
-            # 构造多模态消息
-            from backend.app.services.chat.multimodal import build_multimodal_message
-            human_message = build_multimodal_message(question, attachments)
+            # 构造多模态消息（异步版本，支持文档解析）
+            from backend.app.services.chat.multimodal import build_multimodal_message_async
+            human_message = await build_multimodal_message_async(question, attachments)
             
             # 构造输入
             inputs = {
@@ -403,7 +402,7 @@ async def streaming_chat(
             
             # 如果有附件，关联文件到对话
             if attachments:
-                from backend.app.models.file_upload import FileUpload
+                from backend.app.models.chat import FileUpload
                 for att in attachments:
                     file_id = att.get('file_id')
                     if file_id:
@@ -668,16 +667,16 @@ async def streaming_regenerate(
         # 2. 找到目标用户消息
         human_count = 0
         target_human_idx = -1
-        target_question = ""
+        target_human_msg = None  # 保留原始消息对象（包含多模态内容）
         for i, msg in enumerate(raw_messages):
             if getattr(msg, "type", None) == "human":
                 if human_count == user_msg_index:
                     target_human_idx = i
-                    target_question = getattr(msg, "content", "")
+                    target_human_msg = msg  # 保留原始消息对象
                     break
                 human_count += 1
         
-        if target_human_idx == -1:
+        if target_human_idx == -1 or target_human_msg is None:
             raise Exception(f"找不到用户消息 index={user_msg_index}")
         
         # 3. 发送开始消息
@@ -698,10 +697,10 @@ async def streaming_regenerate(
             # 获取运行时配置
             temp_config = get_agent_run_config(temp_thread_id)
             
-            # 构造输入：截断到目标用户消息之前的历史 + 目标用户消息
+            # 构造输入：截断到目标用户消息之前的历史 + 目标用户消息（保留多模态内容）
             history_messages = list(raw_messages[:target_human_idx])  # 不包含目标用户消息
             inputs = {
-                "messages": history_messages + [HumanMessage(content=target_question)]
+                "messages": history_messages + [target_human_msg]  # 使用原始消息对象，保留多模态内容
             }
             
             # 流式执行并收集新生成的消息
