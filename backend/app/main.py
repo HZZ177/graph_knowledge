@@ -13,6 +13,7 @@ from backend.app.api.v1 import (
     health,
     llm_models,
     files,
+    coding,
 )
 from backend.app.core.file_path import storage_yml_path
 
@@ -55,7 +56,7 @@ async def lifespan(app: FastAPI):
 
     # 初始化文件存储服务
     try:
-        from backend.app.services.chat.storage import init_storage_service
+        from backend.app.services.storage import init_storage_service
         init_storage_service(storage_yml_path)
         logger.info("[Lifespan] 文件存储服务初始化完成")
     except Exception as e:
@@ -87,6 +88,7 @@ app.include_router(canvas.router, prefix="/api/v1")
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(llm_models.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
+app.include_router(coding.router, prefix="/api/v1")
 
 
 @app.get("/health")

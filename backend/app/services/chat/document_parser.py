@@ -5,39 +5,45 @@
 """
 
 import io
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Dict, Any, Union
 from loguru import logger
 import httpx
 
 
 # ========== 文档解析器 ==========
 
-def parse_pdf(file_bytes: bytes, extract_images: bool = True) -> Tuple[str, List[bytes]]:
-    """解析 PDF 文档，提取文本和图片
+# 内容块类型：文本或图片
+ContentBlock = Dict[str, Any]  # {"type": "text", "content": str, "page": int} 或 {"type": "image", "data": bytes, "page": int}
+
+
+def parse_pdf_structured(file_bytes: bytes, extract_images: bool = True) -> List[ContentBlock]:
+    """解析 PDF 文档，按页顺序返回文本和图片（保留位置关系）
     
     Args:
         file_bytes: PDF 文件字节
         extract_images: 是否提取图片
         
     Returns:
-        (text, images): 文本内容和提取的图片列表（bytes）
+        内容块列表，按页顺序排列，每页先文本后图片
     """
-    text_parts = []
-    images = []
+    content_blocks: List[ContentBlock] = []
     
-    # 优先使用 PyMuPDF (fitz)，支持更好的图片提取
     try:
         import fitz  # PyMuPDF
         
         doc = fitz.open(stream=file_bytes, filetype="pdf")
         
         for i, page in enumerate(doc, 1):
-            # 提取文本
+            # 先添加该页的文本
             page_text = page.get_text()
             if page_text and page_text.strip():
-                text_parts.append(f"--- 第 {i} 页 ---\n{page_text}")
+                content_blocks.append({
+                    "type": "text",
+                    "content": f"--- 第 {i} 页 ---\n{page_text}",
+                    "page": i
+                })
             
-            # 提取图片
+            # 再添加该页的图片（图片紧跟在该页文本后面）
             if extract_images:
                 image_list = page.get_images(full=True)
                 for img_index, img_info in enumerate(image_list):
@@ -48,16 +54,23 @@ def parse_pdf(file_bytes: bytes, extract_images: bool = True) -> Tuple[str, List
                         
                         # 过滤太小的图片（可能是图标/装饰）
                         if len(image_bytes) > 5000:  # > 5KB
-                            images.append(image_bytes)
+                            content_blocks.append({
+                                "type": "image",
+                                "data": image_bytes,
+                                "page": i,
+                                "index": img_index
+                            })
                             logger.debug(f"[DocumentParser] 提取图片: 页{i}, 索引{img_index}, {len(image_bytes)} 字节")
                     except Exception as e:
                         logger.warning(f"[DocumentParser] 图片提取失败: 页{i}, 索引{img_index}, {e}")
         
-        page_count = len(doc)  # 在 close 之前获取页数
+        page_count = len(doc)
+        image_count = len([b for b in content_blocks if b["type"] == "image"])
+        text_count = len([b for b in content_blocks if b["type"] == "text"])
         doc.close()
-        text = "\n\n".join(text_parts)
-        logger.info(f"[DocumentParser] PDF 解析完成 (PyMuPDF): {page_count} 页, {len(text)} 字符, {len(images)} 张图片")
-        return text, images
+        
+        logger.info(f"[DocumentParser] PDF 结构化解析完成 (PyMuPDF): {page_count} 页, {text_count} 个文本块, {image_count} 张图片")
+        return content_blocks
         
     except ImportError:
         logger.warning("[DocumentParser] PyMuPDF 未安装，回退到 pypdf（不支持图片提取）")
@@ -73,18 +86,39 @@ def parse_pdf(file_bytes: bytes, extract_images: bool = True) -> Tuple[str, List
         for i, page in enumerate(reader.pages, 1):
             page_text = page.extract_text()
             if page_text:
-                text_parts.append(f"--- 第 {i} 页 ---\n{page_text}")
+                content_blocks.append({
+                    "type": "text",
+                    "content": f"--- 第 {i} 页 ---\n{page_text}",
+                    "page": i
+                })
         
-        text = "\n\n".join(text_parts)
-        logger.info(f"[DocumentParser] PDF 解析完成 (pypdf): {len(reader.pages)} 页, {len(text)} 字符, 无图片")
-        return text, []
+        logger.info(f"[DocumentParser] PDF 结构化解析完成 (pypdf): {len(reader.pages)} 页, 无图片")
+        return content_blocks
         
     except ImportError:
         logger.error("[DocumentParser] PDF 解析库未安装，请运行: pip install pymupdf pypdf")
-        return "[错误: PDF 解析库未安装]", []
+        return [{"type": "text", "content": "[错误: PDF 解析库未安装]", "page": 0}]
     except Exception as e:
         logger.error(f"[DocumentParser] PDF 解析失败: {e}")
-        return f"[PDF 解析失败: {e}]", []
+        return [{"type": "text", "content": f"[PDF 解析失败: {e}]", "page": 0}]
+
+
+def parse_pdf(file_bytes: bytes, extract_images: bool = True) -> Tuple[str, List[bytes]]:
+    """解析 PDF 文档，提取文本和图片（兼容旧接口）
+    
+    Args:
+        file_bytes: PDF 文件字节
+        extract_images: 是否提取图片
+        
+    Returns:
+        (text, images): 文本内容和提取的图片列表（bytes）
+    """
+    blocks = parse_pdf_structured(file_bytes, extract_images)
+    
+    text_parts = [b["content"] for b in blocks if b["type"] == "text"]
+    images = [b["data"] for b in blocks if b["type"] == "image"]
+    
+    return "\n\n".join(text_parts), images
 
 
 def parse_docx(file_bytes: bytes) -> str:
@@ -293,7 +327,7 @@ def parse_document(file_bytes: bytes, content_type: str, filename: str) -> Tuple
     return parse_text_file(file_bytes), []
 
 
-async def parse_document_from_url(url: str, content_type: str, filename: str) -> Tuple[str, List[str]]:
+async def parse_document_from_url(url: str, content_type: str, filename: str) -> Tuple[str, List[bytes]]:
     """从 URL 下载并解析文档
     
     Args:
@@ -325,6 +359,47 @@ async def parse_document_from_url(url: str, content_type: str, filename: str) ->
     except Exception as e:
         logger.error(f"[DocumentParser] 解析失败: {url}, {e}")
         return f"[文档解析失败: {filename}, {e}]", []
+
+
+async def parse_document_structured_from_url(url: str, content_type: str, filename: str) -> List[ContentBlock]:
+    """从 URL 下载并结构化解析文档（保留图片位置关系）
+    
+    Args:
+        url: 文档 URL
+        content_type: MIME 类型
+        filename: 文件名
+        
+    Returns:
+        内容块列表，按页顺序排列
+    """
+    try:
+        # 下载文件
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.get(url)
+            response.raise_for_status()
+            file_bytes = response.content
+        
+        logger.info(f"[DocumentParser] 下载文档完成: {filename}, {len(file_bytes)} 字节")
+        
+        filename_lower = filename.lower()
+        
+        # PDF - 使用结构化解析
+        if content_type == 'application/pdf' or filename_lower.endswith('.pdf'):
+            return parse_pdf_structured(file_bytes)
+        
+        # 其他格式 - 返回纯文本块
+        text, _ = parse_document(file_bytes, content_type, filename)
+        return [{"type": "text", "content": text, "page": 0}]
+        
+    except httpx.TimeoutException:
+        logger.error(f"[DocumentParser] 下载超时: {url}")
+        return [{"type": "text", "content": f"[文档下载超时: {filename}]", "page": 0}]
+    except httpx.HTTPError as e:
+        logger.error(f"[DocumentParser] 下载失败: {url}, {e}")
+        return [{"type": "text", "content": f"[文档下载失败: {filename}]", "page": 0}]
+    except Exception as e:
+        logger.error(f"[DocumentParser] 解析失败: {url}, {e}")
+        return [{"type": "text", "content": f"[文档解析失败: {filename}, {e}]", "page": 0}]
 
 
 # ========== 工具函数 ==========

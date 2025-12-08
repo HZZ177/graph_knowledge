@@ -7,7 +7,7 @@ from loguru import logger
 
 from backend.app.db.sqlite import SessionLocal
 from backend.app.models.chat import FileUpload
-from backend.app.services.chat.storage import get_storage_service
+from backend.app.services.storage import get_storage_service
 from backend.app.core.utils import success_response, error_response
 
 

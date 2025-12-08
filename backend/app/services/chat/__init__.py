@@ -23,7 +23,7 @@ from backend.app.services.chat.history_service import (
     replace_assistant_response,
     save_error_to_history,
 )
-from backend.app.services.chat.storage import (
+from backend.app.services.storage import (
     init_storage_service,
     get_storage_service,
     FileStorageService,

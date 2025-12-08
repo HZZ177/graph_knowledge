@@ -5,13 +5,12 @@
 - 文档：解析提取文本内容，作为上下文发给 LLM
 """
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from langchain_core.messages import HumanMessage
 from loguru import logger
 
 from backend.app.services.chat.document_parser import (
-    parse_document_from_url,
-    truncate_text,
+    parse_document_structured_from_url,
 )
 
 
@@ -231,68 +230,92 @@ async def build_multimodal_message_async(
                 })
                 logger.info(f"[Multimodal] 添加图片附件: {filename}")
             
-            # 文档类型：下载并解析内容
+            # 文档类型：下载并解析内容（按页顺序，保留图片位置）
             elif file_type == 'document':
                 logger.info(f"[Multimodal] 开始解析文档: {filename}")
                 
                 try:
-                    # 异步下载并解析文档
-                    doc_text, doc_images = await parse_document_from_url(
+                    # 异步下载并结构化解析文档
+                    content_blocks = await parse_document_structured_from_url(
                         url=url,
                         content_type=content_type,
                         filename=filename
                     )
                     
-                    # 截断过长的文档
-                    doc_text = truncate_text(doc_text, max_doc_chars)
-                    
-                    # 添加文档内容
+                    # 添加文档开始标记
                     content.append({
                         "type": "text",
-                        "text": f"\n\n--- 文档: {filename} ---\n{doc_text}\n--- 文档结束 ---\n"
+                        "text": f"\n\n--- 文档: {filename} ---\n"
                     })
                     
-                    # 如果文档中有图片，上传到 OSS 并添加到消息
-                    if doc_images:
-                        logger.info(f"[Multimodal] 文档包含 {len(doc_images)} 张图片，开始上传...")
-                        uploaded_count = 0
-                        
-                        try:
-                            from backend.app.services.chat.storage import get_storage_service
-                            storage = get_storage_service()
-                            
-                            for i, img_bytes in enumerate(doc_images):
-                                try:
-                                    # 生成图片文件名
-                                    img_filename = f"{filename}_img_{i+1}.png"
-                                    
-                                    # 上传到 OSS
-                                    _, img_url = await storage.upload_file(
-                                        file_bytes=img_bytes,
-                                        filename=img_filename,
-                                        content_type="image/png"
-                                    )
-                                    
-                                    # 添加图片到消息
-                                    content.append({
-                                        "type": "image_url",
-                                        "image_url": {
-                                            "url": img_url,
-                                            "detail": "high"
-                                        }
-                                    })
-                                    uploaded_count += 1
-                                    logger.debug(f"[Multimodal] 上传文档图片: {img_filename}")
-                                    
-                                except Exception as e:
-                                    logger.warning(f"[Multimodal] 文档图片上传失败: {e}")
-                            
-                            logger.info(f"[Multimodal] 文档图片上传完成: {uploaded_count}/{len(doc_images)} 张")
-                            
-                        except Exception as e:
-                            logger.warning(f"[Multimodal] 获取存储服务失败，跳过图片上传: {e}")
+                    # 按顺序处理内容块（文本和图片交替，保留位置关系）
+                    total_text_chars = 0
+                    image_count = 0
+                    storage = None
                     
-                    logger.info(f"[Multimodal] 文档解析完成: {filename}, {len(doc_text)} 字符, {len(doc_images)} 张图片")
+                    for block in content_blocks:
+                        if block["type"] == "text":
+                            # 文本块：检查长度限制
+                            block_text = block["content"]
+                            if total_text_chars + len(block_text) > max_doc_chars:
+                                # 截断剩余内容
+                                remaining = max_doc_chars - total_text_chars
+                                if remaining > 100:
+                                    block_text = block_text[:remaining] + f"\n\n[文档过长，已截断，共约 {total_text_chars + len(block['content'])} 字符]"
+                                    content.append({
+                                        "type": "text",
+                                        "text": block_text
+                                    })
+                                break
+                            
+                            content.append({
+                                "type": "text",
+                                "text": block_text
+                            })
+                            total_text_chars += len(block_text)
+                            
+                        elif block["type"] == "image":
+                            # 图片块：上传到 OSS 并添加 URL
+                            try:
+                                if storage is None:
+                                    from backend.app.services.storage import get_storage_service
+                                    storage = get_storage_service()
+                                
+                                page = block.get("page", 0)
+                                idx = block.get("index", 0)
+                                img_filename = f"{filename}_p{page}_img{idx}.png"
+                                
+                                _, img_url = await storage.upload_file(
+                                    file_bytes=block["data"],
+                                    filename=img_filename,
+                                    content_type="image/png"
+                                )
+                                
+                                # 添加图片位置说明和图片
+                                content.append({
+                                    "type": "text",
+                                    "text": f"\n[第 {page} 页图片 {idx + 1}]"
+                                })
+                                content.append({
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": img_url,
+                                        "detail": "high"
+                                    }
+                                })
+                                image_count += 1
+                                logger.debug(f"[Multimodal] 上传文档图片: {img_filename}")
+                                
+                            except Exception as e:
+                                logger.warning(f"[Multimodal] 文档图片上传失败: {e}")
+                    
+                    # 添加文档结束标记
+                    content.append({
+                        "type": "text",
+                        "text": f"\n--- 文档结束 ---\n"
+                    })
+                    
+                    logger.info(f"[Multimodal] 文档解析完成: {filename}, {total_text_chars} 字符, {image_count} 张图片")
                     
                 except Exception as e:
                     logger.error(f"[Multimodal] 文档解析失败: {filename}, {e}")

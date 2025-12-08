@@ -5,7 +5,7 @@ from loguru import logger
 
 from backend.app.db.sqlite import SessionLocal
 from backend.app.models.chat import FileUpload
-from backend.app.services.chat.storage import get_storage_service
+from backend.app.services.storage import get_storage_service
 
 
 async def cleanup_orphan_files(retention_days: int = 7):
@@ -86,7 +86,7 @@ def setup_cleanup_scheduler():
     """
     try:
         from apscheduler.schedulers.asyncio import AsyncIOScheduler
-        from backend.app.services.chat.storage.config import StorageConfig
+        from backend.app.services.storage.config import StorageConfig
         
         # 加载配置
         config = StorageConfig()
