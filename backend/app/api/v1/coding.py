@@ -8,7 +8,12 @@ from urllib.parse import quote
 from fastapi import APIRouter
 from fastapi.responses import Response
 
-from backend.app.schemas.coding import IssueRequest
+from backend.app.schemas.coding import (
+    IssueRequest,
+    ProjectListRequest,
+    IterationListRequest,
+    IssueListRequest,
+)
 from backend.app.services.coding_service import coding_service
 from backend.app.core.utils import success_response, error_response
 from backend.app.core.logger import logger
@@ -77,3 +82,61 @@ async def export_issue_pdf(request: IssueRequest):
     except Exception as e:
         logger.error(f"[CodingAPI] 导出 PDF 失败: {e}")
         return error_response(message=f"导出 PDF 失败: {str(e)}")
+
+
+@router.post("/projects")
+async def get_project_list(request: ProjectListRequest):
+    """获取项目列表
+    
+    支持分页和按名称筛选。
+    """
+    try:
+        result = await coding_service.get_project_list(
+            page_number=request.page_number,
+            page_size=request.page_size,
+            project_name=request.project_name or "",
+        )
+        return success_response(data=result.model_dump())
+    except Exception as e:
+        logger.error(f"[CodingAPI] 获取项目列表失败: {e}")
+        return error_response(message=f"获取项目列表失败: {str(e)}")
+
+
+@router.post("/iterations")
+async def get_iteration_list(request: IterationListRequest):
+    """获取项目迭代列表
+    
+    根据项目名称获取该项目下的所有迭代。
+    """
+    try:
+        result = await coding_service.get_iteration_list(
+            project_name=request.project_name,
+            limit=request.limit,
+            offset=request.offset,
+            keywords=request.keywords or "",
+        )
+        return success_response(data=result.model_dump())
+    except Exception as e:
+        logger.error(f"[CodingAPI] 获取迭代列表失败: {e}")
+        return error_response(message=f"获取迭代列表失败: {str(e)}")
+
+
+@router.post("/issues")
+async def get_issue_list(request: IssueListRequest):
+    """获取迭代下的事项列表
+    
+    根据项目名称和迭代 Code 获取该迭代下的需求/缺陷列表。
+    """
+    try:
+        result = await coding_service.get_issue_list(
+            project_name=request.project_name,
+            iteration_code=request.iteration_code,
+            issue_type=request.issue_type,
+            limit=request.limit,
+            offset=request.offset,
+            keyword=request.keyword or "",
+        )
+        return success_response(data=result.model_dump())
+    except Exception as e:
+        logger.error(f"[CodingAPI] 获取事项列表失败: {e}")
+        return error_response(message=f"获取事项列表失败: {str(e)}")

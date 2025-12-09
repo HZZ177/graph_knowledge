@@ -460,6 +460,16 @@ AGENT_CONFIGS = {
         tool_call_limit=30,
         tags=["日志", "排查", "故障诊断"],
     ),
+    "intelligent_testing": AgentConfig(
+        agent_type="intelligent_testing",
+        name="智能测试助手",
+        description="基于需求文档智能生成测试方案和测试用例，支持需求分析、测试设计和用例生成全流程",
+        system_prompt="你是一个智能测试助手，帮助用户分析需求并生成测试用例。",  # 占位，后续会实现完整的 Prompt
+        tools_factory=get_knowledge_qa_tools,  # 暂时复用知识库工具，后续会替换为测试专用工具
+        model_call_limit=30,
+        tool_call_limit=30,
+        tags=["测试", "需求分析", "用例生成"],
+    ),
 }
 
 

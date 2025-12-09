@@ -184,9 +184,9 @@ async def get_thread_history(thread_id: str) -> list:
                         result.append(msg_data)
                     else:
                         # 没有原始附件信息，回退到从 content 解析（兼容旧消息）
-                        logger.info(f"[HistoryService] Human message content type: {type(content)}")
+                        logger.debug(f"[HistoryService] Human message content type: {type(content)}")
                         text_content, attachments = _parse_multimodal_content(content)
-                        logger.info(f"[HistoryService] Parsed: text_len={len(text_content) if text_content else 0}, attachments_count={len(attachments)}")
+                        logger.debug(f"[HistoryService] Parsed: text_len={len(text_content) if text_content else 0}, attachments_count={len(attachments)}")
                         msg_data = {"role": "user", "content": text_content}
                         if attachments:
                             msg_data["attachments"] = attachments

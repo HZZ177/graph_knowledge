@@ -26,6 +26,7 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import { createChatClient, ChatClient, ToolCallInfo, fetchConversationHistory, generateConversationTitle, listConversations, deleteConversation, truncateConversation, createRegenerateClient, RegenerateClient, ChatMessage, BatchInfo, AgentType, fetchAgentTypes, fetchLogQueryOptions, LogQueryOption, FileAttachment } from '../api/llm'
+import { fetchProjects, fetchIterations, fetchIssues, ProjectInfo, IterationInfo, IssueInfo } from '../api/coding'
 import { useTypewriter } from '../hooks/useTypewriter'
 import { useFileUpload } from '../hooks/useFileUpload'
 import { formatFileSize } from '../api/files'
@@ -143,6 +144,17 @@ const agentWelcomeConfig: Record<string, {
       '如何优化这个函数的性能？',
       '代码中是否存在安全隐患？',
       '有没有更优雅的实现方式？',
+    ]
+  },
+  intelligent_testing: {
+    icon: '🧪',
+    title: '智能测试助手',
+    subtitle: '基于需求文档智能生成测试方案和测试用例',
+    suggestions: [
+      '分析这个需求的测试点',
+      '生成功能测试用例',
+      '设计边界值测试场景',
+      '识别潜在的异常场景',
     ]
   }
 }
@@ -1405,9 +1417,21 @@ const ChatPage: React.FC = () => {
   const [businessLine, setBusinessLine] = useState<string>('')
   const [privateServer, setPrivateServer] = useState<string | null>(null)
   
+  // 智能测试配置（仅 intelligent_testing Agent 使用）
+  const [iterations, setIterations] = useState<IterationInfo[]>([])
+  const [issues, setIssues] = useState<IssueInfo[]>([])
+  const [selectedIteration, setSelectedIteration] = useState<IterationInfo | null>(null)
+  const [selectedIssue, setSelectedIssue] = useState<IssueInfo | null>(null)
+  const [iterationSearchText, setIterationSearchText] = useState('')
+  const [issueSearchText, setIssueSearchText] = useState('')
+  const [isIterationLoading, setIsIterationLoading] = useState(false)
+  const [isIssueLoading, setIsIssueLoading] = useState(false)
+  
   // 下拉框展开状态
   const [isBusinessLineOpen, setIsBusinessLineOpen] = useState(false)
   const [isPrivateServerOpen, setIsPrivateServerOpen] = useState(false)
+  const [isIterationOpen, setIsIterationOpen] = useState(false)
+  const [isIssueOpen, setIsIssueOpen] = useState(false)
   
   // 文件工具弹窗状态
   const [isFileToolsOpen, setIsFileToolsOpen] = useState(false)
@@ -1575,6 +1599,86 @@ const ChatPage: React.FC = () => {
     loadLogQueryOptions()
   }, [currentAgentType])
   
+  // 加载智能测试配置：迭代列表（仅在切换到智能测试 Agent 时加载）
+  useEffect(() => {
+    if (currentAgentType !== 'intelligent_testing') return
+    if (iterations.length > 0) return  // 已加载过则不重复请求
+    
+    const loadIterations = async () => {
+      setIsIterationLoading(true)
+      try {
+        // 暂时写死项目名称
+        const result = await fetchIterations('yongcepingtaipro2.0', 100, 0, '')
+        if (result?.iterations) {
+          setIterations(result.iterations)
+        }
+      } catch (e) {
+        console.error('加载迭代列表失败', e)
+      } finally {
+        setIsIterationLoading(false)
+      }
+    }
+    loadIterations()
+  }, [currentAgentType])
+  
+  // 选择迭代后加载需求列表
+  useEffect(() => {
+    if (!selectedIteration) {
+      setIssues([])
+      setSelectedIssue(null)
+      return
+    }
+    
+    const loadIssues = async () => {
+      setIsIssueLoading(true)
+      setIssues([])
+      setSelectedIssue(null)
+      setIssueSearchText('')  // 切换迭代时清空搜索
+      try {
+        const result = await fetchIssues('yongcepingtaipro2.0', selectedIteration.code, 'REQUIREMENT', 100, 0, '')
+        if (result?.issues) {
+          setIssues(result.issues)
+        }
+      } catch (e) {
+        console.error('加载需求列表失败', e)
+      } finally {
+        setIsIssueLoading(false)
+      }
+    }
+    loadIssues()
+  }, [selectedIteration])
+  
+  // 搜索迭代（后端查询）
+  const handleSearchIterations = useCallback(async () => {
+    setIsIterationLoading(true)
+    try {
+      const result = await fetchIterations('yongcepingtaipro2.0', 100, 0, iterationSearchText)
+      if (result?.iterations) {
+        setIterations(result.iterations)
+      }
+    } catch (e) {
+      console.error('搜索迭代失败', e)
+    } finally {
+      setIsIterationLoading(false)
+    }
+  }, [iterationSearchText])
+  
+  // 搜索需求（后端查询）
+  const handleSearchIssues = useCallback(async () => {
+    if (!selectedIteration) return
+    setIsIssueLoading(true)
+    try {
+      const result = await fetchIssues('yongcepingtaipro2.0', selectedIteration.code, 'REQUIREMENT', 100, 0, issueSearchText)
+      if (result?.issues) {
+        setIssues(result.issues)
+      }
+    } catch (e) {
+      console.error('搜索需求失败', e)
+    } finally {
+      setIsIssueLoading(false)
+    }
+  }, [selectedIteration, issueSearchText])
+  
   // 点击外部关闭下拉菜单
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -1586,15 +1690,19 @@ const ChatPage: React.FC = () => {
         setIsBusinessLineOpen(false)
         setIsPrivateServerOpen(false)
       }
+      if (!target.closest('.testing-dropdown-wrapper')) {
+        setIsIterationOpen(false)
+        setIsIssueOpen(false)
+      }
       if (!target.closest('.file-tools-wrapper')) {
         setIsFileToolsOpen(false)
       }
     }
-    if (isAgentDropdownOpen || isBusinessLineOpen || isPrivateServerOpen || isFileToolsOpen) {
+    if (isAgentDropdownOpen || isBusinessLineOpen || isPrivateServerOpen || isIterationOpen || isIssueOpen || isFileToolsOpen) {
       document.addEventListener('click', handleClickOutside)
       return () => document.removeEventListener('click', handleClickOutside)
     }
-  }, [isAgentDropdownOpen, isBusinessLineOpen, isPrivateServerOpen, isFileToolsOpen])
+  }, [isAgentDropdownOpen, isBusinessLineOpen, isPrivateServerOpen, isIterationOpen, isIssueOpen, isFileToolsOpen])
 
   const upsertConversation = useCallback((tid: string, title: string, updatedAt: string, agentType?: string) => {
     if (!tid) return
@@ -2451,6 +2559,173 @@ const ChatPage: React.FC = () => {
                             {privateServer === opt.value && <CheckCircleOutlined className="log-item-check" />}
                           </div>
                         ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {/* 智能测试配置选择器 - 仅 intelligent_testing Agent 显示 */}
+            {currentAgentType === 'intelligent_testing' && (
+              <div className="log-query-selectors">
+                {/* 迭代选择器 */}
+                <div className="testing-dropdown-wrapper log-dropdown-wrapper">
+                  <button
+                    className="log-dropdown-trigger"
+                    onClick={() => {
+                      setIsIterationOpen(!isIterationOpen)
+                      setIsIssueOpen(false)
+                    }}
+                  >
+                    <span className="log-trigger-name">
+                      {selectedIteration ? selectedIteration.name : (isIterationLoading ? '加载中...' : '选择迭代')}
+                    </span>
+                    <DownOutlined className={`log-trigger-arrow ${isIterationOpen ? 'open' : ''}`} />
+                  </button>
+                  {isIterationOpen && (
+                    <div className="log-dropdown-menu" style={{ maxHeight: '300px', overflowY: 'auto', overflowX: 'hidden' }}>
+                      {/* 搜索框 + 搜索按钮 */}
+                      <div style={{ padding: '8px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '6px' }}>
+                        <input
+                          type="text"
+                          placeholder="输入关键词搜索..."
+                          value={iterationSearchText}
+                          onChange={(e) => setIterationSearchText(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') handleSearchIterations() }}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            flex: 1,
+                            padding: '6px 10px',
+                            border: '1px solid #d9d9d9',
+                            borderRadius: '6px',
+                            fontSize: '13px',
+                            outline: 'none',
+                          }}
+                        />
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleSearchIterations() }}
+                          disabled={isIterationLoading}
+                          style={{
+                            padding: '6px 12px',
+                            border: '1px solid #1890ff',
+                            borderRadius: '6px',
+                            background: '#1890ff',
+                            color: '#fff',
+                            cursor: isIterationLoading ? 'not-allowed' : 'pointer',
+                            fontSize: '13px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                          }}
+                        >
+                          <SearchOutlined />
+                        </button>
+                      </div>
+                      {isIterationLoading && (
+                        <div style={{ padding: '12px', color: '#999', textAlign: 'center' }}>搜索中...</div>
+                      )}
+                      {!isIterationLoading && iterations.map(iteration => (
+                          <div
+                            key={iteration.code}
+                            className={`log-dropdown-item ${selectedIteration?.code === iteration.code ? 'selected' : ''}`}
+                            onClick={() => {
+                              setSelectedIteration(iteration)
+                              setIsIterationOpen(false)
+                              setIterationSearchText('')
+                            }}
+                          >
+                            <span>{iteration.name}</span>
+                            {selectedIteration?.code === iteration.code && <CheckCircleOutlined className="log-item-check" />}
+                          </div>
+                        ))}
+                      {!isIterationLoading && iterations.length === 0 && (
+                        <div style={{ padding: '12px', color: '#999', textAlign: 'center' }}>暂无匹配迭代</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                
+                {/* 需求选择器 - 仅选择迭代后显示 */}
+                {selectedIteration && (
+                  <div className="testing-dropdown-wrapper log-dropdown-wrapper">
+                    <button
+                      className="log-dropdown-trigger"
+                      onClick={() => {
+                        setIsIssueOpen(!isIssueOpen)
+                        setIsIterationOpen(false)
+                      }}
+                    >
+                      <span className="log-trigger-name">
+                        {selectedIssue ? `#${selectedIssue.code} ${selectedIssue.name}`.slice(0, 30) + (selectedIssue.name.length > 20 ? '...' : '') : (isIssueLoading ? '加载中...' : '选择需求')}
+                      </span>
+                      <DownOutlined className={`log-trigger-arrow ${isIssueOpen ? 'open' : ''}`} />
+                    </button>
+                    {isIssueOpen && (
+                      <div className="log-dropdown-menu" style={{ maxHeight: '300px', overflow: 'auto', minWidth: '350px' }}>
+                        {/* 搜索框 + 搜索按钮 */}
+                        <div style={{ padding: '8px', borderBottom: '1px solid #f0f0f0', display: 'flex', gap: '6px' }}>
+                          <input
+                            type="text"
+                            placeholder="输入关键词搜索..."
+                            value={issueSearchText}
+                            onChange={(e) => setIssueSearchText(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Enter') handleSearchIssues() }}
+                            onClick={(e) => e.stopPropagation()}
+                            style={{
+                              flex: 1,
+                              padding: '6px 10px',
+                              border: '1px solid #d9d9d9',
+                              borderRadius: '6px',
+                              fontSize: '13px',
+                              outline: 'none',
+                            }}
+                          />
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleSearchIssues() }}
+                            disabled={isIssueLoading}
+                            style={{
+                              padding: '6px 12px',
+                              border: '1px solid #1890ff',
+                              borderRadius: '6px',
+                              background: '#1890ff',
+                              color: '#fff',
+                              cursor: isIssueLoading ? 'not-allowed' : 'pointer',
+                              fontSize: '13px',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '4px',
+                            }}
+                          >
+                            <SearchOutlined />
+                          </button>
+                        </div>
+                        {isIssueLoading && (
+                          <div style={{ padding: '12px', color: '#999', textAlign: 'center' }}>搜索中...</div>
+                        )}
+                        {!isIssueLoading && issues.map(issue => (
+                            <div
+                              key={issue.code}
+                              className={`log-dropdown-item ${selectedIssue?.code === issue.code ? 'selected' : ''}`}
+                              onClick={() => {
+                                setSelectedIssue(issue)
+                                setIsIssueOpen(false)
+                                setIssueSearchText('')
+                              }}
+                              style={{ flexDirection: 'column', alignItems: 'flex-start' }}
+                            >
+                              <span style={{ fontWeight: 500 }}>#{issue.code} {issue.name}</span>
+                              <span style={{ fontSize: '12px', color: '#999', marginTop: '2px' }}>
+                                {issue.status_name} · {issue.assignee_names.join(', ') || '未指派'}
+                              </span>
+                              {selectedIssue?.code === issue.code && (
+                                <CheckCircleOutlined className="log-item-check" style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)' }} />
+                              )}
+                            </div>
+                          ))}
+                        {!isIssueLoading && issues.length === 0 && (
+                          <div style={{ padding: '12px', color: '#999', textAlign: 'center' }}>暂无匹配需求</div>
+                        )}
                       </div>
                     )}
                   </div>

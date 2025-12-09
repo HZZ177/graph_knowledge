@@ -5,6 +5,7 @@
 
 import re
 import io
+import time
 from typing import List, Tuple
 
 import httpx
@@ -16,7 +17,15 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.colors import HexColor
 
-from backend.app.schemas.coding import IssueDetail
+from backend.app.schemas.coding import (
+    IssueDetail,
+    ProjectInfo,
+    ProjectListResponse,
+    IterationInfo,
+    IterationListResponse,
+    IssueInfo,
+    IssueListResponse,
+)
 from backend.app.core.logger import logger
 
 
@@ -347,6 +356,217 @@ class CodingService:
         filename = f"{safe_name}.pdf"
         
         return pdf_bytes, filename
+    
+    async def get_project_list(
+        self,
+        page_number: int = 1,
+        page_size: int = 50,
+        project_name: str = "",
+    ) -> ProjectListResponse:
+        """获取项目列表
+        
+        Args:
+            page_number: 页码，从 1 开始
+            page_size: 每页数量，最大 100
+            project_name: 可选，按项目名称筛选
+            
+        Returns:
+            ProjectListResponse: 项目列表响应
+        """
+        url = f"{self.base_url}?Action=DescribeCodingProjects"
+        payload = {
+            "PageNumber": page_number,
+            "PageSize": page_size,
+            "ProjectName": project_name or "",
+        }
+        
+        logger.info(f"[CodingService] 请求项目列表: page={page_number}, size={page_size}, filter='{project_name}'")
+        
+        start_time = time.time()
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, json=payload, headers=self._headers)
+            response.raise_for_status()
+            data = response.json()
+        elapsed = time.time() - start_time
+        logger.debug(f"[CodingService] API 响应耗时: {elapsed:.2f}s")
+        
+        resp_data = data["Response"]["Data"]
+        project_list = [
+            ProjectInfo(
+                id=p["Id"],
+                name=p["Name"],
+                display_name=p.get("DisplayName", p["Name"]),
+                description=p.get("Description", ""),
+                icon=p.get("Icon", ""),
+                status=p.get("Status", 1),
+                archived=p.get("Archived", False),
+                created_at=p.get("CreatedAt", 0),
+                updated_at=p.get("UpdatedAt", 0),
+            )
+            for p in resp_data.get("ProjectList", [])
+        ]
+        
+        logger.info(f"[CodingService] 获取项目列表成功: 返回 {len(project_list)} 个项目, 总计 {resp_data.get('TotalCount', 0)} 个")
+        
+        return ProjectListResponse(
+            page_number=resp_data.get("PageNumber", page_number),
+            page_size=resp_data.get("PageSize", page_size),
+            total_count=resp_data.get("TotalCount", 0),
+            project_list=project_list,
+        )
+    
+    async def get_iteration_list(
+        self,
+        project_name: str,
+        limit: int = 20,
+        offset: int = 0,
+        keywords: str = "",
+    ) -> IterationListResponse:
+        """获取项目迭代列表
+        
+        Args:
+            project_name: 项目名称（必填）
+            limit: 每页数量
+            offset: 偏移量
+            keywords: 可选，关键词搜索
+            
+        Returns:
+            IterationListResponse: 迭代列表响应
+        """
+        url = f"{self.base_url}?Action=DescribeIterationList"
+        payload = {
+            "ProjectName": project_name,
+            "Limit": limit,
+            "Offset": offset,
+            "Keywords": keywords or "",
+        }
+        
+        logger.info(f"[CodingService] 请求迭代列表: project='{project_name}', limit={limit}, offset={offset}")
+        
+        start_time = time.time()
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, json=payload, headers=self._headers)
+            response.raise_for_status()
+            data = response.json()
+        elapsed = time.time() - start_time
+        logger.debug(f"[CodingService] API 响应耗时: {elapsed:.2f}s")
+        
+        resp_data = data["Response"]["Data"]
+        iterations = [
+            IterationInfo(
+                id=it["Id"],
+                code=it["Code"],
+                name=it["Name"],
+                status=it.get("Status", ""),
+                goal=it.get("Goal", ""),
+                start_at=it.get("StartAt", 0),
+                end_at=it.get("EndAt", 0),
+                wait_process_count=it.get("WaitProcessCount", 0),
+                processing_count=it.get("ProcessingCount", 0),
+                completed_count=it.get("CompletedCount", 0),
+                completed_percent=it.get("CompletedPercent", 0.0),
+            )
+            for it in resp_data.get("List", [])
+        ]
+        
+        logger.info(f"[CodingService] 获取迭代列表成功: {project_name}, 返回 {len(iterations)} 个迭代, 总计 {resp_data.get('TotalRow', 0)} 个")
+        
+        return IterationListResponse(
+            page=resp_data.get("Page", 1),
+            page_size=resp_data.get("PageSize", limit),
+            total_page=resp_data.get("TotalPage", 1),
+            total_row=resp_data.get("TotalRow", 0),
+            iterations=iterations,
+        )
+    
+    async def get_issue_list(
+        self,
+        project_name: str,
+        iteration_code: int,
+        issue_type: str = "REQUIREMENT",
+        limit: int = 50,
+        offset: int = 0,
+        keyword: str = "",
+    ) -> IssueListResponse:
+        """获取迭代下的事项列表
+        
+        Args:
+            project_name: 项目名称
+            iteration_code: 迭代 Code
+            issue_type: 事项类型，REQUIREMENT/DEFECT/MISSION/SUB_TASK
+            limit: 每页数量
+            offset: 偏移量
+            keyword: 关键词搜索
+            
+        Returns:
+            IssueListResponse: 事项列表响应
+        """
+        url = f"{self.base_url}?Action=DescribeIssueList"
+        
+        # 构建查询条件
+        conditions = [
+            {
+                "Key": "ITERATION",
+                "Value": iteration_code,
+            }
+        ]
+        # 如果有关键词，添加 KEYWORD 条件
+        if keyword:
+            conditions.append({
+                "Key": "KEYWORD",
+                "Value": keyword,
+            })
+        
+        payload = {
+            "ProjectName": project_name,
+            "IssueType": issue_type,
+            "Limit": limit,
+            "Offset": offset,
+            "SortKey": "CODE",
+            "SortValue": "DESC",
+            "Conditions": conditions,
+        }
+        
+        logger.info(f"[CodingService] 请求事项列表: project='{project_name}', iteration={iteration_code}, type={issue_type}, keyword='{keyword}'")
+        
+        start_time = time.time()
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(url, json=payload, headers=self._headers)
+            response.raise_for_status()
+            data = response.json()
+        elapsed = time.time() - start_time
+        logger.debug(f"[CodingService] API 响应耗时: {elapsed:.2f}s")
+        
+        issue_list = data["Response"].get("IssueList", [])
+        issues = [
+            IssueInfo(
+                id=issue["Id"],
+                code=issue["Code"],
+                name=issue["Name"],
+                type=issue.get("Type", issue_type),
+                priority=issue.get("Priority", ""),
+                status_name=issue.get("IssueStatusName", ""),
+                status_type=issue.get("IssueStatusType", ""),
+                iteration_id=issue.get("IterationId", 0),
+                iteration_name=issue.get("Iteration", {}).get("Name", ""),
+                assignee_names=[
+                    a.get("Name", "") for a in issue.get("Assignees", [])
+                ],
+                created_at=issue.get("CreatedAt", 0),
+                updated_at=issue.get("UpdatedAt", 0),
+            )
+            for issue in issue_list
+        ]
+        
+        logger.info(
+            f"[CodingService] 获取事项列表成功: {project_name}, 迭代 {iteration_code}, "
+            f"返回 {len(issues)} 个 {issue_type}"
+        )
+        
+        return IssueListResponse(
+            total_count=len(issues),  # API 未返回 total，暂用当前数量
+            issues=issues,
+        )
 
 
 # 全局单例
