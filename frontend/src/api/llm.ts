@@ -48,7 +48,7 @@ export interface ToolCallInfo {
 
 /** WebSocket 消息类型 */
 export interface ChatStreamMessage {
-  type: 'start' | 'stream' | 'tool_start' | 'tool_end' | 'result' | 'error'
+  type: 'start' | 'stream' | 'tool_start' | 'tool_end' | 'phase_changed' | 'result' | 'error'
   // start 消息
   request_id?: string
   thread_id?: string
@@ -65,6 +65,8 @@ export interface ChatStreamMessage {
   input_summary?: string   // 输入摘要，如 "关键词: 开卡"
   output_summary?: string  // 输出摘要，如 "找到 3 个结果"
   elapsed?: number         // 耗时（秒）
+  // phase_changed 消息（智能测试 Agent 专用）
+  phase?: string           // 阶段名称，如 "analysis" | "plan" | "generate" | "completed"
   // result 消息
   tool_calls?: ToolCallInfo[]
   // error 消息
@@ -87,6 +89,8 @@ export interface ChatCallbacks {
   onToolStart?: (toolName: string, toolInput: Record<string, unknown>, toolId?: number, batch?: BatchInfo) => void
   /** 工具调用结束 */
   onToolEnd?: (toolName: string, inputSummary: string, outputSummary: string, elapsed: number, toolId?: number, batch?: BatchInfo) => void
+  /** 阶段切换（智能测试 Agent 专用）*/
+  onPhaseChanged?: (phase: string) => void
   /** 最终结果 */
   onResult?: (content: string, threadId: string, toolCalls: ToolCallInfo[]) => void
   /** 错误 */
@@ -213,6 +217,10 @@ export class ChatClient {
             batchIndex: message.batch_index || 0,
           } : undefined
         )
+        break
+      
+      case 'phase_changed':
+        this.callbacks.onPhaseChanged?.(message.phase || '')
         break
         
       case 'result':

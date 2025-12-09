@@ -18,6 +18,7 @@ from backend.app.services.chat.chat_service import (
     streaming_chat,
     streaming_regenerate,
 )
+from backend.app.services import testing_service
 from backend.app.services.chat.history_service import (
     get_conversation_history,
     clear_conversation,
@@ -79,10 +80,44 @@ async def websocket_chat(websocket: WebSocket):
             }, ensure_ascii=False))
             return
         
-        # 构建 agent_context（用于日志排查等需要动态配置的 Agent）
+        # ===== 根据 agent_type 分流处理 =====
+        
+        # 1. 智能测试助手 - 使用专用的三阶段状态机
+        if request.agent_type == "intelligent_testing":
+            if not request.testing_context:
+                await websocket.send_text(json.dumps({
+                    "type": "error",
+                    "error": "智能测试助手需要提供测试上下文（项目、需求信息）",
+                }, ensure_ascii=False))
+                return
+            
+            # 创建或获取会话 ID
+            session_id = request.thread_id or str(uuid.uuid4())
+            
+            # 如果是新会话，先创建会话记录
+            if not request.thread_id:
+                await testing_service.create_testing_session(
+                    db=db,
+                    project_name=request.testing_context.project_name,
+                    requirement_id=request.testing_context.requirement_id,
+                    requirement_name=request.testing_context.requirement_name,
+                    session_id=session_id,
+                )
+            
+            # 执行测试工作流
+            await testing_service.run_testing_workflow(
+                db=db,
+                session_id=session_id,
+                requirement_id=request.testing_context.requirement_id,
+                project_name=request.testing_context.project_name,
+                requirement_name=request.testing_context.requirement_name,
+                websocket=websocket,
+            )
+            return
+        
+        # 2. 日志排查助手 - 需要 log_query 上下文
         agent_context = None
         if request.agent_type == "log_troubleshoot":
-            # 日志排查 Agent 必须提供 log_query 配置
             if not request.log_query:
                 await websocket.send_text(json.dumps({
                     "type": "error",
@@ -91,7 +126,7 @@ async def websocket_chat(websocket: WebSocket):
                 return
             agent_context = {"log_query": request.log_query.model_dump()}
         
-        # 调用流式问答服务（支持多轮对话 + 多 Agent 类型 + 多模态）
+        # 3. 业务知识助手 (knowledge_qa) 和其他 Agent - 走通用流程
         await streaming_chat(
             db=db,
             question=request.question,

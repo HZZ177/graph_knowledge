@@ -1,11 +1,12 @@
 """Chat 模块数据模型
 
 合并了 Conversation 和 FileUpload 两个与 Chat 相关的模型。
+新增测试助手相关模型：TestSessionAnalysis。
 """
 
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, String, Integer, DateTime, Text, Index
+from sqlalchemy import Column, String, Integer, DateTime, Text, Index, Float
 
 from backend.app.db.sqlite import Base
 
@@ -15,18 +16,50 @@ def utc_now():
 
 
 class Conversation(Base):
-    """会话元数据表
+    """会话元数据表（统一存储普通对话和测试任务）
     
-    存储对话的标题、创建时间等元数据。
-    实际的对话消息内容存储在 LangGraph Checkpoint 中。
+    普通对话：id 就是 thread_id，测试专用字段为 null
+    测试任务：id 是 session_id，通过 thread_id_* 关联三个阶段的消息
     """
     __tablename__ = "conversations"
     
-    id = Column(String, primary_key=True, comment="Thread ID")
+    # ========== 通用字段（原有）==========
+    id = Column(String, primary_key=True, comment="普通对话=thread_id，测试任务=session_id")
     title = Column(String, nullable=True, default="新对话", comment="会话标题")
     agent_type = Column(String, nullable=True, default="knowledge_qa", comment="Agent 类型")
     created_at = Column(DateTime(timezone=True), default=utc_now)
     updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    
+    # ========== 测试助手专用字段（新增，其他 agent 为 null）==========
+    requirement_id = Column(String, nullable=True, comment="Coding 需求 ID")
+    project_name = Column(String, nullable=True, comment="Coding 项目名称")
+    status = Column(String, nullable=True, comment="测试任务状态: pending/analysis/plan/generate/completed/failed")
+    current_phase = Column(String, nullable=True, comment="当前阶段: analysis/plan/generate")
+    thread_id_analysis = Column(String, nullable=True, comment="阶段1 需求分析 thread_id")
+    thread_id_plan = Column(String, nullable=True, comment="阶段2 方案生成 thread_id")
+    thread_id_generate = Column(String, nullable=True, comment="阶段3 用例生成 thread_id")
+
+
+class TestSessionAnalysis(Base):
+    """测试会话分析缓存表
+    
+    存储阶段间传递的摘要内容，用于分阶段 Token 压缩。
+    """
+    __tablename__ = "test_session_analysis"
+    
+    id = Column(String, primary_key=True, comment="UUID")
+    session_id = Column(String, nullable=False, index=True, comment="对应 conversations.id（测试任务的 session_id）")
+    phase = Column(String, nullable=False, comment="阶段: analysis / plan / generate")
+    analysis_type = Column(String, nullable=False, comment="摘要类型: requirement_summary / test_plan / test_cases")
+    content = Column(Text, nullable=False, comment="JSON 格式的摘要内容")
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    
+    __table_args__ = (
+        Index('idx_test_session_analysis_session', 'session_id'),
+        Index('idx_test_session_analysis_session_phase', 'session_id', 'phase'),
+        Index('idx_test_session_analysis_session_type', 'session_id', 'analysis_type', unique=True),
+    )
 
 
 class FileUpload(Base):

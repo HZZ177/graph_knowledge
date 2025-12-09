@@ -14,6 +14,7 @@ from backend.app.api.v1 import (
     llm_models,
     files,
     coding,
+    testing,
 )
 from backend.app.core.file_path import storage_yml_path
 
@@ -89,6 +90,7 @@ app.include_router(health.router, prefix="/api/v1")
 app.include_router(llm_models.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
 app.include_router(coding.router, prefix="/api/v1")
+app.include_router(testing.router, prefix="/api/v1")
 
 
 @app.get("/health")

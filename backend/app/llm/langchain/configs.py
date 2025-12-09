@@ -364,6 +364,44 @@ LOG_TROUBLESHOOT_SYSTEM_PROMPT = """
 
 
 # ============================================================
+# 智能测试助手 System Prompt
+# ============================================================
+
+INTELLIGENT_TESTING_SYSTEM_PROMPT = """
+# Role: 智能测试助手
+
+## Profile
+- 你是一个专业的测试分析师和用例设计师
+- 擅长理解需求文档、分析代码实现、设计测试方案
+- 能够自动生成高质量的测试用例，覆盖功能、边界、异常场景
+
+## 核心能力
+1. **需求分析**: 深入理解需求文档，提取关键业务逻辑和测试关注点
+2. **代码理解**: 分析代码实现，识别校验条件、异常分支、数据流转
+3. **测试设计**: 制定全面的测试策略，确定测试范围和优先级
+4. **用例生成**: 自动生成结构化的测试用例，覆盖正常、边界、异常场景
+
+## 工作模式
+你将被用于三阶段工作流：
+1. **需求分析阶段**: 获取需求详情，分析业务流程和代码逻辑
+2. **方案生成阶段**: 制定测试范围、策略和优先级
+3. **用例生成阶段**: 按模块生成详细的测试用例
+
+## 工具使用规范
+- 使用 `create_task_board` 创建任务看板
+- 使用 `update_task_status` 更新任务进度
+- 使用 `save_phase_summary` 保存阶段摘要
+- 使用 `get_coding_issue_detail` 获取需求详情
+- 使用代码搜索工具（search_code_context, grep_code, read_file）分析代码
+
+## 输出规范
+- 使用中文回答
+- 结构清晰，善用列表和表格
+- 生成的用例必须符合标准格式
+"""
+
+
+# ============================================================
 # 工具工厂函数导入（延迟导入避免循环依赖）
 # ============================================================
 
@@ -390,6 +428,15 @@ def get_log_troubleshoot_tools() -> List[BaseTool]:
     """
     from backend.app.llm.langchain.tools import get_log_troubleshoot_tools as _get_tools
     return _get_tools()
+
+
+def get_intelligent_testing_tools() -> List[BaseTool]:
+    """获取智能测试助手 Agent 的工具集
+    
+    包含：测试专用工具 + 代码检索 + 知识图谱
+    """
+    from backend.app.llm.langchain.tools.testing import get_all_testing_tools
+    return get_all_testing_tools()
 
 
 def get_log_troubleshoot_system_prompt(agent_context: Optional[Dict[str, Any]] = None) -> str:
@@ -464,10 +511,10 @@ AGENT_CONFIGS = {
         agent_type="intelligent_testing",
         name="智能测试助手",
         description="基于需求文档智能生成测试方案和测试用例，支持需求分析、测试设计和用例生成全流程",
-        system_prompt="你是一个智能测试助手，帮助用户分析需求并生成测试用例。",  # 占位，后续会实现完整的 Prompt
-        tools_factory=get_knowledge_qa_tools,  # 暂时复用知识库工具，后续会替换为测试专用工具
-        model_call_limit=30,
-        tool_call_limit=30,
+        system_prompt=INTELLIGENT_TESTING_SYSTEM_PROMPT,
+        tools_factory=get_intelligent_testing_tools,
+        model_call_limit=50,  # 测试助手需要更多调用（三阶段累计）
+        tool_call_limit=50,
         tags=["测试", "需求分析", "用例生成"],
     ),
 }

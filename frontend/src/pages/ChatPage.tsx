@@ -26,9 +26,10 @@ import {
   PlusOutlined,
 } from '@ant-design/icons'
 import { createChatClient, ChatClient, ToolCallInfo, fetchConversationHistory, generateConversationTitle, listConversations, deleteConversation, truncateConversation, createRegenerateClient, RegenerateClient, ChatMessage, BatchInfo, AgentType, fetchAgentTypes, fetchLogQueryOptions, LogQueryOption, FileAttachment } from '../api/llm'
-import { fetchProjects, fetchIterations, fetchIssues, ProjectInfo, IterationInfo, IssueInfo } from '../api/coding'
+import { fetchIterations, fetchIssues, IterationInfo, IssueInfo } from '../api/coding'
 import { useTypewriter } from '../hooks/useTypewriter'
 import { useFileUpload } from '../hooks/useFileUpload'
+import { useTestingTaskBoard, TestingWSMessage, PhaseId } from '../hooks/useTestingTaskBoard'
 import { formatFileSize } from '../api/files'
 import '../styles/ChatPage.css'
 import { showConfirm } from '../utils/confirm'
@@ -52,13 +53,15 @@ interface ToolSummaryInfo {
 
 interface DisplayMessage {
   id: string
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'phase_divider'  // 新增 phase_divider 类型
   content: string
   toolCalls?: ToolCallInfo[]
   isThinking?: boolean // 是否正在思考（等待工具返回）
   currentToolName?: string // 当前正在调用的工具名称
   toolSummaries?: Map<string, ToolSummaryInfo> // 该消息关联的工具摘要，key 为 "toolName:toolId"
   attachments?: FileAttachment[] // 用户消息的附件（图片、文档等）
+  phaseName?: string // 阶段名称（仅 phase_divider）
+  phaseIndex?: number // 阶段序号（仅 phase_divider）
 }
 
 // 后端返回的原始消息格式
@@ -1418,6 +1421,8 @@ const ChatPage: React.FC = () => {
   const [privateServer, setPrivateServer] = useState<string | null>(null)
   
   // 智能测试配置（仅 intelligent_testing Agent 使用）
+  // 暂时硬编码项目名称
+  const TESTING_PROJECT_NAME = 'yongcepingtaipro2.0'
   const [iterations, setIterations] = useState<IterationInfo[]>([])
   const [issues, setIssues] = useState<IssueInfo[]>([])
   const [selectedIteration, setSelectedIteration] = useState<IterationInfo | null>(null)
@@ -1435,6 +1440,21 @@ const ChatPage: React.FC = () => {
   
   // 文件工具弹窗状态
   const [isFileToolsOpen, setIsFileToolsOpen] = useState(false)
+  
+  // 智能测试任务看板 Hook
+  const {
+    tasks: testingTasks,
+    phases: testingPhases,
+    currentPhase: testingCurrentPhase,
+    viewingPhase: testingViewingPhase,
+    isRunning: isTestingRunning,
+    handleMessage: handleTestingMessage,
+    reset: resetTestingTaskBoard,
+    setViewingPhase: setTestingViewingPhase,
+    totalProgress: testingTotalProgress,
+    currentPhaseInfo: testingCurrentPhaseInfo,
+    viewingPhaseInfo: testingViewingPhaseInfo,
+  } = useTestingTaskBoard()
   
   // 切换业务线时，如果不是私有化则清空私有化选择
   const handleBusinessLineChange = (value: string) => {
@@ -1607,8 +1627,7 @@ const ChatPage: React.FC = () => {
     const loadIterations = async () => {
       setIsIterationLoading(true)
       try {
-        // 暂时写死项目名称
-        const result = await fetchIterations('yongcepingtaipro2.0', 100, 0, '')
+        const result = await fetchIterations(TESTING_PROJECT_NAME, 100, 0, '')
         if (result?.iterations) {
           setIterations(result.iterations)
         }
@@ -1635,7 +1654,7 @@ const ChatPage: React.FC = () => {
       setSelectedIssue(null)
       setIssueSearchText('')  // 切换迭代时清空搜索
       try {
-        const result = await fetchIssues('yongcepingtaipro2.0', selectedIteration.code, 'REQUIREMENT', 100, 0, '')
+        const result = await fetchIssues(TESTING_PROJECT_NAME, selectedIteration.code, 'REQUIREMENT', 100, 0, '')
         if (result?.issues) {
           setIssues(result.issues)
         }
@@ -1652,7 +1671,7 @@ const ChatPage: React.FC = () => {
   const handleSearchIterations = useCallback(async () => {
     setIsIterationLoading(true)
     try {
-      const result = await fetchIterations('yongcepingtaipro2.0', 100, 0, iterationSearchText)
+      const result = await fetchIterations(TESTING_PROJECT_NAME, 100, 0, iterationSearchText)
       if (result?.iterations) {
         setIterations(result.iterations)
       }
@@ -1668,7 +1687,7 @@ const ChatPage: React.FC = () => {
     if (!selectedIteration) return
     setIsIssueLoading(true)
     try {
-      const result = await fetchIssues('yongcepingtaipro2.0', selectedIteration.code, 'REQUIREMENT', 100, 0, issueSearchText)
+      const result = await fetchIssues(TESTING_PROJECT_NAME, selectedIteration.code, 'REQUIREMENT', 100, 0, issueSearchText)
       if (result?.issues) {
         setIssues(result.issues)
       }
@@ -1877,12 +1896,33 @@ const ChatPage: React.FC = () => {
       }
     }
     
+    // 智能测试 Agent 需要传递 testing_context
+    if (currentAgentType === 'intelligent_testing') {
+      if (!selectedIssue) {
+        // 没有选择需求时不允许发送
+        console.warn('智能测试助手需要先选择需求')
+        setIsLoading(false)
+        setMessages(prev => prev.slice(0, -2))  // 移除刚添加的消息
+        return
+      }
+      requestPayload.testing_context = {
+        project_name: TESTING_PROJECT_NAME,
+        requirement_id: String(selectedIssue.code),
+        requirement_name: selectedIssue.name,
+      }
+    }
+    
     client.start(
       requestPayload,
       {
         onStart: (_rid, newThreadId) => {
           setThreadId(newThreadId)
           setActiveConversationId(newThreadId)
+          
+          // 智能测试 Agent: 发送开始消息
+          if (currentAgentType === 'intelligent_testing') {
+            handleTestingMessage({ type: 'start', session_id: newThreadId || '' })
+          }
           
           // 立即将对话添加到历史列表（不等 AI 回复完成）
           const isNewConversation = !threadId
@@ -1914,9 +1954,22 @@ const ChatPage: React.FC = () => {
           }
         },
         
-        onToolStart: (name, _input, toolId, batch) => {
+        onToolStart: (name, toolInput, toolId, batch) => {
           // 不再插入占位符（后端已经通过 stream 发送了）
           // 只更新工具状态
+          
+          // 智能测试 Agent: 转发消息给任务看板 Hook
+          if (currentAgentType === 'intelligent_testing') {
+            handleTestingMessage({
+              type: 'tool_start',
+              tool_name: name,
+              tool_id: toolId,
+              tool_input: toolInput,
+              batch_id: batch?.batchId,
+              batch_size: batch?.batchSize,
+              batch_index: batch?.batchIndex,
+            })
+          }
           
           // 记录当前工具 ID（用于 onToolEnd 时关联摘要）
           if (toolId) {
@@ -1957,6 +2010,22 @@ const ChatPage: React.FC = () => {
         
         onToolEnd: (name, inputSummary, outputSummary, elapsed, toolId, batch) => {
           const finalToolId = toolId ?? currentToolIdRef.current
+          
+          // 智能测试 Agent: 转发消息给任务看板 Hook
+          if (currentAgentType === 'intelligent_testing') {
+            handleTestingMessage({
+              type: 'tool_end',
+              tool_name: name,
+              tool_id: finalToolId,
+              input_summary: inputSummary,
+              output_summary: outputSummary,
+              elapsed: elapsed,
+              batch_id: batch?.batchId,
+              batch_size: batch?.batchSize,
+              batch_index: batch?.batchIndex,
+            })
+          }
+          
           setCurrentTool(null)
           // 记录工具调用
           currentToolCallsRef.current.push({ name, output_length: 0 })
@@ -1991,9 +2060,39 @@ const ChatPage: React.FC = () => {
           })
         },
         
+        // 智能测试 Agent: 阶段切换
+        onPhaseChanged: (phase) => {
+          if (currentAgentType === 'intelligent_testing') {
+            handleTestingMessage({ type: 'phase_changed', phase })
+            
+            // 在聊天区域插入阶段分隔符
+            const phaseNames: Record<string, { name: string; index: number }> = {
+              'analysis': { name: '需求分析', index: 1 },
+              'plan': { name: '方案生成', index: 2 },
+              'generate': { name: '用例生成', index: 3 },
+              'completed': { name: '测试完成', index: 4 },
+            }
+            const phaseInfo = phaseNames[phase] || { name: phase, index: 0 }
+            
+            const dividerId = `phase-divider-${phase}-${Date.now()}`
+            setMessages(prev => [...prev, {
+              id: dividerId,
+              role: 'phase_divider' as const,
+              content: '',
+              phaseName: phaseInfo.name,
+              phaseIndex: phaseInfo.index,
+            }])
+          }
+        },
+        
         onResult: (content, resultThreadId, toolCalls) => {
           // 最终结果 - 触发打字机加速清空缓冲区
           finishTypewriter()
+          
+          // 智能测试 Agent: 发送完成消息
+          if (currentAgentType === 'intelligent_testing') {
+            handleTestingMessage({ type: 'result', status: 'completed' })
+          }
           
           // 快照当前工具摘要（后续会清空 ref，需要先复制一份）
           const snapshotToolSummaries = new Map(toolSummariesRef.current)
@@ -2063,6 +2162,12 @@ const ChatPage: React.FC = () => {
         onError: (err) => {
           console.error(err)
           finishTypewriter()
+          
+          // 智能测试 Agent: 发送错误消息
+          if (currentAgentType === 'intelligent_testing') {
+            handleTestingMessage({ type: 'error', error: String(err) })
+          }
+          
           // 更新最后一条 assistant 消息为错误状态，保留已有内容
           setMessages(prev => {
             const newPrev = [...prev]
@@ -2084,7 +2189,7 @@ const ChatPage: React.FC = () => {
         }
       }
     )
-  }, [inputValue, isLoading, threadId, currentAgentType, businessLine, privateServer, upsertConversation, appendToTypewriter, finishTypewriter, resetTypewriter, scrollToBottom])
+  }, [inputValue, isLoading, threadId, currentAgentType, businessLine, privateServer, selectedIssue, upsertConversation, appendToTypewriter, finishTypewriter, resetTypewriter, scrollToBottom, handleTestingMessage])
 
   const handleStop = () => {
     if (chatClientRef.current) {
@@ -2463,7 +2568,96 @@ const ChatPage: React.FC = () => {
         </div>
       </div>
 
-      <div className={`chat-main ${messages.length === 0 ? 'empty-chat' : ''}`}>
+      {/* 智能测试任务看板面板 - 仅 intelligent_testing Agent 显示 */}
+      {currentAgentType === 'intelligent_testing' && (
+        <div className="testing-task-panel">
+          <div className="testing-panel-header">
+            <span className="testing-panel-header-icon">📋</span>
+            任务追踪看板
+          </div>
+          
+          {/* 阶段选择器 */}
+          <div className="testing-phase-tabs">
+            {testingPhases.map((phase, idx) => {
+              const isViewing = testingViewingPhase === phase.id
+              const isCurrent = testingCurrentPhase === phase.id
+              const hasContent = phase.tasksTotal > 0
+              return (
+                <div 
+                  key={phase.id}
+                  className={`testing-phase-tab ${isViewing ? 'active' : ''} ${phase.status === 'completed' ? 'completed' : ''} ${isCurrent && isTestingRunning ? 'running' : ''}`}
+                  onClick={() => hasContent && setTestingViewingPhase(phase.id)}
+                  style={{ cursor: hasContent ? 'pointer' : 'default', opacity: hasContent ? 1 : 0.5 }}
+                  title={hasContent ? `查看${phase.name}任务` : '暂无任务'}
+                >
+                  <span className="phase-tab-name">{phase.name}</span>
+                  {phase.status === 'completed' && <CheckCircleOutlined style={{ fontSize: 11, color: '#52c41a' }} />}
+                  {isCurrent && isTestingRunning && <SyncOutlined spin style={{ fontSize: 11, color: '#1890ff' }} />}
+                </div>
+              )
+            })}
+          </div>
+          
+          {/* 当前查看阶段的任务列表 */}
+          <div className="testing-panel-content">
+            {testingTasks.length === 0 ? (
+              <div className="testing-empty-state">
+                {isTestingRunning && testingViewingPhase === testingCurrentPhase 
+                  ? '等待任务创建...' 
+                  : testingViewingPhase !== testingCurrentPhase
+                    ? '该阶段暂无任务记录'
+                    : '选择需求后发送消息开始'}
+              </div>
+            ) : (
+              testingTasks.map((task, index) => (
+                <div 
+                  key={task.id} 
+                  className={`testing-task-card ${task.status === 'in_progress' ? 'active' : ''} ${task.status === 'completed' ? 'completed' : ''}`}
+                >
+                  <div className="testing-task-title">
+                    {task.status === 'completed' ? (
+                      <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
+                    ) : task.status === 'in_progress' ? (
+                      <SyncOutlined spin style={{ color: '#1890ff', marginRight: 8 }} />
+                    ) : (
+                      <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', border: '2px solid #d9d9d9', marginRight: 8 }} />
+                    )}
+                    <span>{index + 1}. {task.title}</span>
+                  </div>
+                  {task.status === 'in_progress' && task.progress > 0 && (
+                    <div style={{ marginTop: 8, marginLeft: 22 }}>
+                      <div style={{ height: 4, background: '#f0f0f0', borderRadius: 2 }}>
+                        <div style={{ height: '100%', width: `${task.progress}%`, background: '#1890ff', borderRadius: 2, transition: 'width 0.3s' }} />
+                      </div>
+                    </div>
+                  )}
+                  {task.status === 'completed' && task.result && (
+                    <div className="testing-task-result">└─ {task.result}</div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
+          
+          <div className="testing-panel-footer">
+            <div className="testing-progress-summary">
+              <span className="label">{testingViewingPhaseInfo?.name || '进度'}: </span>
+              <span className="value">{testingTasks.filter(t => t.status === 'completed').length}/{testingTasks.length} 完成</span>
+            </div>
+            <div style={{ height: 6, background: '#f0f0f0', borderRadius: 3 }}>
+              <div style={{ 
+                height: '100%', 
+                width: `${testingTasks.length > 0 ? Math.round(testingTasks.filter(t => t.status === 'completed').length / testingTasks.length * 100) : 0}%`, 
+                background: '#1890ff', 
+                borderRadius: 3, 
+                transition: 'width 0.3s' 
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className={`chat-main ${messages.length === 0 ? 'empty-chat' : ''} ${currentAgentType === 'intelligent_testing' ? 'with-task-panel' : ''}`}>
         {/* Agent 选择器 - 对话区域左上角 */}
         {agentTypes.length > 0 && (
           <div className="agent-selector-header">
@@ -2748,6 +2942,22 @@ const ChatPage: React.FC = () => {
             ) : (
               <>
                 {messages.map((msg, idx) => {
+                  // 阶段分隔符消息 - 特殊渲染
+                  if (msg.role === 'phase_divider') {
+                    return (
+                      <div key={msg.id} className="phase-divider">
+                        <div className="phase-divider-line" />
+                        <div className="phase-divider-badge">
+                          <span className="phase-divider-icon">🚀</span>
+                          <span className="phase-divider-text">
+                            阶段 {msg.phaseIndex}: {msg.phaseName}
+                          </span>
+                        </div>
+                        <div className="phase-divider-line" />
+                      </div>
+                    )
+                  }
+                  
                   // 计算该 assistant 消息对应的用户消息索引
                   let userMsgIndex = -1
                   if (msg.role === 'assistant') {

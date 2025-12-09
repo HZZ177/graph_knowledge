@@ -140,6 +140,21 @@ def get_log_troubleshoot_tools():
     ]
 
 
+# 测试工具
+from .testing import (
+    create_task_board,
+    update_task_status,
+    transition_phase,
+    save_phase_summary,
+    get_phase_summary,
+    get_coding_issue_detail,
+    get_all_testing_tools,
+    get_testing_tools_phase1,
+    get_testing_tools_phase2,
+    get_testing_tools_phase3,
+)
+
+
 # 导出所有公开 API
 __all__ = [
     # 工具函数
@@ -162,6 +177,13 @@ __all__ = [
     "search_logs",
     "get_table_schema",
     "query_database",
+    # 测试工具
+    "create_task_board",
+    "update_task_status",
+    "transition_phase",
+    "save_phase_summary",
+    "get_phase_summary",
+    "get_coding_issue_detail",
     # 配置类
     "LogQueryConfig",
     "BusinessLine",
@@ -172,4 +194,8 @@ __all__ = [
     "get_all_chat_tools",
     "get_log_troubleshoot_tools",
     "get_db_tools",
+    "get_all_testing_tools",
+    "get_testing_tools_phase1",
+    "get_testing_tools_phase2",
+    "get_testing_tools_phase3",
 ]

@@ -1663,3 +1663,195 @@
     transform: rotate(360deg);
   }
 }
+
+/* ==========================================
+   智能测试任务看板面板
+   ========================================== */
+
+.testing-task-panel {
+  width: 280px;
+  min-width: 280px;
+  background: #fafafa;
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.testing-panel-header {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color);
+  font-weight: 600;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.testing-panel-header-icon {
+  margin-right: 4px;
+}
+
+/* 阶段选择器标签 */
+.testing-phase-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color);
+  background: #fff;
+}
+
+.testing-phase-tab {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  transition: all 0.2s ease;
+  background: #f5f5f5;
+  color: var(--text-secondary);
+}
+
+.testing-phase-tab:hover {
+  background: #e8e8e8;
+}
+
+.testing-phase-tab.active {
+  background: #e6f7ff;
+  color: #1890ff;
+  font-weight: 500;
+}
+
+.testing-phase-tab.completed {
+  color: #52c41a;
+}
+
+.testing-phase-tab.completed.active {
+  background: #f6ffed;
+  color: #52c41a;
+}
+
+.testing-phase-tab.running {
+  color: #1890ff;
+}
+
+.phase-tab-name {
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.testing-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px;
+}
+
+.testing-empty-state {
+  text-align: center;
+  color: var(--text-tertiary);
+  padding: 40px 20px;
+  font-size: 13px;
+}
+
+.testing-task-card {
+  background: #fff;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 8px;
+  transition: all 0.2s ease;
+}
+
+.testing-task-card.active {
+  border-color: #1890ff;
+  background: #f0f7ff;
+}
+
+.testing-task-card.completed {
+  border-color: #52c41a;
+  background: #f6ffed;
+}
+
+.testing-task-title {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.testing-task-result {
+  margin-top: 8px;
+  margin-left: 22px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.testing-panel-footer {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color);
+  background: #fff;
+}
+
+.testing-progress-summary {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-bottom: 8px;
+}
+
+.testing-progress-summary .label {
+  color: var(--text-tertiary);
+}
+
+.testing-progress-summary .value {
+  font-weight: 500;
+}
+
+/* 有任务面板时，聊天主区域宽度调整 */
+.chat-main.with-task-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ==========================================
+   阶段分隔符样式
+   ========================================== */
+
+.phase-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  margin: 8px 0;
+}
+
+.phase-divider-line {
+  flex: 1;
+  height: 1px;
+  background: #e0e0e0;
+}
+
+.phase-divider-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: #f5f5f5;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+}
+
+.phase-divider-icon {
+  font-size: 12px;
+}
+
+.phase-divider-text {
+  font-size: 12px;
+  font-weight: 500;
+  color: #666;
+  white-space: nowrap;
+}
