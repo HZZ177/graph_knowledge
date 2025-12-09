@@ -9,7 +9,6 @@ import {
   RightOutlined,
   DownOutlined,
   CheckCircleOutlined,
-  SyncOutlined,
   ToolOutlined,
   SearchOutlined,
   EditOutlined,
@@ -24,18 +23,23 @@ import {
   ReloadOutlined,
   RollbackOutlined,
   PlusOutlined,
+  LockOutlined,
+  LoadingOutlined,
 } from '@ant-design/icons'
-import { createChatClient, ChatClient, ToolCallInfo, fetchConversationHistory, generateConversationTitle, listConversations, deleteConversation, truncateConversation, createRegenerateClient, RegenerateClient, ChatMessage, BatchInfo, AgentType, fetchAgentTypes, fetchLogQueryOptions, LogQueryOption, FileAttachment } from '../api/llm'
+import { createChatClient, ChatClient, ToolCallInfo, fetchConversationHistory, fetchTestingHistory, generateConversationTitle, listConversations, deleteConversation, truncateConversation, createRegenerateClient, RegenerateClient, ChatMessage, BatchInfo, AgentType, fetchAgentTypes, fetchLogQueryOptions, LogQueryOption, FileAttachment, fetchTestingSessionStatus, clearSubsequentPhases, TestingSessionStatus } from '../api/llm'
 import { fetchIterations, fetchIssues, IterationInfo, IssueInfo } from '../api/coding'
+import { showWarning } from '../utils/message'
 import { useTypewriter } from '../hooks/useTypewriter'
 import { useFileUpload } from '../hooks/useFileUpload'
 import { useTestingTaskBoard, TestingWSMessage, PhaseId } from '../hooks/useTestingTaskBoard'
+import { getTestingResults, TestingResults } from '../api/testing'
 import { formatFileSize } from '../api/files'
 import '../styles/ChatPage.css'
 import { showConfirm } from '../utils/confirm'
-import { Upload, Image, Spin } from 'antd'
-import { PaperClipOutlined, CloseCircleOutlined, CloseOutlined, FileOutlined } from '@ant-design/icons'
+import { Upload, Image, Spin, Modal } from 'antd'
+import { PaperClipOutlined, CloseCircleOutlined, CloseOutlined, FileOutlined, FileTextOutlined } from '@ant-design/icons'
 import FileAttachmentCard from '../components/FileAttachmentCard'
+// TestingPhaseTabs 组件已集成到左侧任务看板中
 
 // ==========================================
 // Interfaces
@@ -151,7 +155,7 @@ const agentWelcomeConfig: Record<string, {
   },
   intelligent_testing: {
     icon: '🧪',
-    title: '智能测试助手',
+    title: '需求分析测试助手',
     subtitle: '基于需求文档智能生成测试方案和测试用例',
     suggestions: [
       '分析这个需求的测试点',
@@ -1403,6 +1407,8 @@ const ChatPage: React.FC = () => {
   const [messages, setMessages] = useState<DisplayMessage[]>([])
   const [inputValue, setInputValue] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false)  // 加载历史对话
+  const [isConversationsLoading, setIsConversationsLoading] = useState(true)  // 加载会话列表
   const [threadId, setThreadId] = useState<string | null>(null)
   const [conversations, setConversations] = useState<ConversationSummary[]>([])
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null)
@@ -1432,6 +1438,17 @@ const ChatPage: React.FC = () => {
   const [isIterationLoading, setIsIterationLoading] = useState(false)
   const [isIssueLoading, setIsIssueLoading] = useState(false)
   
+  // 测试助手阶段管理（Tab 模式）
+  const [testingSessionId, setTestingSessionId] = useState<string | null>(null)
+  const [testingActivePhase, setTestingActivePhase] = useState<PhaseId>('analysis')
+  const [testingSessionStatus, setTestingSessionStatus] = useState<TestingSessionStatus | null>(null)
+  // 每个阶段独立的消息列表
+  const [testingPhaseMessages, setTestingPhaseMessages] = useState<{
+    analysis: DisplayMessage[]
+    plan: DisplayMessage[]
+    generate: DisplayMessage[]
+  }>({ analysis: [], plan: [], generate: [] })
+  
   // 下拉框展开状态
   const [isBusinessLineOpen, setIsBusinessLineOpen] = useState(false)
   const [isPrivateServerOpen, setIsPrivateServerOpen] = useState(false)
@@ -1450,11 +1467,18 @@ const ChatPage: React.FC = () => {
     isRunning: isTestingRunning,
     handleMessage: handleTestingMessage,
     reset: resetTestingTaskBoard,
+    restoreFromHistory: restoreTestingFromHistory,
     setViewingPhase: setTestingViewingPhase,
+    setCurrentPhase: setTestingCurrentPhase,
     totalProgress: testingTotalProgress,
     currentPhaseInfo: testingCurrentPhaseInfo,
     viewingPhaseInfo: testingViewingPhaseInfo,
   } = useTestingTaskBoard()
+  
+  // 阶段总结弹窗状态
+  const [summaryModalVisible, setSummaryModalVisible] = useState(false)
+  const [summaryContent, setSummaryContent] = useState<string>('')
+  const [summaryLoading, setSummaryLoading] = useState(false)
   
   // 切换业务线时，如果不是私有化则清空私有化选择
   const handleBusinessLineChange = (value: string) => {
@@ -1464,6 +1488,16 @@ const ChatPage: React.FC = () => {
       setPrivateServer(null)
     }
   }
+  
+  // 判断当前对话是否已有内容（用于锁定选择器）
+  // - 测试助手：有 sessionId 且有状态
+  // - 其他 Agent：有 threadId 且有消息
+  const hasConversationContent = useMemo(() => {
+    if (currentAgentType === 'intelligent_testing') {
+      return !!testingSessionId && !!testingSessionStatus
+    }
+    return !!threadId && messages.length > 0
+  }, [currentAgentType, testingSessionId, testingSessionStatus, threadId, messages.length])
   
   const handlePrivateServerChange = (value: string | null) => {
     setPrivateServer(value)
@@ -1495,6 +1529,7 @@ const ChatPage: React.FC = () => {
   const chatClientRef = useRef<ChatClient | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messageListRef = useRef<HTMLDivElement>(null)
+  const phaseMessagesRef = useRef<Map<PhaseId, DisplayMessage[]>>(new Map())  // 缓存各阶段的消息
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const userScrolledUpRef = useRef(false)
   const lastScrollTopRef = useRef(0)
@@ -1561,6 +1596,7 @@ const ChatPage: React.FC = () => {
   // 加载本地存储的会话列表
   useEffect(() => {
     const loadConversations = async () => {
+      setIsConversationsLoading(true)
       try {
         const data = await listConversations()
         const summaries: ConversationSummary[] = data.map(c => ({
@@ -1572,6 +1608,8 @@ const ChatPage: React.FC = () => {
         setConversations(summaries)
       } catch (e) {
         console.error('加载会话列表失败', e)
+      } finally {
+        setIsConversationsLoading(false)
       }
     }
     loadConversations()
@@ -1697,6 +1735,32 @@ const ChatPage: React.FC = () => {
       setIsIssueLoading(false)
     }
   }, [selectedIteration, issueSearchText])
+  
+  // 刷新测试任务状态
+  const refreshTestingSessionStatus = useCallback(async () => {
+    if (!testingSessionId) return
+    try {
+      const status = await fetchTestingSessionStatus(testingSessionId)
+      setTestingSessionStatus(status)
+    } catch (e) {
+      console.error('刷新测试任务状态失败', e)
+    }
+  }, [testingSessionId])
+  
+  // 当 testingSessionId 变化时，刷新状态
+  useEffect(() => {
+    if (testingSessionId) {
+      refreshTestingSessionStatus()
+    }
+  }, [testingSessionId, refreshTestingSessionStatus])
+  
+  // 切换 Agent 或新建对话时，重置测试阶段状态
+  const resetTestingPhaseState = useCallback(() => {
+    setTestingSessionId(null)
+    setTestingActivePhase('analysis')
+    setTestingSessionStatus(null)
+    setTestingPhaseMessages({ analysis: [], plan: [], generate: [] })
+  }, [])
   
   // 点击外部关闭下拉菜单
   useEffect(() => {
@@ -1896,20 +1960,36 @@ const ChatPage: React.FC = () => {
       }
     }
     
-    // 智能测试 Agent 需要传递 testing_context
+    // 需求分析测试助手需要传递 testing_context（使用阶段模式）
     if (currentAgentType === 'intelligent_testing') {
-      if (!selectedIssue) {
-        // 没有选择需求时不允许发送
-        console.warn('智能测试助手需要先选择需求')
+      // 已有会话时，使用会话中保存的需求信息
+      if (testingSessionId && testingSessionStatus) {
+        requestPayload.testing_context = {
+          project_name: testingSessionStatus.project_name || TESTING_PROJECT_NAME,
+          requirement_id: testingSessionStatus.requirement_id || '',
+          requirement_name: testingSessionStatus.requirement_name || '',
+          phase: testingActivePhase,
+          session_id: testingSessionId,
+        }
+      } else if (selectedIssue) {
+        // 新任务时，使用选择器中的需求信息
+        requestPayload.testing_context = {
+          project_name: TESTING_PROJECT_NAME,
+          iteration_name: selectedIteration?.name || '',
+          requirement_id: String(selectedIssue.code),
+          requirement_name: selectedIssue.name,
+          phase: testingActivePhase,
+          session_id: undefined,
+        }
+      } else {
+        // 没有选择需求时提示
         setIsLoading(false)
-        setMessages(prev => prev.slice(0, -2))  // 移除刚添加的消息
+        setMessages(prev => prev.slice(0, -2))
+        showWarning('请先在顶部配置栏中选择迭代和需求')
         return
       }
-      requestPayload.testing_context = {
-        project_name: TESTING_PROJECT_NAME,
-        requirement_id: String(selectedIssue.code),
-        requirement_name: selectedIssue.name,
-      }
+      // 不使用 threadId，而是使用阶段特定的 thread_id（由后端根据 phase 生成）
+      delete requestPayload.thread_id
     }
     
     client.start(
@@ -1919,15 +1999,30 @@ const ChatPage: React.FC = () => {
           setThreadId(newThreadId)
           setActiveConversationId(newThreadId)
           
-          // 智能测试 Agent: 发送开始消息
-          if (currentAgentType === 'intelligent_testing') {
-            handleTestingMessage({ type: 'start', session_id: newThreadId || '' })
-          }
-          
-          // 立即将对话添加到历史列表（不等 AI 回复完成）
-          const isNewConversation = !threadId
-          if (isNewConversation && newThreadId) {
-            upsertConversation(newThreadId, '新对话', new Date().toISOString(), currentAgentType)
+          // 智能测试 Agent: 处理 session_id
+          if (currentAgentType === 'intelligent_testing' && newThreadId) {
+            // thread_id 格式: {session_id}_{phase}，提取 session_id
+            // 循环移除所有后缀（防止多层后缀）
+            let sessionId = newThreadId
+            while (sessionId.match(/_(analysis|plan|generate)$/)) {
+              sessionId = sessionId.replace(/_(analysis|plan|generate)$/, '')
+            }
+            console.log('[Testing] onStart - newThreadId:', newThreadId, '提取的 sessionId:', sessionId)
+            if (!testingSessionId) {
+              setTestingSessionId(sessionId)
+            }
+            handleTestingMessage({ type: 'start', session_id: sessionId, phase: testingActivePhase })
+            
+            // 新任务时添加到历史列表，使用 session_id 而不是 thread_id
+            if (!testingSessionId) {
+              upsertConversation(sessionId, '新对话', new Date().toISOString(), currentAgentType)
+            }
+          } else {
+            // 其他 Agent: 使用 thread_id
+            const isNewConversation = !threadId
+            if (isNewConversation && newThreadId) {
+              upsertConversation(newThreadId, '新对话', new Date().toISOString(), currentAgentType)
+            }
           }
         },
         
@@ -2060,28 +2155,25 @@ const ChatPage: React.FC = () => {
           })
         },
         
-        // 智能测试 Agent: 阶段切换
+        // 智能测试 Agent: 阶段切换（只更新任务面板状态）
+        // 注意：阶段分隔符现在由后端作为 stream 消息发送，嵌入到 assistant 消息内容中
         onPhaseChanged: (phase) => {
           if (currentAgentType === 'intelligent_testing') {
             handleTestingMessage({ type: 'phase_changed', phase })
-            
-            // 在聊天区域插入阶段分隔符
-            const phaseNames: Record<string, { name: string; index: number }> = {
-              'analysis': { name: '需求分析', index: 1 },
-              'plan': { name: '方案生成', index: 2 },
-              'generate': { name: '用例生成', index: 3 },
-              'completed': { name: '测试完成', index: 4 },
-            }
-            const phaseInfo = phaseNames[phase] || { name: phase, index: 0 }
-            
-            const dividerId = `phase-divider-${phase}-${Date.now()}`
-            setMessages(prev => [...prev, {
-              id: dividerId,
-              role: 'phase_divider' as const,
-              content: '',
-              phaseName: phaseInfo.name,
-              phaseIndex: phaseInfo.index,
-            }])
+          }
+        },
+        
+        // 智能测试 Agent: 阶段完成（标记上一阶段已完成）
+        onPhaseCompleted: (phase) => {
+          if (currentAgentType === 'intelligent_testing') {
+            handleTestingMessage({ type: 'phase_completed', phase })
+          }
+        },
+        
+        // 智能测试 Agent: 标题生成（在工作流开始时立即生成）
+        onTitleGenerated: (title, tid) => {
+          if (currentAgentType === 'intelligent_testing' && tid) {
+            upsertConversation(tid, title, new Date().toISOString(), currentAgentType)
           }
         },
         
@@ -2089,9 +2181,16 @@ const ChatPage: React.FC = () => {
           // 最终结果 - 触发打字机加速清空缓冲区
           finishTypewriter()
           
-          // 智能测试 Agent: 发送完成消息
+          // 智能测试 Agent: 发送完成消息，同步消息到阶段列表
           if (currentAgentType === 'intelligent_testing') {
             handleTestingMessage({ type: 'result', status: 'completed' })
+            // 刷新任务状态（检查是否有新的摘要保存）
+            refreshTestingSessionStatus()
+            // 同步消息到当前阶段
+            setTestingPhaseMessages(prev => ({
+              ...prev,
+              [testingActivePhase]: messages,
+            }))
           }
           
           // 快照当前工具摘要（后续会清空 ref，需要先复制一份）
@@ -2146,17 +2245,20 @@ const ChatPage: React.FC = () => {
           setTimeout(ensureComplete, 500)
           
           // 延迟处理：生成对话标题（如果是新对话）
-          setTimeout(() => {
-            const finalThreadId = resultThreadId || threadId
-            const isNewConversation = !threadId
-            if (finalThreadId && isNewConversation) {
-              generateConversationTitle(finalThreadId)
-                .then(title => {
-                  upsertConversation(finalThreadId, title, new Date().toISOString(), currentAgentType)
-                })
-                .catch(e => console.warn('生成标题失败', e))
-            }
-          }, 200)
+          // 注意：intelligent_testing agent 已在 onTitleGenerated 中处理，无需重复生成
+          if (currentAgentType !== 'intelligent_testing') {
+            setTimeout(() => {
+              const finalThreadId = resultThreadId || threadId
+              const isNewConversation = !threadId
+              if (finalThreadId && isNewConversation) {
+                generateConversationTitle(finalThreadId)
+                  .then(title => {
+                    upsertConversation(finalThreadId, title, new Date().toISOString(), currentAgentType)
+                  })
+                  .catch(e => console.warn('生成标题失败', e))
+              }
+            }, 200)
+          }
         },
         
         onError: (err) => {
@@ -2217,6 +2319,13 @@ const ChatPage: React.FC = () => {
     setActiveConversationId(null)
     resetTypewriter()
     setInputValue('')
+    // 重置智能测试任务面板
+    resetTestingTaskBoard()
+    // 重置测试阶段状态
+    resetTestingPhaseState()
+    // 清空阶段消息缓存
+    phaseMessagesRef.current.clear()
+    toolSummariesRef.current.clear()
   }
 
   // 精准重新生成指定 AI 回复（通过对应的用户消息索引）
@@ -2258,7 +2367,7 @@ const ChatPage: React.FC = () => {
     const client = createRegenerateClient()
     
     client.start(
-      { thread_id: threadId, user_msg_index: userMsgIndex },
+      { thread_id: threadId, user_msg_index: userMsgIndex, agent_type: currentAgentType },
       {
         onStream: (chunk) => {
           fullContentRef.current += chunk
@@ -2433,22 +2542,124 @@ const ChatPage: React.FC = () => {
     if (conv.agentType) {
       setCurrentAgentType(conv.agentType)
     }
-    setIsLoading(true)
+    setIsHistoryLoading(true)
+    setMessages([])  // 先清空，显示加载状态
     resetTypewriter()
 
     try {
-      const rawMessages = await fetchConversationHistory(conv.threadId)
+      // 智能测试 Agent 使用专用 API 恢复历史
+      if (conv.agentType === 'intelligent_testing') {
+        // 设置 session_id（确保移除所有可能的 _phase 后缀）
+        let sessionId = conv.threadId
+        // 循环移除所有后缀（防止多层后缀如 xxx_generate_generate）
+        while (sessionId.match(/_(analysis|plan|generate)$/)) {
+          sessionId = sessionId.replace(/_(analysis|plan|generate)$/, '')
+        }
+        console.log('[Testing] 恢复历史 - conv.threadId:', conv.threadId, '提取的 sessionId:', sessionId)
+        setTestingSessionId(sessionId)
+        
+        // 获取任务状态
+        try {
+          const status = await fetchTestingSessionStatus(sessionId)
+          setTestingSessionStatus(status)
+          
+          // 确定初始显示的阶段（从最后一个有内容的阶段开始）
+          let initialPhase: PhaseId = 'analysis'
+          if (status.phases.generate.has_summary) {
+            initialPhase = 'generate'
+          } else if (status.phases.plan.has_summary) {
+            initialPhase = 'plan'
+          } else if (status.phases.analysis.has_summary) {
+            initialPhase = 'plan'  // 分析完成，显示方案阶段
+          }
+          setTestingActivePhase(initialPhase)
+          setTestingViewingPhase(initialPhase)
+          
+          // 预加载所有阶段的消息到缓存
+          const phases: PhaseId[] = ['analysis', 'plan', 'generate']
+          toolSummariesRef.current.clear()
+          phaseMessagesRef.current.clear()  // 清空缓存，确保不会有脏数据
+          
+          console.log('[Testing] 开始预加载所有阶段消息, sessionId:', sessionId)
+          for (const phase of phases) {
+            try {
+              const phaseThreadId = `${sessionId}_${phase}`
+              console.log('[Testing] 加载阶段消息:', phase, 'threadId:', phaseThreadId)
+              const rawMessages = await fetchConversationHistory(phaseThreadId)
+              console.log('[Testing] 阶段', phase, '获取到消息数:', rawMessages.length)
+              if (rawMessages.length > 0) {
+                const result = convertRawMessagesToDisplay(rawMessages, phaseThreadId)
+                phaseMessagesRef.current.set(phase, result.messages)
+                console.log('[Testing] 阶段', phase, '转换后消息数:', result.messages.length)
+                // 合并工具摘要
+                result.toolSummaries.forEach((value, key) => {
+                  toolSummariesRef.current.set(key, value)
+                })
+              }
+            } catch (e) {
+              console.log(`[Testing] 阶段 ${phase} 加载失败:`, e)
+            }
+          }
+          console.log('[Testing] 预加载完成, 缓存内容:', 
+            'analysis:', phaseMessagesRef.current.get('analysis')?.length || 0,
+            'plan:', phaseMessagesRef.current.get('plan')?.length || 0,
+            'generate:', phaseMessagesRef.current.get('generate')?.length || 0
+          )
+          
+          setToolSummariesVersion(v => v + 1)
+          
+          // 显示初始阶段的消息
+          const initialMessages = phaseMessagesRef.current.get(initialPhase) || []
+          setMessages(initialMessages)
+          
+          // 获取任务历史并恢复任务面板状态
+          const testingResult = await fetchTestingHistory(sessionId)
+          restoreTestingFromHistory(
+            {
+              analysis: { completed: status.phases.analysis.has_summary },
+              plan: { completed: status.phases.plan.has_summary },
+              generate: { completed: status.phases.generate.has_summary },
+            },
+            status.current_phase,
+            status.status,
+            testingResult.task_history
+          )
+        } catch (e) {
+          console.error('加载测试任务状态失败', e)
+          // 回退到旧的恢复逻辑
+          const testingResult = await fetchTestingHistory(sessionId)
+          if (testingResult.phases) {
+            restoreTestingFromHistory(
+              testingResult.phases, 
+              testingResult.current_phase, 
+              testingResult.status,
+              testingResult.task_history
+            )
+          }
+          const result = convertRawMessagesToDisplay(testingResult.messages, sessionId)
+          toolSummariesRef.current.clear()
+          result.toolSummaries.forEach((value, key) => {
+            toolSummariesRef.current.set(key, value)
+          })
+          setToolSummariesVersion(v => v + 1)
+          setMessages(result.messages)
+        }
+      } else {
+        // 其他 Agent 使用普通 API
+        const rawMessages = await fetchConversationHistory(conv.threadId)
+        
+        // 使用统一的转换函数
+        const result = convertRawMessagesToDisplay(rawMessages, conv.threadId)
+        
+        // 更新工具摘要 ref
+        toolSummariesRef.current.clear()
+        result.toolSummaries.forEach((value, key) => {
+          toolSummariesRef.current.set(key, value)
+        })
+        setToolSummariesVersion(v => v + 1)
+        setMessages(result.messages)
+      }
       
-      // 使用统一的转换函数
-      const result = convertRawMessagesToDisplay(rawMessages, conv.threadId)
-      
-      // 更新工具摘要 ref
-      toolSummariesRef.current.clear()
-      result.toolSummaries.forEach((value, key) => {
-        toolSummariesRef.current.set(key, value)
-      })
-      setToolSummariesVersion(v => v + 1)
-      setMessages(result.messages)
       // 历史会话加载完成后，直接定位到底部（不使用动画）
       setTimeout(() => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'instant' })
@@ -2456,9 +2667,9 @@ const ChatPage: React.FC = () => {
     } catch (e) {
       console.error('加载会话历史失败', e)
     } finally {
-      setIsLoading(false)
+      setIsHistoryLoading(false)
     }
-  }, [resetTypewriter, scrollToBottom])
+  }, [resetTypewriter, scrollToBottom, restoreTestingFromHistory])
 
   const handleDeleteConversation = async (e: React.MouseEvent, conv: ConversationSummary) => {
     e.stopPropagation()
@@ -2521,7 +2732,12 @@ const ChatPage: React.FC = () => {
               </div>
               
               <div className="conversation-list">
-                {conversations.length === 0 ? (
+                {isConversationsLoading ? (
+                  <div className="conversation-list-loading">
+                    <LoadingOutlined spin />
+                    <span>加载中...</span>
+                  </div>
+                ) : conversations.length === 0 ? (
                   <div className="conversation-list-empty">暂无历史</div>
                 ) : (
                   groupedConversations.map(group => (
@@ -2530,25 +2746,29 @@ const ChatPage: React.FC = () => {
                       {group.conversations.map(conv => (
                         <div
                           key={conv.threadId}
-                          className={`conversation-item ${conv.threadId === activeConversationId ? 'active' : ''}`}
+                          className={`conversation-item ${conv.threadId === activeConversationId ? 'active' : ''} ${isHistoryLoading && conv.threadId === activeConversationId ? 'loading' : ''}`}
                           onClick={() => handleSelectConversation(conv)}
                           title={conv.title || '新对话'}
                         >
                           <div className="conversation-item-title">{conv.title || '新对话'}</div>
-                          <div 
-                             className="conversation-item-delete"
-                             onClick={(e) => handleDeleteConversation(e, conv)}
-                             title="删除对话"
-                          >
-                             <DeleteOutlined />
-                          </div>
+                          {isHistoryLoading && conv.threadId === activeConversationId ? (
+                            <LoadingOutlined spin className="conversation-item-loading" />
+                          ) : (
+                            <div 
+                               className="conversation-item-delete"
+                               onClick={(e) => handleDeleteConversation(e, conv)}
+                               title="删除对话"
+                            >
+                               <DeleteOutlined />
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
                   ))
                 )}
                 
-                {conversations.length > 0 && (
+                {!isConversationsLoading && conversations.length > 0 && (
                    <div className="view-all-history">查看全部</div>
                 )}
               </div>
@@ -2576,23 +2796,59 @@ const ChatPage: React.FC = () => {
             任务追踪看板
           </div>
           
-          {/* 阶段选择器 */}
+          {/* 阶段选择器 - 点击切换阶段和对话 */}
           <div className="testing-phase-tabs">
-            {testingPhases.map((phase, idx) => {
-              const isViewing = testingViewingPhase === phase.id
+            {testingPhases.map((phase) => {
+              const isActive = testingActivePhase === phase.id
               const isCurrent = testingCurrentPhase === phase.id
-              const hasContent = phase.tasksTotal > 0
+              const isCompleted = phase.status === 'completed'
               return (
                 <div 
                   key={phase.id}
-                  className={`testing-phase-tab ${isViewing ? 'active' : ''} ${phase.status === 'completed' ? 'completed' : ''} ${isCurrent && isTestingRunning ? 'running' : ''}`}
-                  onClick={() => hasContent && setTestingViewingPhase(phase.id)}
-                  style={{ cursor: hasContent ? 'pointer' : 'default', opacity: hasContent ? 1 : 0.5 }}
-                  title={hasContent ? `查看${phase.name}任务` : '暂无任务'}
+                  className={`testing-phase-tab ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''} ${isCurrent && isTestingRunning ? 'running' : ''}`}
+                  onClick={async () => {
+                    // 如果正在生成中，禁止切换阶段
+                    if (isLoading) {
+                      showWarning('AI 正在生成中，请等待完成后再切换阶段')
+                      return
+                    }
+                    
+                    // 保存当前阶段的消息到缓存
+                    phaseMessagesRef.current.set(testingActivePhase, [...messages])
+                    
+                    // 切换活跃阶段
+                    setTestingActivePhase(phase.id as PhaseId)
+                    setTestingViewingPhase(phase.id)
+                    setCurrentTool(null)
+                    
+                    // 尝试从缓存加载目标阶段的消息
+                    const cachedMessages = phaseMessagesRef.current.get(phase.id as PhaseId)
+                    console.log('[Testing] 切换阶段:', phase.id, '缓存消息数:', cachedMessages?.length || 0)
+                    if (cachedMessages && cachedMessages.length > 0) {
+                      setMessages(cachedMessages)
+                    } else if (testingSessionId) {
+                      // 缓存为空时，从服务器加载历史
+                      setMessages([])
+                      try {
+                        const phaseThreadId = `${testingSessionId}_${phase.id}`
+                        const rawMessages = await fetchConversationHistory(phaseThreadId)
+                        if (rawMessages.length > 0) {
+                          const result = convertRawMessagesToDisplay(rawMessages, phaseThreadId)
+                          setMessages(result.messages)
+                          phaseMessagesRef.current.set(phase.id as PhaseId, result.messages)
+                        }
+                      } catch (e) {
+                        console.log('该阶段暂无历史消息')
+                      }
+                    } else {
+                      setMessages([])
+                    }
+                  }}
+                  title={`切换到${phase.name}`}
                 >
+                  {isCompleted && <CheckCircleOutlined className="phase-tab-icon" style={{ color: '#52c41a' }} />}
+                  {isCurrent && isTestingRunning && <LoadingOutlined spin className="phase-tab-icon" />}
                   <span className="phase-tab-name">{phase.name}</span>
-                  {phase.status === 'completed' && <CheckCircleOutlined style={{ fontSize: 11, color: '#52c41a' }} />}
-                  {isCurrent && isTestingRunning && <SyncOutlined spin style={{ fontSize: 11, color: '#1890ff' }} />}
                 </div>
               )
             })}
@@ -2615,24 +2871,24 @@ const ChatPage: React.FC = () => {
                   className={`testing-task-card ${task.status === 'in_progress' ? 'active' : ''} ${task.status === 'completed' ? 'completed' : ''}`}
                 >
                   <div className="testing-task-title">
-                    {task.status === 'completed' ? (
-                      <CheckCircleOutlined style={{ color: '#52c41a', marginRight: 8 }} />
-                    ) : task.status === 'in_progress' ? (
-                      <SyncOutlined spin style={{ color: '#1890ff', marginRight: 8 }} />
-                    ) : (
-                      <span style={{ display: 'inline-block', width: 14, height: 14, borderRadius: '50%', border: '2px solid #d9d9d9', marginRight: 8 }} />
-                    )}
+                    <span className="task-icon">
+                      {task.status === 'completed' ? (
+                        <CheckCircleOutlined style={{ color: '#52c41a' }} />
+                      ) : task.status === 'in_progress' ? (
+                        <LoadingOutlined spin />
+                      ) : '○'}
+                    </span>
                     <span>{index + 1}. {task.title}</span>
                   </div>
                   {task.status === 'in_progress' && task.progress > 0 && (
-                    <div style={{ marginTop: 8, marginLeft: 22 }}>
-                      <div style={{ height: 4, background: '#f0f0f0', borderRadius: 2 }}>
-                        <div style={{ height: '100%', width: `${task.progress}%`, background: '#1890ff', borderRadius: 2, transition: 'width 0.3s' }} />
+                    <div className="testing-task-progress">
+                      <div className="testing-task-progress-bar">
+                        <div className="testing-task-progress-fill" style={{ width: `${task.progress}%` }} />
                       </div>
                     </div>
                   )}
                   {task.status === 'completed' && task.result && (
-                    <div className="testing-task-result">└─ {task.result}</div>
+                    <div className="testing-task-result">{task.result}</div>
                   )}
                 </div>
               ))
@@ -2653,109 +2909,189 @@ const ChatPage: React.FC = () => {
                 transition: 'width 0.3s' 
               }} />
             </div>
+            {/* 查看阶段总结按钮 - 当阶段完成时显示 */}
+            {testingViewingPhaseInfo?.status === 'completed' && testingSessionId && (
+              <button 
+                className="testing-summary-btn"
+                disabled={summaryLoading}
+                onClick={async () => {
+                  try {
+                    setSummaryLoading(true)
+                    const results = await getTestingResults(testingSessionId!)
+                    // 根据当前查看的阶段获取对应摘要
+                    const summaryMap: Record<PhaseId, keyof TestingResults> = {
+                      analysis: 'requirement_summary',
+                      plan: 'test_plan',
+                      generate: 'test_cases',
+                    }
+                    const summaryKey = summaryMap[testingViewingPhase]
+                    const content = results[summaryKey]
+                    if (content) {
+                      setSummaryContent(JSON.stringify(content, null, 2))
+                      setSummaryModalVisible(true)
+                    } else {
+                      showWarning('暂无该阶段的总结数据')
+                    }
+                  } catch (error) {
+                    console.error('获取阶段总结失败:', error)
+                    showWarning('获取阶段总结失败')
+                  } finally {
+                    setSummaryLoading(false)
+                  }
+                }}
+              >
+                {summaryLoading ? <LoadingOutlined /> : <FileTextOutlined />} 查看阶段总结
+              </button>
+            )}
           </div>
         </div>
       )}
+      
+      {/* 阶段总结弹窗 */}
+      <Modal
+        title={`${testingViewingPhaseInfo?.name || '阶段'}总结`}
+        open={summaryModalVisible}
+        onCancel={() => setSummaryModalVisible(false)}
+        footer={null}
+        width={700}
+        styles={{ body: { maxHeight: '60vh', overflowY: 'auto' } }}
+      >
+        {summaryContent && (
+          <MarkdownPreview
+            source={'```json\n' + summaryContent + '\n```'}
+            style={{ background: 'transparent', fontSize: 14 }}
+            wrapperElement={{ "data-color-mode": "light" }}
+          />
+        )}
+      </Modal>
 
       <div className={`chat-main ${messages.length === 0 ? 'empty-chat' : ''} ${currentAgentType === 'intelligent_testing' ? 'with-task-panel' : ''}`}>
         {/* Agent 选择器 - 对话区域左上角 */}
         {agentTypes.length > 0 && (
           <div className="agent-selector-header">
             <div className="agent-dropdown-wrapper">
-              <button 
-                className="agent-dropdown-trigger"
-                onClick={() => setIsAgentDropdownOpen(!isAgentDropdownOpen)}
-              >
-                <span className="agent-trigger-name">
-                  {agentTypes.find(a => a.agent_type === currentAgentType)?.name || 'Agent'}
-                </span>
-                <DownOutlined className={`agent-trigger-arrow ${isAgentDropdownOpen ? 'open' : ''}`} />
-              </button>
-              
-              {isAgentDropdownOpen && (
-                <div className="agent-dropdown-menu">
-                  {agentTypes.map(agent => {
-                    const isSelected = currentAgentType === agent.agent_type
-                    return (
-                      <div
-                        key={agent.agent_type}
-                        className={`agent-dropdown-item ${isSelected ? 'selected' : ''}`}
-                        onClick={() => {
-                          setCurrentAgentType(agent.agent_type)
-                          setIsAgentDropdownOpen(false)
-                        }}
-                      >
-                        <div className="agent-item-content">
-                          <span className="agent-item-name">{agent.name}</span>
-                          <span className="agent-item-desc">{agent.description}</span>
-                        </div>
-                        {isSelected && <CheckCircleOutlined className="agent-item-check" />}
-                      </div>
-                    )
-                  })}
+              {/* 有对话内容时显示锁定状态 */}
+              {hasConversationContent ? (
+                <div className="agent-locked-info">
+                  <LockOutlined className="locked-icon" />
+                  <span className="locked-value">
+                    {agentTypes.find(a => a.agent_type === currentAgentType)?.name || 'Agent'}
+                  </span>
                 </div>
+              ) : (
+                <>
+                  <button 
+                    className="agent-dropdown-trigger"
+                    onClick={() => setIsAgentDropdownOpen(!isAgentDropdownOpen)}
+                  >
+                    <span className="agent-trigger-name">
+                      {agentTypes.find(a => a.agent_type === currentAgentType)?.name || 'Agent'}
+                    </span>
+                    <DownOutlined className={`agent-trigger-arrow ${isAgentDropdownOpen ? 'open' : ''}`} />
+                  </button>
+                  
+                  {isAgentDropdownOpen && (
+                    <div className="agent-dropdown-menu">
+                      {agentTypes.map(agent => {
+                        const isSelected = currentAgentType === agent.agent_type
+                        return (
+                          <div
+                            key={agent.agent_type}
+                            className={`agent-dropdown-item ${isSelected ? 'selected' : ''}`}
+                            onClick={() => {
+                              setCurrentAgentType(agent.agent_type)
+                              setIsAgentDropdownOpen(false)
+                            }}
+                          >
+                            <div className="agent-item-content">
+                              <span className="agent-item-name">{agent.name}</span>
+                              <span className="agent-item-desc">{agent.description}</span>
+                            </div>
+                            {isSelected && <CheckCircleOutlined className="agent-item-check" />}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </>
               )}
             </div>
             
             {/* 日志排查配置选择器 - 仅 log_troubleshoot Agent 显示 */}
             {currentAgentType === 'log_troubleshoot' && businessLines.length > 0 && (
               <div className="log-query-selectors">
-                {/* 业务线选择器 */}
-                <div className="log-dropdown-wrapper">
-                  <button
-                    className="log-dropdown-trigger"
-                    onClick={() => {
-                      setIsBusinessLineOpen(!isBusinessLineOpen)
-                      setIsPrivateServerOpen(false)
-                    }}
-                  >
-                    <span className="log-trigger-name">{businessLine || '选择业务线'}</span>
-                    <DownOutlined className={`log-trigger-arrow ${isBusinessLineOpen ? 'open' : ''}`} />
-                  </button>
-                  {isBusinessLineOpen && (
-                    <div className="log-dropdown-menu">
-                      {businessLines.map(opt => (
-                        <div
-                          key={opt.value}
-                          className={`log-dropdown-item ${businessLine === opt.value ? 'selected' : ''}`}
-                          onClick={() => handleBusinessLineChange(opt.value)}
-                        >
-                          <span>{opt.label}</span>
-                          {businessLine === opt.value && <CheckCircleOutlined className="log-item-check" />}
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                
-                {/* 私有化集团选择器 - 仅私有化业务线显示 */}
-                {businessLine === '私有化' && privateServers.length > 0 && (
-                  <div className="log-dropdown-wrapper">
-                    <button
-                      className="log-dropdown-trigger"
-                      onClick={() => {
-                        setIsPrivateServerOpen(!isPrivateServerOpen)
-                        setIsBusinessLineOpen(false)
-                      }}
-                    >
-                      <span className="log-trigger-name">{privateServer || '选择集团'}</span>
-                      <DownOutlined className={`log-trigger-arrow ${isPrivateServerOpen ? 'open' : ''}`} />
-                    </button>
-                    {isPrivateServerOpen && (
-                      <div className="log-dropdown-menu">
-                        {privateServers.map(opt => (
-                          <div
-                            key={opt.value}
-                            className={`log-dropdown-item ${privateServer === opt.value ? 'selected' : ''}`}
-                            onClick={() => handlePrivateServerChange(opt.value)}
-                          >
-                            <span>{opt.label}</span>
-                            {privateServer === opt.value && <CheckCircleOutlined className="log-item-check" />}
-                          </div>
-                        ))}
-                      </div>
+                {/* 有对话内容时显示锁定状态 */}
+                {hasConversationContent ? (
+                  <div className="log-locked-info">
+                    <LockOutlined className="locked-icon" />
+                    <span className="locked-value">{businessLine}</span>
+                    {businessLine === '私有化' && privateServer && (
+                      <>
+                        <span className="locked-separator">·</span>
+                        <span className="locked-value">{privateServer}</span>
+                      </>
                     )}
                   </div>
+                ) : (
+                  <>
+                    {/* 业务线选择器 */}
+                    <div className="log-dropdown-wrapper">
+                      <button
+                        className="log-dropdown-trigger"
+                        onClick={() => {
+                          setIsBusinessLineOpen(!isBusinessLineOpen)
+                          setIsPrivateServerOpen(false)
+                        }}
+                      >
+                        <span className="log-trigger-name">{businessLine || '选择业务线'}</span>
+                        <DownOutlined className={`log-trigger-arrow ${isBusinessLineOpen ? 'open' : ''}`} />
+                      </button>
+                      {isBusinessLineOpen && (
+                        <div className="log-dropdown-menu">
+                          {businessLines.map(opt => (
+                            <div
+                              key={opt.value}
+                              className={`log-dropdown-item ${businessLine === opt.value ? 'selected' : ''}`}
+                              onClick={() => handleBusinessLineChange(opt.value)}
+                            >
+                              <span>{opt.label}</span>
+                              {businessLine === opt.value && <CheckCircleOutlined className="log-item-check" />}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    
+                    {/* 私有化集团选择器 - 仅私有化业务线显示 */}
+                    {businessLine === '私有化' && privateServers.length > 0 && (
+                      <div className="log-dropdown-wrapper">
+                        <button
+                          className="log-dropdown-trigger"
+                          onClick={() => {
+                            setIsPrivateServerOpen(!isPrivateServerOpen)
+                            setIsBusinessLineOpen(false)
+                          }}
+                        >
+                          <span className="log-trigger-name">{privateServer || '选择集团'}</span>
+                          <DownOutlined className={`log-trigger-arrow ${isPrivateServerOpen ? 'open' : ''}`} />
+                        </button>
+                        {isPrivateServerOpen && (
+                          <div className="log-dropdown-menu">
+                            {privateServers.map(opt => (
+                              <div
+                                key={opt.value}
+                                className={`log-dropdown-item ${privateServer === opt.value ? 'selected' : ''}`}
+                                onClick={() => handlePrivateServerChange(opt.value)}
+                              >
+                                <span>{opt.label}</span>
+                                {privateServer === opt.value && <CheckCircleOutlined className="log-item-check" />}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -2763,6 +3099,17 @@ const ChatPage: React.FC = () => {
             {/* 智能测试配置选择器 - 仅 intelligent_testing Agent 显示 */}
             {currentAgentType === 'intelligent_testing' && (
               <div className="log-query-selectors">
+                {/* 有 sessionId 时显示锁定的需求信息 */}
+                {testingSessionId && testingSessionStatus ? (
+                  <div className="testing-locked-info">
+                    <LockOutlined className="locked-icon" />
+                    <span className="locked-value">
+                      {testingSessionStatus.requirement_name || `#${testingSessionStatus.requirement_id}`}
+                    </span>
+                    <span className="locked-badge">已锁定</span>
+                  </div>
+                ) : (
+                  <>
                 {/* 迭代选择器 */}
                 <div className="testing-dropdown-wrapper log-dropdown-wrapper">
                   <button
@@ -2924,16 +3271,23 @@ const ChatPage: React.FC = () => {
                     )}
                   </div>
                 )}
+                </>
+                )}
               </div>
             )}
           </div>
         )}
-
+        
         <div className="chat-message-list" ref={messageListRef} onScroll={handleScroll}>
           <div className="chat-content-width">
-            {messages.length === 0 ? (
+            {isHistoryLoading ? (
+              <div className="history-loading-container">
+                <LoadingOutlined spin style={{ fontSize: 32, color: '#1890ff' }} />
+                <span className="history-loading-text">正在加载对话...</span>
+              </div>
+            ) : messages.length === 0 ? (
               <WelcomeScreen 
-                key={`${currentAgentType}-${businessLine || ''}-${privateServer || ''}`}
+                key={`${currentAgentType}-${businessLine || ''}-${privateServer || ''}-${testingActivePhase}`}
                 onSuggestionClick={(q) => sendMessage(q)} 
                 agentType={currentAgentType}
                 businessLine={businessLine}
@@ -2989,6 +3343,36 @@ const ChatPage: React.FC = () => {
                     />
                   )
                 })}
+                {/* 测试助手：阶段完成后显示进入下一阶段按钮 */}
+                {currentAgentType === 'intelligent_testing' && 
+                 testingSessionId && 
+                 testingActivePhase !== 'generate' && 
+                 testingSessionStatus?.phases?.[testingActivePhase]?.has_summary && 
+                 !isLoading && (
+                  <div className="next-phase-message">
+                    <div className="next-phase-content">
+                      <CheckCircleOutlined className="next-phase-icon" />
+                      <span className="next-phase-text">
+                        {testingActivePhase === 'analysis' ? '需求分析' : '测试方案'}阶段已完成
+                      </span>
+                      <button
+                        className="next-phase-btn"
+                        onClick={() => {
+                          const nextPhase = testingActivePhase === 'analysis' ? 'plan' : 'generate'
+                          phaseMessagesRef.current.set(testingActivePhase, [...messages])
+                          refreshTestingSessionStatus()
+                          setTestingActivePhase(nextPhase as PhaseId)
+                          setTestingViewingPhase(nextPhase as PhaseId)
+                          setTestingCurrentPhase(nextPhase as PhaseId)
+                          setMessages([])
+                          setCurrentTool(null)
+                        }}
+                      >
+                        进入下一阶段: {testingActivePhase === 'analysis' ? '测试方案' : '用例生成'} →
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {/* 占位符，用于滚动 */}
                 <div ref={messagesEndRef} style={{ height: 1 }} />
               </>
@@ -3197,22 +3581,36 @@ const ChatPage: React.FC = () => {
               )}
             </div>
             
-            <textarea
-              ref={inputRef}
-              className="chat-textarea"
-              placeholder="输入问题，开始探索（支持拖拽/粘贴图片）"
-              value={inputValue}
-              onChange={e => setInputValue(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault()
-                  if (!isLoading) {
-                    sendMessage()
-                  }
-                }
-              }}
-              rows={1}
-            />
+            {/* 智能测试助手：空状态时显示预设指令 */}
+            {(() => {
+              const isTestingEmpty = currentAgentType === 'intelligent_testing' && messages.length === 0
+              const testingPresetText: Record<string, string> = {
+                analysis: '点击发送按钮开始分析需求',
+                plan: '开始生成测试方案',
+                generate: '开始生成测试用例',
+              }
+              const presetValue = isTestingEmpty ? testingPresetText[testingActivePhase] || '' : ''
+              
+              return (
+                <textarea
+                  ref={inputRef}
+                  className={`chat-textarea ${isTestingEmpty ? 'testing-preset' : ''}`}
+                  placeholder="输入问题，开始探索（支持拖拽/粘贴图片）"
+                  value={isTestingEmpty ? presetValue : inputValue}
+                  onChange={e => !isTestingEmpty && setInputValue(e.target.value)}
+                  readOnly={isTestingEmpty}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      if (!isLoading) {
+                        isTestingEmpty ? sendMessage(presetValue) : sendMessage()
+                      }
+                    }
+                  }}
+                  rows={1}
+                />
+              )
+            })()}
             
             <div className="action-buttons">
               {isLoading ? (
@@ -3220,8 +3618,20 @@ const ChatPage: React.FC = () => {
               ) : (
                 <button 
                   className="send-btn" 
-                  onClick={() => sendMessage()}
-                  disabled={!inputValue.trim() && uploadedFiles.length === 0}
+                  onClick={() => {
+                    const isTestingEmpty = currentAgentType === 'intelligent_testing' && messages.length === 0
+                    const testingPresetText: Record<string, string> = {
+                      analysis: '点击发送按钮开始分析需求',
+                      plan: '开始生成测试方案',
+                      generate: '开始生成测试用例',
+                    }
+                    isTestingEmpty ? sendMessage(testingPresetText[testingActivePhase]) : sendMessage()
+                  }}
+                  disabled={
+                    currentAgentType === 'intelligent_testing' && messages.length === 0
+                      ? false  // 测试助手空状态时始终可点击
+                      : !inputValue.trim() && uploadedFiles.length === 0
+                  }
                 >
                   <ArrowUpOutlined style={{ fontSize: 20, fontWeight: 'bold' }} />
                 </button>

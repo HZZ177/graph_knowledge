@@ -103,12 +103,12 @@ class CodeWorkspaceConfig:
     WORKSPACES: dict[str, dict] = {
         "vehicle-owner-server": {
             "name": "C端逻辑服务",
-            "root": r"C:\Users\86364\PycharmProjects\vehicle-owner-server",
+            "root": r"D:\Pycharm Projects\vehicle-owner-server",
             "description": "C端逻辑服务，主要包含非后台相关的owner-center和pay-center两大业务模块"
         },
         "vehicle-admin": {
             "name": "C端后台服务",
-            "root": r"C:\Users\86364\PycharmProjects\yongce-pro-admin-vehicle-owner",
+            "root": r"D:\Pycharm Projects\yongce-pro-admin-vehicle-owner",
             "description": "C端后台服务，主要包含后台管理相关的业务模块"
         },
     }

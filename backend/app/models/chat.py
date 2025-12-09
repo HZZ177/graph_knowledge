@@ -32,6 +32,7 @@ class Conversation(Base):
     
     # ========== 测试助手专用字段（新增，其他 agent 为 null）==========
     requirement_id = Column(String, nullable=True, comment="Coding 需求 ID")
+    requirement_name = Column(String, nullable=True, comment="Coding 需求标题")
     project_name = Column(String, nullable=True, comment="Coding 项目名称")
     status = Column(String, nullable=True, comment="测试任务状态: pending/analysis/plan/generate/completed/failed")
     current_phase = Column(String, nullable=True, comment="当前阶段: analysis/plan/generate")
@@ -59,6 +60,31 @@ class TestSessionAnalysis(Base):
         Index('idx_test_session_analysis_session', 'session_id'),
         Index('idx_test_session_analysis_session_phase', 'session_id', 'phase'),
         Index('idx_test_session_analysis_session_type', 'session_id', 'analysis_type', unique=True),
+    )
+
+
+class TestSessionTask(Base):
+    """测试任务表
+    
+    存储测试助手每个阶段的任务列表及状态，用于历史恢复。
+    """
+    __tablename__ = "test_session_tasks"
+    
+    id = Column(String, primary_key=True, comment="任务ID，如 analysis_abc123")
+    session_id = Column(String, nullable=False, index=True, comment="对应 conversations.id")
+    phase = Column(String, nullable=False, comment="阶段: analysis / plan / generate")
+    title = Column(String, nullable=False, comment="任务标题")
+    scope = Column(String, nullable=True, comment="任务范围")
+    status = Column(String, default="pending", comment="状态: pending/in_progress/completed/failed/skipped")
+    progress = Column(Integer, default=0, comment="进度百分比 0-100")
+    result = Column(String, nullable=True, comment="任务结果摘要")
+    sort_order = Column(Integer, default=0, comment="排序顺序")
+    created_at = Column(DateTime(timezone=True), default=utc_now)
+    updated_at = Column(DateTime(timezone=True), default=utc_now, onupdate=utc_now)
+    
+    __table_args__ = (
+        Index('idx_test_session_tasks_session', 'session_id'),
+        Index('idx_test_session_tasks_session_phase', 'session_id', 'phase'),
     )
 
 

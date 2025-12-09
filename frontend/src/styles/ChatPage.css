@@ -415,6 +415,26 @@
   text-align: center;
 }
 
+.conversation-list-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 12px;
+  color: var(--text-tertiary);
+  font-size: 13px;
+}
+
+.conversation-item.loading {
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.conversation-item-loading {
+  font-size: 14px;
+  color: #1890ff;
+}
+
 .view-all-history {
   font-size: 13px;
   color: var(--text-secondary);
@@ -463,6 +483,22 @@
   max-width: var(--max-width);
   margin: 0 auto;
   width: 100%;
+}
+
+/* 历史加载状态 */
+.history-loading-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  height: 200px;
+  color: var(--text-tertiary);
+}
+
+.history-loading-text {
+  font-size: 14px;
+  color: var(--text-secondary);
 }
 
 /* 欢迎界面 */
@@ -948,6 +984,15 @@
 
 .chat-textarea::placeholder {
   color: #999;
+}
+
+/* 智能测试助手预设指令样式 */
+.chat-textarea.testing-preset {
+  color: #1890ff;
+  font-weight: 500;
+  cursor: default;
+  user-select: none;
+  text-align: center;
 }
 
 .action-buttons {
@@ -1665,40 +1710,40 @@
 }
 
 /* ==========================================
-   智能测试任务看板面板
+   智能测试任务看板面板 - 简洁风格
    ========================================== */
 
 .testing-task-panel {
   width: 280px;
   min-width: 280px;
-  background: #fafafa;
-  border-right: 1px solid var(--border-color);
+  background: var(--bg-color);
+  border-left: 1px solid var(--border-color);
   display: flex;
   flex-direction: column;
   height: 100%;
 }
 
 .testing-panel-header {
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--border-color);
+  padding: 16px;
   font-weight: 600;
-  font-size: 14px;
+  font-size: 13px;
+  color: var(--text-primary);
   display: flex;
   align-items: center;
   gap: 8px;
+  letter-spacing: 0.3px;
 }
 
 .testing-panel-header-icon {
-  margin-right: 4px;
+  font-size: 14px;
 }
 
-/* 阶段选择器标签 */
+/* 阶段选择器 - 底部线条指示 */
 .testing-phase-tabs {
   display: flex;
-  gap: 4px;
-  padding: 8px 12px;
+  padding: 0 16px;
   border-bottom: 1px solid var(--border-color);
-  background: #fff;
+  background: var(--bg-color);
 }
 
 .testing-phase-tab {
@@ -1706,36 +1751,36 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 4px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  gap: 6px;
+  padding: 12px 8px;
   font-size: 12px;
+  cursor: pointer;
   transition: all 0.2s ease;
-  background: #f5f5f5;
-  color: var(--text-secondary);
+  color: var(--text-tertiary);
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
 }
 
 .testing-phase-tab:hover {
-  background: #e8e8e8;
+  color: var(--text-secondary);
 }
 
 .testing-phase-tab.active {
-  background: #e6f7ff;
-  color: #1890ff;
+  color: var(--text-primary);
   font-weight: 500;
+  border-bottom-color: var(--text-primary);
 }
 
-.testing-phase-tab.completed {
-  color: #52c41a;
+.testing-phase-tab.completed .phase-tab-icon {
+  color: var(--text-secondary);
 }
 
-.testing-phase-tab.completed.active {
-  background: #f6ffed;
-  color: #52c41a;
+.testing-phase-tab.running .phase-tab-icon {
+  color: var(--text-secondary);
 }
 
-.testing-phase-tab.running {
-  color: #1890ff;
+.phase-tab-icon {
+  font-size: 12px;
 }
 
 .phase-tab-name {
@@ -1743,56 +1788,87 @@
   font-size: 12px;
 }
 
+/* 任务列表区域 */
 .testing-panel-content {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: 16px;
+  background: var(--bg-secondary);
 }
 
 .testing-empty-state {
   text-align: center;
   color: var(--text-tertiary);
-  padding: 40px 20px;
+  padding: 48px 20px;
   font-size: 13px;
 }
 
+/* 任务卡片 - 简洁风格 */
 .testing-task-card {
-  background: #fff;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
-  padding: 12px;
-  margin-bottom: 8px;
-  transition: all 0.2s ease;
+  background: var(--bg-color);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 10px;
+  box-shadow: var(--shadow-sm);
 }
 
 .testing-task-card.active {
-  border-color: #1890ff;
-  background: #f0f7ff;
+  box-shadow: 0 0 0 1px var(--text-primary), var(--shadow-sm);
 }
 
 .testing-task-card.completed {
-  border-color: #52c41a;
-  background: #f6ffed;
+  opacity: 0.7;
 }
 
 .testing-task-title {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
+  gap: 10px;
   font-size: 13px;
-  line-height: 1.4;
+  line-height: 1.5;
+  color: var(--text-primary);
+}
+
+.testing-task-title .task-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  margin-top: 1px;
 }
 
 .testing-task-result {
-  margin-top: 8px;
-  margin-left: 22px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-color);
   font-size: 12px;
   color: var(--text-secondary);
+  line-height: 1.5;
 }
 
+/* 任务进度条 */
+.testing-task-progress {
+  margin-top: 10px;
+  margin-left: 24px;
+}
+
+.testing-task-progress-bar {
+  height: 3px;
+  background: var(--border-color);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.testing-task-progress-fill {
+  height: 100%;
+  background: var(--text-primary);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+/* 底部进度区域 */
 .testing-panel-footer {
-  padding: 12px 16px;
+  padding: 16px;
   border-top: 1px solid var(--border-color);
-  background: #fff;
+  background: var(--bg-color);
 }
 
 .testing-progress-summary {
@@ -1800,7 +1876,7 @@
   justify-content: space-between;
   font-size: 12px;
   color: var(--text-secondary);
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
 
 .testing-progress-summary .label {
@@ -1809,6 +1885,7 @@
 
 .testing-progress-summary .value {
   font-weight: 500;
+  color: var(--text-primary);
 }
 
 /* 有任务面板时，聊天主区域宽度调整 */
@@ -1855,3 +1932,239 @@
   color: #666;
   white-space: nowrap;
 }
+
+/* ============================================
+   测试助手阶段 Tab 样式
+   ============================================ */
+
+.testing-phase-tabs {
+  border-bottom: 1px solid #e8e8e8;
+  background: linear-gradient(180deg, #ffffff 0%, #fafafa 100%);
+  padding: 0 16px;
+  flex-shrink: 0;
+}
+
+.testing-phase-tabs .ant-tabs-nav {
+  margin-bottom: 0;
+}
+
+.testing-phase-tabs .ant-tabs-tab {
+  padding: 10px 16px;
+}
+
+.testing-phase-tab {
+  display: flex;
+  align-items: center;
+  font-size: 13px;
+}
+
+/* 进入下一阶段操作栏 */
+.testing-phase-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 16px;
+  background: linear-gradient(180deg, rgba(250,250,250,0) 0%, rgba(245,245,245,0.8) 100%);
+}
+
+.testing-next-phase-btn {
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  color: white;
+  border: none;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.3);
+}
+
+.testing-next-phase-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(24, 144, 255, 0.4);
+}
+
+.testing-next-phase-btn:active {
+  transform: translateY(0);
+}
+
+.testing-phase-hint {
+  font-size: 12px;
+  color: #999;
+}
+
+/* 锁定的需求信息显示 - 与 Agent 选择器风格对齐 */
+.testing-locked-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg-color);
+  border: 1px solid rgba(82, 196, 26, 0.5);
+  border-radius: 20px;
+  font-size: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  white-space: nowrap;
+}
+
+.testing-locked-info .locked-icon {
+  color: #52c41a;
+  font-size: 14px;
+}
+
+.testing-locked-info .locked-value {
+  color: var(--text-primary);
+  font-weight: 500;
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.testing-locked-info .locked-badge {
+  padding: 2px 8px;
+  background: rgba(82, 196, 26, 0.15);
+  color: #52c41a;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+/* Agent 类型锁定信息显示 */
+.agent-locked-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg-color);
+  border: 1px solid rgba(82, 196, 26, 0.5);
+  border-radius: 20px;
+  font-size: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  white-space: nowrap;
+}
+
+.agent-locked-info .locked-icon {
+  color: #52c41a;
+  font-size: 14px;
+}
+
+.agent-locked-info .locked-value {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* 日志排查锁定信息显示 */
+.log-locked-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: var(--bg-color);
+  border: 1px solid rgba(82, 196, 26, 0.5);
+  border-radius: 20px;
+  font-size: 14px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+  white-space: nowrap;
+}
+
+.log-locked-info .locked-icon {
+  color: #52c41a;
+  font-size: 14px;
+}
+
+.log-locked-info .locked-value {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.log-locked-info .locked-separator {
+  color: #999;
+}
+
+/* 进入下一阶段消息（显示在消息列表末尾） */
+.next-phase-message {
+  display: flex;
+  justify-content: center;
+  padding: 20px;
+  margin: 12px 0;
+}
+
+.next-phase-content {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 24px;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.next-phase-icon {
+  color: #52c41a;
+  font-size: 20px;
+}
+
+.next-phase-text {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.next-phase-btn {
+  padding: 8px 20px;
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.next-phase-btn:hover {
+  background: linear-gradient(135deg, #40a9ff 0%, #1890ff 100%);
+}
+
+.next-phase-btn:active {
+  background: linear-gradient(135deg, #1890ff 0%, #096dd9 100%);
+}
+
+/* 阶段总结按钮 */
+.testing-summary-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: var(--bg-color);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.testing-summary-btn:hover {
+  border-color: #1890ff;
+  color: #1890ff;
+  background: rgba(24, 144, 255, 0.06);
+}
+
+.testing-summary-btn:active {
+  background: rgba(24, 144, 255, 0.1);
+}
+
+.testing-summary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+

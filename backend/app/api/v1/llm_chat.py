@@ -18,12 +18,15 @@ from backend.app.services.chat.chat_service import (
     streaming_chat,
     streaming_regenerate,
 )
-from backend.app.services import testing_service
+from backend.app.services.intelligent_testing_service import (
+    create_testing_session,
+)
 from backend.app.services.chat.history_service import (
     get_conversation_history,
     clear_conversation,
     truncate_conversation,
     generate_conversation_title,
+    get_testing_history,
 )
 from backend.app.core.utils import success_response, error_response
 from backend.app.core.logger import logger, trace_id_var
@@ -31,6 +34,153 @@ from backend.app.core.logger import logger, trace_id_var
 
 router = APIRouter(prefix="/llm", tags=["chat"])
 
+
+# ============================================================
+# Agent 分流处理函数
+# ============================================================
+
+async def _handle_intelligent_testing(
+    db: Session, 
+    request: StreamChatRequest, 
+    websocket: WebSocket
+) -> None:
+    """处理需求分析测试助手 (intelligent_testing)
+    
+    特点：
+    - 三阶段工作流（analysis → plan → generate）
+    - 每个阶段有独立的 thread_id
+    - 需要 testing_context 提供项目和需求信息
+    """
+    if not request.testing_context:
+        await websocket.send_text(json.dumps({
+            "type": "error",
+            "error": "需求分析测试助手需要提供测试上下文（项目、需求信息）",
+        }, ensure_ascii=False))
+        return
+    
+    ctx = request.testing_context
+    phase = ctx.phase or "analysis"
+    
+    # session_id 用于关联三个阶段，thread_id 用于当前阶段的对话
+    session_id = ctx.session_id or str(uuid.uuid4())
+    phase_thread_id = f"{session_id}_{phase}"
+    
+    # 如果是新任务（没有 session_id），创建会话记录并生成标题
+    if not ctx.session_id:
+        await create_testing_session(
+            db=db,
+            project_name=ctx.project_name,
+            requirement_id=ctx.requirement_id,
+            requirement_name=ctx.requirement_name,
+            session_id=session_id,
+        )
+        
+        # 立即生成标题：迭代名 - 需求名
+        title_parts = []
+        if ctx.iteration_name:
+            title_parts.append(ctx.iteration_name)
+        if ctx.requirement_name:
+            title_parts.append(ctx.requirement_name)
+        title = " - ".join(title_parts) if title_parts else f"测试任务 {ctx.requirement_id}"
+        title = title[:30]  # 截断
+        
+        # 更新数据库标题
+        conv = db.query(Conversation).filter(Conversation.id == session_id).first()
+        if conv:
+            conv.title = title
+            db.commit()
+        
+        # 发送标题生成消息给前端
+        await websocket.send_text(json.dumps({
+            "type": "title_generated",
+            "title": title,
+            "thread_id": session_id,
+        }, ensure_ascii=False))
+        logger.info(f"[IntelligentTesting] 生成标题: {title}")
+    
+    # 构造阶段上下文
+    agent_context = {
+        "session_id": session_id,
+        "phase": phase,
+        "requirement_id": ctx.requirement_id,
+        "project_name": ctx.project_name,
+        "requirement_name": ctx.requirement_name,
+    }
+    
+    # 调用通用流式对话服务
+    await streaming_chat(
+        db=db,
+        question=request.question,
+        websocket=websocket,
+        thread_id=phase_thread_id,
+        agent_type="intelligent_testing",
+        agent_context=agent_context,
+        attachments=[att.model_dump() for att in (request.attachments or [])],
+    )
+
+
+async def _handle_log_troubleshoot(
+    db: Session, 
+    request: StreamChatRequest, 
+    websocket: WebSocket
+) -> None:
+    """处理日志排查助手 (log_troubleshoot)
+    
+    特点：
+    - 需要 log_query 配置（业务线、私有化集团等）
+    - 配置信息注入到 agent_context 供工具使用
+    """
+    if not request.log_query:
+        await websocket.send_text(json.dumps({
+            "type": "error",
+            "error": "日志排查助手需要选择业务线配置",
+        }, ensure_ascii=False))
+        return
+    
+    # 构造日志查询上下文
+    agent_context = {
+        "log_query": request.log_query.model_dump()
+    }
+    
+    # 调用通用流式对话服务
+    await streaming_chat(
+        db=db,
+        question=request.question,
+        websocket=websocket,
+        thread_id=request.thread_id,
+        agent_type="log_troubleshoot",
+        agent_context=agent_context,
+        attachments=[att.model_dump() for att in (request.attachments or [])],
+    )
+
+
+async def _handle_knowledge_qa(
+    db: Session, 
+    request: StreamChatRequest, 
+    websocket: WebSocket
+) -> None:
+    """处理业务知识助手 (knowledge_qa) 及其他通用 Agent
+    
+    特点：
+    - 基于知识图谱的问答
+    - 支持多轮对话
+    - 无需额外配置上下文
+    """
+    # 调用通用流式对话服务
+    await streaming_chat(
+        db=db,
+        question=request.question,
+        websocket=websocket,
+        thread_id=request.thread_id,
+        agent_type=request.agent_type,
+        agent_context=None,
+        attachments=[att.model_dump() for att in (request.attachments or [])],
+    )
+
+
+# ============================================================
+# WebSocket 路由
+# ============================================================
 
 @router.websocket("/chat/ws")
 async def websocket_chat(websocket: WebSocket):
@@ -81,61 +231,20 @@ async def websocket_chat(websocket: WebSocket):
             return
         
         # ===== 根据 agent_type 分流处理 =====
+        # 每个 Agent 有独立的处理分支，便于维护和扩展
         
-        # 1. 智能测试助手 - 使用专用的三阶段状态机
+        # ----- 分支 1: 需求分析测试助手 (intelligent_testing) -----
         if request.agent_type == "intelligent_testing":
-            if not request.testing_context:
-                await websocket.send_text(json.dumps({
-                    "type": "error",
-                    "error": "智能测试助手需要提供测试上下文（项目、需求信息）",
-                }, ensure_ascii=False))
-                return
-            
-            # 创建或获取会话 ID
-            session_id = request.thread_id or str(uuid.uuid4())
-            
-            # 如果是新会话，先创建会话记录
-            if not request.thread_id:
-                await testing_service.create_testing_session(
-                    db=db,
-                    project_name=request.testing_context.project_name,
-                    requirement_id=request.testing_context.requirement_id,
-                    requirement_name=request.testing_context.requirement_name,
-                    session_id=session_id,
-                )
-            
-            # 执行测试工作流
-            await testing_service.run_testing_workflow(
-                db=db,
-                session_id=session_id,
-                requirement_id=request.testing_context.requirement_id,
-                project_name=request.testing_context.project_name,
-                requirement_name=request.testing_context.requirement_name,
-                websocket=websocket,
-            )
+            await _handle_intelligent_testing(db, request, websocket)
             return
         
-        # 2. 日志排查助手 - 需要 log_query 上下文
-        agent_context = None
+        # ----- 分支 2: 日志排查助手 (log_troubleshoot) -----
         if request.agent_type == "log_troubleshoot":
-            if not request.log_query:
-                await websocket.send_text(json.dumps({
-                    "type": "error",
-                    "error": "日志排查 Agent 需要选择业务线配置",
-                }, ensure_ascii=False))
-                return
-            agent_context = {"log_query": request.log_query.model_dump()}
+            await _handle_log_troubleshoot(db, request, websocket)
+            return
         
-        # 3. 业务知识助手 (knowledge_qa) 和其他 Agent - 走通用流程
-        await streaming_chat(
-            db=db,
-            question=request.question,
-            websocket=websocket,
-            thread_id=request.thread_id,
-            agent_type=request.agent_type,
-            agent_context=agent_context,
-            attachments=[att.model_dump() for att in (request.attachments or [])],
-        )
+        # ----- 分支 3: 业务知识助手 (knowledge_qa) 及其他 Agent -----
+        await _handle_knowledge_qa(db, request, websocket)
         
     except WebSocketDisconnect:
         logger.info("WebSocket 连接断开 - 知识图谱问答")
@@ -198,6 +307,29 @@ async def delete_conversation(thread_id: str, db: Session = Depends(get_db)):
 async def get_conversation(thread_id: str):
     messages = await get_conversation_history(thread_id)
     return ConversationHistoryResponse(thread_id=thread_id, messages=messages)
+
+
+@router.get("/conversation/{session_id}/testing")
+async def get_testing_conversation(session_id: str, db: Session = Depends(get_db)):
+    """获取智能测试会话的完整历史
+    
+    合并三个阶段的消息，并返回任务面板状态数据。
+    专门用于 intelligent_testing agent 的历史恢复。
+    
+    Returns:
+        {
+            "thread_id": session_id,
+            "messages": [...],
+            "phases": {...},
+            "current_phase": "...",
+            "status": "..."
+        }
+    """
+    result = await get_testing_history(session_id, db)
+    return {
+        "thread_id": session_id,
+        **result
+    }
 
 
 @router.post("/conversation/{thread_id}/title")
@@ -300,3 +432,111 @@ async def get_log_query_options():
         "businessLines": [{"value": bl.value, "label": bl.value} for bl in BusinessLine],
         "privateServers": [{"value": ps.value, "label": ps.value} for ps in PrivateServer],
     })
+
+
+# ============================================================
+# 测试助手阶段管理 API
+# ============================================================
+
+@router.get("/testing/{session_id}/status")
+async def get_testing_session_status(session_id: str, db: Session = Depends(get_db)):
+    """获取测试任务状态
+    
+    返回各阶段的解锁状态和摘要信息。
+    """
+    from backend.app.models.chat import TestSessionAnalysis
+    
+    # 获取会话信息
+    conv = db.query(Conversation).filter(Conversation.id == session_id).first()
+    if not conv:
+        return error_response(message="会话不存在")
+    
+    # 获取各阶段摘要
+    summaries = db.query(TestSessionAnalysis).filter(
+        TestSessionAnalysis.session_id == session_id
+    ).all()
+    
+    summary_map = {s.analysis_type: s.content for s in summaries}
+    
+    # 判断阶段解锁状态
+    analysis_unlocked = True  # 阶段1永远解锁
+    plan_unlocked = "requirement_summary" in summary_map
+    generate_unlocked = "test_plan" in summary_map
+    
+    return success_response(data={
+        "session_id": session_id,
+        "status": conv.status,
+        "current_phase": conv.current_phase,
+        "phases": {
+            "analysis": {
+                "unlocked": analysis_unlocked,
+                "has_summary": "requirement_summary" in summary_map,
+                "thread_id": f"{session_id}_analysis",
+            },
+            "plan": {
+                "unlocked": plan_unlocked,
+                "has_summary": "test_plan" in summary_map,
+                "thread_id": f"{session_id}_plan",
+            },
+            "generate": {
+                "unlocked": generate_unlocked,
+                "has_summary": "test_cases" in summary_map,
+                "thread_id": f"{session_id}_generate",
+            },
+        },
+        # 需求信息（用于前端锁定选择器显示）
+        "requirement_id": conv.requirement_id,
+        "requirement_name": conv.requirement_name,
+        "project_name": conv.project_name,
+    })
+
+
+@router.post("/testing/{session_id}/clear-subsequent")
+async def clear_subsequent_phases(
+    session_id: str, 
+    from_phase: str = Body(..., embed=True),
+    db: Session = Depends(get_db)
+):
+    """清空指定阶段之后的所有内容
+    
+    当用户修改前序阶段时调用，清空后续阶段的摘要和对话。
+    
+    Args:
+        session_id: 任务 ID
+        from_phase: 从哪个阶段开始清空（不包括该阶段）
+    """
+    from backend.app.models.chat import TestSessionAnalysis
+    from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
+    
+    phase_order = ["analysis", "plan", "generate"]
+    try:
+        start_index = phase_order.index(from_phase) + 1
+    except ValueError:
+        return error_response(message=f"无效的阶段: {from_phase}")
+    
+    phases_to_clear = phase_order[start_index:]
+    
+    if not phases_to_clear:
+        return success_response(message="没有需要清空的阶段")
+    
+    # 清空摘要
+    analysis_types_to_clear = []
+    if "plan" in phases_to_clear:
+        analysis_types_to_clear.append("test_plan")
+    if "generate" in phases_to_clear:
+        analysis_types_to_clear.append("test_cases")
+    
+    if analysis_types_to_clear:
+        db.query(TestSessionAnalysis).filter(
+            TestSessionAnalysis.session_id == session_id,
+            TestSessionAnalysis.analysis_type.in_(analysis_types_to_clear)
+        ).delete(synchronize_session=False)
+        db.commit()
+    
+    # TODO: 清空对话历史（需要操作 llm_checkpoints.db）
+    # 这部分可以后续实现，目前只清空摘要
+    
+    return success_response(
+        message=f"已清空阶段: {', '.join(phases_to_clear)}",
+        data={"cleared_phases": phases_to_clear}
+    )

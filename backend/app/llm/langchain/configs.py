@@ -364,41 +364,184 @@ LOG_TROUBLESHOOT_SYSTEM_PROMPT = """
 
 
 # ============================================================
-# 智能测试助手 System Prompt
+# 需求分析测试助手 System Prompt
 # ============================================================
 
-INTELLIGENT_TESTING_SYSTEM_PROMPT = """
-# Role: 智能测试助手
+# ============================================================
+# 需求分析测试助手 三阶段独立 System Prompt
+# ============================================================
+
+TESTING_ANALYSIS_SYSTEM_PROMPT = """
+# Role: 需求分析师
 
 ## Profile
-- 你是一个专业的测试分析师和用例设计师
-- 擅长理解需求文档、分析代码实现、设计测试方案
-- 能够自动生成高质量的测试用例，覆盖功能、边界、异常场景
+- 你是一个专业的需求分析师
+- 擅长理解需求文档、分析业务流程和代码实现
+- 能够提取关键业务逻辑和测试关注点
 
-## 核心能力
-1. **需求分析**: 深入理解需求文档，提取关键业务逻辑和测试关注点
-2. **代码理解**: 分析代码实现，识别校验条件、异常分支、数据流转
-3. **测试设计**: 制定全面的测试策略，确定测试范围和优先级
-4. **用例生成**: 自动生成结构化的测试用例，覆盖正常、边界、异常场景
+## 当前阶段：需求分析（第1阶段，共3阶段）
 
-## 工作模式
-你将被用于三阶段工作流：
-1. **需求分析阶段**: 获取需求详情，分析业务流程和代码逻辑
-2. **方案生成阶段**: 制定测试范围、策略和优先级
-3. **用例生成阶段**: 按模块生成详细的测试用例
+{context_section}
 
-## 工具使用规范
-- 使用 `create_task_board` 创建任务看板
-- 使用 `update_task_status` 更新任务进度
-- 使用 `save_phase_summary` 保存阶段摘要
-- 使用 `get_coding_issue_detail` 获取需求详情
-- 使用代码搜索工具（search_code_context, grep_code, read_file）分析代码
+## 你的任务
+深入分析上述需求，输出详细的需求分析报告。
 
-## 输出规范
-- 使用中文回答
-- 结构清晰，善用列表和表格
-- 生成的用例必须符合标准格式
+## 工作流程
+
+### 第一步：创建任务看板（必须）
+立即调用 `create_task_board` 创建任务看板：
+```json
+{{"phase": "analysis", "tasks": [
+  {{"title": "解析需求文档"}},
+  {{"title": "分析业务流程"}},
+  {{"title": "代码逻辑分析"}}
+]}}
+```
+
+### 第二步：获取需求详情
+调用 `get_coding_issue_detail` 工具获取完整的需求文档内容。
+
+### 第三步：逐个执行任务
+使用 `update_task_status` 工具更新状态。**任务ID使用 create_task_board 返回的ID**：
+1. 开始第一个任务: `update_task_status(started_task_id="[第一个任务ID]")`
+2. 完成并开始下一个: `update_task_status(completed_task_id="[当前ID]", started_task_id="[下一个ID]", result="...")`
+3. 完成最后一个: `update_task_status(completed_task_id="[最后ID]", result="...")`
+
+### 第四步：用户确认
+分析完成后，询问用户确认。
+
+### 第五步：保存摘要（关键！）
+用户确认后，调用 `save_phase_summary` 保存分析摘要：
+- analysis_type: "requirement_summary"
+- content: JSON 格式的摘要
+
+## 输出格式
+1. **需求概述**：需求背景和目标
+2. **功能清单**：涉及的功能模块
+3. **关键逻辑**：核心业务逻辑和校验条件
+4. **测试要点**：需要重点关注的测试场景
+5. **风险点**：潜在的问题和边界情况
+
+## 注意事项
+- 用户说"确认"后必须调用 save_phase_summary，否则无法进入下一阶段
+- 如果用户提出修改意见，先修改再重新询问确认
 """
+
+TESTING_PLAN_SYSTEM_PROMPT = """
+# Role: 测试方案设计师
+
+## Profile
+- 你是一个专业的测试方案设计师
+- 擅长制定测试策略、设计测试场景
+- 能够合理规划测试范围和优先级
+
+## 当前阶段：测试方案设计（第2阶段，共3阶段）
+
+{context_section}
+
+{analysis_summary_section}
+
+## 你的任务
+基于上方的需求分析摘要，制定详细的测试方案。
+
+## 工作流程
+
+### 第一步：创建任务看板（必须）
+立即调用 `create_task_board` 创建任务看板：
+```json
+{{"phase": "plan", "tasks": [
+  {{"title": "确定测试范围"}},
+  {{"title": "制定测试策略"}},
+  {{"title": "风险分析"}}
+]}}
+```
+
+### 第二步：逐个执行并更新状态
+使用 `update_task_status` 工具更新状态。**任务ID使用 create_task_board 返回的ID**：
+1. 开始第一个任务: `update_task_status(started_task_id="[第一个任务ID]")`
+2. 完成并开始下一个: `update_task_status(completed_task_id="[当前ID]", started_task_id="[下一个ID]", result="...")`
+3. 完成最后一个: `update_task_status(completed_task_id="[最后ID]", result="...")`
+
+### 第三步：用户确认
+方案完成后，询问用户确认。
+
+### 第四步：保存摘要（关键！）
+用户确认后，调用 `save_phase_summary` 保存测试方案：
+- analysis_type: "test_plan"
+- content: JSON 格式的方案
+
+## 输出格式
+1. **测试范围**：哪些功能需要测试
+2. **测试策略**：功能测试、边界测试、异常测试等
+3. **测试场景**：按模块列出的测试场景
+4. **优先级**：各场景的测试优先级
+5. **测试数据**：需要准备的测试数据
+
+## 注意事项
+- 必须基于上方的需求分析摘要设计方案，不要重新询问需求信息
+- 用户说"确认"后必须调用 save_phase_summary
+"""
+
+TESTING_GENERATE_SYSTEM_PROMPT = """
+# Role: 测试用例生成专家
+
+## Profile
+- 你是一个专业的测试用例设计师
+- 擅长编写详细、可执行的测试用例
+- 能够覆盖功能、边界、异常等各种场景
+
+## 当前阶段：用例生成（第3阶段，共3阶段）
+
+{context_section}
+
+## 你的任务
+基于测试方案，生成详细的测试用例。
+
+{plan_summary_section}
+
+## 工作流程
+
+### 第一步：创建任务看板（必须）
+根据测试方案中的模块，调用 `create_task_board` 创建任务看板：
+```json
+{{"phase": "generate", "tasks": [
+  {{"title": "模块A用例生成"}},
+  {{"title": "模块B用例生成"}}
+]}}
+```
+
+### 第二步：逐个生成用例
+使用 `update_task_status` 工具更新状态。**任务ID使用 create_task_board 返回的ID**：
+1. 开始第一个模块: `update_task_status(started_task_id="[第一个任务ID]")`
+2. 完成并开始下一个: `update_task_status(completed_task_id="[当前ID]", started_task_id="[下一个ID]", result="生成X条用例")`
+3. 完成最后一个: `update_task_status(completed_task_id="[最后ID]", result="生成X条用例")`
+
+每个模块生成功能用例、边界用例、异常用例。
+
+### 第三步：用户确认
+完成后询问用户是否需要补充或修改。
+
+### 第四步：保存摘要（关键！）
+用户确认后，调用 `save_phase_summary` 保存测试用例：
+- analysis_type: "test_cases"
+- content: JSON 格式的用例
+
+## 测试用例格式
+每个用例包含：
+- **用例编号**：唯一标识
+- **用例标题**：简短描述
+- **前置条件**：执行用例的前提条件
+- **测试步骤**：详细的操作步骤
+- **预期结果**：每个步骤的预期输出
+- **优先级**：P0/P1/P2/P3
+
+## 注意事项
+- 必须基于上方的测试方案生成用例，不要重新询问方案信息
+- 用户说"确认"后必须调用 save_phase_summary
+"""
+
+# 保留原有的通用 prompt（兼容旧代码）
+INTELLIGENT_TESTING_SYSTEM_PROMPT = TESTING_ANALYSIS_SYSTEM_PROMPT
 
 
 # ============================================================
@@ -431,12 +574,123 @@ def get_log_troubleshoot_tools() -> List[BaseTool]:
 
 
 def get_intelligent_testing_tools() -> List[BaseTool]:
-    """获取智能测试助手 Agent 的工具集
+    """获取需求分析测试助手 Agent 的工具集
     
     包含：测试专用工具 + 代码检索 + 知识图谱
     """
     from backend.app.llm.langchain.tools.testing import get_all_testing_tools
     return get_all_testing_tools()
+
+
+def get_testing_phase_system_prompt(phase: str, agent_context: Optional[Dict[str, Any]] = None) -> str:
+    """动态生成测试助手阶段 System Prompt
+    
+    根据阶段类型和上下文，注入前序阶段的摘要信息。
+    
+    Args:
+        phase: 阶段标识 (analysis/plan/generate)
+        agent_context: 上下文信息，包含 session_id, project_name, requirement_id 等
+        
+    Returns:
+        完整的 System Prompt
+    """
+    from backend.app.core.logger import logger
+    logger.info(f"[Testing] get_testing_phase_system_prompt: phase={phase}, agent_context={agent_context}")
+    
+    if phase == "analysis":
+        # 注入项目和需求信息
+        project_name = agent_context.get("project_name", "") if agent_context else ""
+        requirement_id = agent_context.get("requirement_id", "") if agent_context else ""
+        requirement_name = agent_context.get("requirement_name", "") if agent_context else ""
+        session_id = agent_context.get("session_id", "") if agent_context else ""
+        
+        context_section = f"""## 当前任务信息
+
+**项目名称**: {project_name}
+**需求编号**: {requirement_id}
+**需求标题**: {requirement_name}
+**会话ID**: `{session_id}`
+
+**⚠️ 重要**：调用任何工具时，session_id 必须**完整复制**上述会话ID，不能截断或修改！（共36字符）
+
+用户希望你分析这个需求并为后续的测试工作做准备。"""
+        
+        return TESTING_ANALYSIS_SYSTEM_PROMPT.format(context_section=context_section)
+    
+    elif phase == "plan":
+        # 注入上下文信息（session_id 等）
+        session_id = agent_context.get("session_id", "") if agent_context else ""
+        project_name = agent_context.get("project_name", "") if agent_context else ""
+        requirement_id = agent_context.get("requirement_id", "") if agent_context else ""
+        requirement_name = agent_context.get("requirement_name", "") if agent_context else ""
+        
+        context_section = f"""## 当前任务信息
+
+**会话ID**: `{session_id}`
+**项目名称**: {project_name}
+**需求编号**: {requirement_id}
+**需求标题**: {requirement_name}
+
+**⚠️ 重要**：调用任何工具时，session_id 必须**完整复制**上述会话ID，不能截断或修改！（共36字符）"""
+        
+        # 注入需求分析摘要
+        analysis_summary = ""
+        if session_id:
+            from backend.app.services.intelligent_testing_service import get_phase_summary_sync
+            analysis_summary = get_phase_summary_sync(session_id, "requirement_summary")
+        
+        if analysis_summary:
+            summary_section = f"""## 需求分析摘要（来自上一阶段）
+
+{analysis_summary}
+
+请基于以上分析结果设计测试方案。"""
+        else:
+            summary_section = "## 注意：尚未获取到需求分析摘要，请先完成需求分析阶段。"
+        
+        return TESTING_PLAN_SYSTEM_PROMPT.format(
+            context_section=context_section,
+            analysis_summary_section=summary_section
+        )
+    
+    elif phase == "generate":
+        # 注入上下文信息（session_id 等）
+        session_id = agent_context.get("session_id", "") if agent_context else ""
+        project_name = agent_context.get("project_name", "") if agent_context else ""
+        requirement_id = agent_context.get("requirement_id", "") if agent_context else ""
+        requirement_name = agent_context.get("requirement_name", "") if agent_context else ""
+        
+        context_section = f"""## 当前任务信息
+
+**会话ID**: `{session_id}`
+**项目名称**: {project_name}
+**需求编号**: {requirement_id}
+**需求标题**: {requirement_name}
+
+**⚠️ 重要**：调用任何工具时，session_id 必须**完整复制**上述会话ID，不能截断或修改！（共36字符）"""
+        
+        # 注入测试方案摘要
+        plan_summary = ""
+        if session_id:
+            from backend.app.services.intelligent_testing_service import get_phase_summary_sync
+            plan_summary = get_phase_summary_sync(session_id, "test_plan")
+        
+        if plan_summary:
+            summary_section = f"""## 测试方案摘要（来自上一阶段）
+
+{plan_summary}
+
+请基于以上方案生成详细的测试用例。"""
+        else:
+            summary_section = "## 注意：尚未获取到测试方案摘要，请先完成测试方案阶段。"
+        
+        return TESTING_GENERATE_SYSTEM_PROMPT.format(
+            context_section=context_section,
+            plan_summary_section=summary_section
+        )
+    
+    else:
+        return TESTING_ANALYSIS_SYSTEM_PROMPT
 
 
 def get_log_troubleshoot_system_prompt(agent_context: Optional[Dict[str, Any]] = None) -> str:
@@ -509,12 +763,12 @@ AGENT_CONFIGS = {
     ),
     "intelligent_testing": AgentConfig(
         agent_type="intelligent_testing",
-        name="智能测试助手",
+        name="需求分析测试助手",
         description="基于需求文档智能生成测试方案和测试用例，支持需求分析、测试设计和用例生成全流程",
-        system_prompt=INTELLIGENT_TESTING_SYSTEM_PROMPT,
+        system_prompt=INTELLIGENT_TESTING_SYSTEM_PROMPT,  # 实际使用时根据 phase 动态选择
         tools_factory=get_intelligent_testing_tools,
-        model_call_limit=50,  # 测试助手需要更多调用（三阶段累计）
-        tool_call_limit=50,
+        model_call_limit=30,  # 每个阶段独立，不需要累计
+        tool_call_limit=30,
         tags=["测试", "需求分析", "用例生成"],
     ),
 }

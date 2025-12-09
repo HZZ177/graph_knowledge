@@ -140,11 +140,10 @@ def get_log_troubleshoot_tools():
     ]
 
 
-# 测试工具
+# 测试工具（transition_phase 已删除，阶段切换由编排器控制）
 from .testing import (
     create_task_board,
     update_task_status,
-    transition_phase,
     save_phase_summary,
     get_phase_summary,
     get_coding_issue_detail,
@@ -177,10 +176,9 @@ __all__ = [
     "search_logs",
     "get_table_schema",
     "query_database",
-    # 测试工具
+    # 测试工具（transition_phase 已删除）
     "create_task_board",
     "update_task_status",
-    "transition_phase",
     "save_phase_summary",
     "get_phase_summary",
     "get_coding_issue_detail",

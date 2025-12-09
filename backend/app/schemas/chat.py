@@ -55,8 +55,11 @@ class LogQueryContext(BaseModel):
 class TestingContext(BaseModel):
     """测试助手上下文（智能测试 Agent 专用）"""
     project_name: str  # Coding 项目名称
+    iteration_name: Optional[str] = None  # 迭代名称
     requirement_id: str  # 需求编号
     requirement_name: str  # 需求标题
+    phase: str = "analysis"  # 当前阶段: analysis/plan/generate
+    session_id: Optional[str] = None  # 任务 ID（三个阶段共享）
 
 
 class StreamChatRequest(BaseModel):

@@ -48,7 +48,7 @@ export interface ToolCallInfo {
 
 /** WebSocket 消息类型 */
 export interface ChatStreamMessage {
-  type: 'start' | 'stream' | 'tool_start' | 'tool_end' | 'phase_changed' | 'result' | 'error'
+  type: 'start' | 'stream' | 'tool_start' | 'tool_end' | 'phase_changed' | 'phase_completed' | 'title_generated' | 'result' | 'error'
   // start 消息
   request_id?: string
   thread_id?: string
@@ -67,6 +67,8 @@ export interface ChatStreamMessage {
   elapsed?: number         // 耗时（秒）
   // phase_changed 消息（智能测试 Agent 专用）
   phase?: string           // 阶段名称，如 "analysis" | "plan" | "generate" | "completed"
+  // title_generated 消息（智能测试 Agent 专用）
+  title?: string           // 生成的会话标题
   // result 消息
   tool_calls?: ToolCallInfo[]
   // error 消息
@@ -91,6 +93,10 @@ export interface ChatCallbacks {
   onToolEnd?: (toolName: string, inputSummary: string, outputSummary: string, elapsed: number, toolId?: number, batch?: BatchInfo) => void
   /** 阶段切换（智能测试 Agent 专用）*/
   onPhaseChanged?: (phase: string) => void
+  /** 阶段完成（智能测试 Agent 专用）*/
+  onPhaseCompleted?: (phase: string) => void
+  /** 标题生成（智能测试 Agent 专用）*/
+  onTitleGenerated?: (title: string, threadId: string) => void
   /** 最终结果 */
   onResult?: (content: string, threadId: string, toolCalls: ToolCallInfo[]) => void
   /** 错误 */
@@ -221,6 +227,14 @@ export class ChatClient {
       
       case 'phase_changed':
         this.callbacks.onPhaseChanged?.(message.phase || '')
+        break
+      
+      case 'phase_completed':
+        this.callbacks.onPhaseCompleted?.(message.phase || '')
+        break
+      
+      case 'title_generated':
+        this.callbacks.onTitleGenerated?.(message.title || '', message.thread_id || '')
         break
         
       case 'result':
@@ -376,6 +390,43 @@ export async function fetchConversationHistory(threadId: string): Promise<ChatMe
   return data.messages || []
 }
 
+/** 任务状态 */
+export interface TaskInfo {
+  id: string
+  title: string
+  scope?: string
+  status: 'pending' | 'in_progress' | 'completed' | 'failed' | 'skipped'
+  progress: number
+  result?: string
+}
+
+/** 智能测试历史响应类型 */
+export interface TestingHistoryResponse {
+  thread_id: string
+  messages: ChatMessage[]
+  phases: {
+    analysis: { completed: boolean; thread_id: string | null }
+    plan: { completed: boolean; thread_id: string | null }
+    generate: { completed: boolean; thread_id: string | null }
+  }
+  current_phase: string | null
+  status: string | null
+  task_history: {
+    analysis: TaskInfo[]
+    plan: TaskInfo[]
+    generate: TaskInfo[]
+  }
+}
+
+/** 获取智能测试会话的完整历史（合并三个阶段） */
+export async function fetchTestingHistory(sessionId: string): Promise<TestingHistoryResponse> {
+  const resp = await fetch(`${HTTP_BASE_PATH}/conversation/${encodeURIComponent(sessionId)}/testing`)
+  if (!resp.ok) {
+    throw new Error(`获取测试会话历史失败: ${resp.status}`)
+  }
+  return await resp.json() as TestingHistoryResponse
+}
+
 export async function generateConversationTitle(threadId: string): Promise<string> {
   const resp = await fetch(`${HTTP_BASE_PATH}/conversation/${encodeURIComponent(threadId)}/title`, {
     method: 'POST',
@@ -426,4 +477,55 @@ export async function fetchLogQueryOptions(): Promise<LogQueryOptions> {
   if (!resp.ok) throw new Error('获取日志查询配置失败')
   const result = await resp.json()
   return result.data
+}
+
+// ============================================================
+// 测试助手阶段管理 API
+// ============================================================
+
+/** 测试任务阶段状态 */
+export interface TestingPhaseStatus {
+  unlocked: boolean
+  has_summary: boolean
+  thread_id: string
+}
+
+/** 测试任务状态响应 */
+export interface TestingSessionStatus {
+  session_id: string
+  status: string | null
+  current_phase: string | null
+  phases: {
+    analysis: TestingPhaseStatus
+    plan: TestingPhaseStatus
+    generate: TestingPhaseStatus
+  }
+  // 需求信息（用于锁定选择器显示）
+  requirement_id: string | null
+  requirement_name: string | null
+  project_name: string | null
+}
+
+/**
+ * 获取测试任务状态
+ */
+export async function fetchTestingSessionStatus(sessionId: string): Promise<TestingSessionStatus> {
+  const resp = await fetch(`${HTTP_BASE_PATH}/testing/${encodeURIComponent(sessionId)}/status`)
+  if (!resp.ok) throw new Error('获取测试任务状态失败')
+  const result = await resp.json()
+  return result.data
+}
+
+/**
+ * 清空指定阶段之后的所有内容
+ */
+export async function clearSubsequentPhases(sessionId: string, fromPhase: string): Promise<string[]> {
+  const resp = await fetch(`${HTTP_BASE_PATH}/testing/${encodeURIComponent(sessionId)}/clear-subsequent`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from_phase: fromPhase }),
+  })
+  if (!resp.ok) throw new Error('清空后续阶段失败')
+  const result = await resp.json()
+  return result.data?.cleared_phases || []
 }

@@ -6,7 +6,6 @@ import ResourceLibraryPage from './pages/ResourceLibraryPage'
 import BusinessLibraryPage from './pages/BusinessLibraryPage'
 import LLMModelManagePage from './pages/LLMModelManagePage'
 import ChatPage from './pages/ChatPage'
-import TestingPage from './pages/TestingPage'
 
 const router = createBrowserRouter(
   [
@@ -21,10 +20,6 @@ const router = createBrowserRouter(
         {
           path: '/chat',
           element: <ChatPage />,
-        },
-        {
-          path: '/testing',
-          element: <TestingPage />,
         },
         {
           path: '/resources',

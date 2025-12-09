@@ -6,8 +6,8 @@
  * - RightTimelinePanel: 右侧时间线
  */
 
-import React from 'react'
-import { Progress, Button, Tooltip } from 'antd'
+import React, { useState } from 'react'
+import { Progress, Button, Tooltip, Modal } from 'antd'
 import {
   CheckCircleOutlined,
   SyncOutlined,
@@ -15,7 +15,9 @@ import {
   CloseCircleOutlined,
   ForwardOutlined,
   PauseCircleOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons'
+import MarkdownPreview from '@uiw/react-markdown-preview'
 import type { Task, Phase, PhaseId, TaskStatus, PhaseStatus } from '../hooks/useTestingTaskBoard'
 
 // ==================== 样式 ====================
@@ -169,6 +171,7 @@ interface LeftTaskPanelProps {
   tasks: Task[]
   currentPhase: PhaseId
   currentPhaseInfo?: Phase
+  phaseSummary?: string  // 当前阶段的摘要内容
   onPause?: () => void
   onSkip?: () => void
 }
@@ -178,13 +181,26 @@ export const LeftTaskPanel: React.FC<LeftTaskPanelProps> = ({
   tasks,
   currentPhase,
   currentPhaseInfo,
+  phaseSummary,
   onPause,
   onSkip,
 }) => {
+  const [summaryModalVisible, setSummaryModalVisible] = useState(false)
+  
   const phaseName = currentPhaseInfo?.name || '需求分析'
   const phaseIndex = currentPhase === 'analysis' ? 1 : currentPhase === 'plan' ? 2 : 3
   const completedCount = tasks.filter(t => t.status === 'completed').length
   const totalCount = tasks.length
+  
+  // 格式化摘要内容显示
+  const formatSummaryContent = (content: string) => {
+    try {
+      const parsed = JSON.parse(content)
+      return '```json\n' + JSON.stringify(parsed, null, 2) + '\n```'
+    } catch {
+      return content
+    }
+  }
 
   return (
     <div style={panelStyles.leftPanel}>
@@ -242,6 +258,18 @@ export const LeftTaskPanel: React.FC<LeftTaskPanelProps> = ({
           size="small"
           strokeColor="#1890ff"
         />
+        {/* 查看阶段总结按钮 */}
+        {phaseSummary && (
+          <Button 
+            block
+            type="default"
+            icon={<FileTextOutlined />}
+            onClick={() => setSummaryModalVisible(true)}
+            style={{ marginTop: 12 }}
+          >
+            查看阶段总结
+          </Button>
+        )}
         {(onPause || onSkip) && (
           <div style={{ marginTop: 12, display: 'flex', gap: 8 }}>
             {onPause && (
@@ -253,6 +281,24 @@ export const LeftTaskPanel: React.FC<LeftTaskPanelProps> = ({
           </div>
         )}
       </div>
+      
+      {/* 阶段总结弹窗 */}
+      <Modal
+        title={`${phaseName}总结`}
+        open={summaryModalVisible}
+        onCancel={() => setSummaryModalVisible(false)}
+        footer={null}
+        width={700}
+        styles={{ body: { maxHeight: '60vh', overflowY: 'auto' } }}
+      >
+        {phaseSummary && (
+          <MarkdownPreview
+            source={formatSummaryContent(phaseSummary)}
+            style={{ background: 'transparent', fontSize: 14 }}
+            wrapperElement={{ "data-color-mode": "light" }}
+          />
+        )}
+      </Modal>
     </div>
   )
 }

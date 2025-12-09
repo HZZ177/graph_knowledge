@@ -1,4 +1,4 @@
-"""智能测试助手工具集
+"""需求分析测试助手工具集
 
 提供测试助手专用的工具函数：
 - 任务管理工具（create_task_board, update_task_status）
@@ -21,123 +21,176 @@ from backend.app.core.logger import logger
 # ============================================================
 
 @tool
-def create_task_board(phase: str, tasks: List[dict]) -> str:
+def create_task_board(session_id: str, phase: str, tasks: List[dict]) -> str:
     """创建任务看板
     
     当开始一个新阶段时，调用此工具创建该阶段的任务列表。
     前端会监听此工具的 tool_start 事件，从 tool_input 中获取任务列表并展示。
+    任务会被持久化到数据库，支持历史恢复。
+    
+    **重要**：session_id 必须完整复制，不能截断！格式为 UUID（36字符）。
     
     Args:
+        session_id: 测试会话 ID（必须是完整的 UUID，36字符）
         phase: 当前阶段 (analysis/plan/generate)
         tasks: 任务列表，每个任务包含:
-            - id: 任务唯一标识 (如 "task_1")
             - title: 任务标题 (如 "解析需求文档")
-            - scope: 任务范围 (如 "requirement", "business", "code")
+            - scope: 任务范围 (可选，如 "requirement", "business", "code")
     
     Returns:
-        确认消息
+        确认消息，包含生成的任务 ID 映射
     
     Example:
         create_task_board(
+            session_id="571c124c-953f-43dd-a4c7-64eb578c7176",  # 完整36字符UUID
             phase="analysis",
             tasks=[
-                {"id": "task_1", "title": "解析需求文档", "scope": "requirement"},
-                {"id": "task_2", "title": "分析业务流程: 月卡开通", "scope": "business"},
-                {"id": "task_3", "title": "代码逻辑分析: MonthCardService", "scope": "code"}
+                {"title": "解析需求文档", "scope": "requirement"},
+                {"title": "分析业务流程", "scope": "business"},
+                {"title": "代码逻辑分析", "scope": "code"}
             ]
         )
     """
-    logger.info(f"[Testing] 创建任务看板: phase={phase}, tasks={len(tasks)}")
-    return f"任务看板已创建，阶段: {phase}，共 {len(tasks)} 个任务"
+    from backend.app.db.sqlite import SessionLocal
+    from backend.app.models.chat import TestSessionTask
+    
+    # 验证 session_id 格式
+    try:
+        uuid.UUID(session_id)
+    except ValueError:
+        error_msg = f"错误：session_id 格式不正确！你传递的是 '{session_id}'（{len(session_id)}字符），但有效的 UUID 应该是36字符。请使用完整的会话ID重新调用此工具。"
+        logger.error(f"[Testing] {error_msg}")
+        return error_msg
+    
+    # 为每个任务生成唯一 ID
+    task_id_map = {}
+    for i, task in enumerate(tasks):
+        if 'id' not in task or not task['id']:
+            task['id'] = f"{phase}_{str(uuid.uuid4())[:8]}"
+        task_id_map[task['title']] = task['id']
+    
+    logger.info(f"[Testing] 创建任务看板: session={session_id}, phase={phase}, tasks={len(tasks)}, ids={list(task_id_map.values())}")
+    
+    # 入库任务
+    db = SessionLocal()
+    try:
+        # 先删除该阶段的旧任务（支持重新生成）
+        db.query(TestSessionTask).filter(
+            TestSessionTask.session_id == session_id,
+            TestSessionTask.phase == phase
+        ).delete(synchronize_session=False)
+        
+        # 插入新任务
+        for i, task in enumerate(tasks):
+            db_task = TestSessionTask(
+                id=task['id'],
+                session_id=session_id,
+                phase=phase,
+                title=task.get('title', ''),
+                scope=task.get('scope'),
+                status='pending',
+                progress=0,
+                sort_order=i,
+            )
+            db.add(db_task)
+        
+        db.commit()
+        logger.info(f"[Testing] 任务入库成功: session={session_id}, phase={phase}, count={len(tasks)}")
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Testing] 任务入库失败: {e}")
+    finally:
+        db.close()
+    
+    # 返回任务 ID 映射，方便 AI 后续更新任务状态
+    id_list = [f"- {title}: {tid}" for title, tid in task_id_map.items()]
+    return f"任务看板已创建，阶段: {phase}，共 {len(tasks)} 个任务。\n\n任务ID映射（更新状态时使用）:\n" + "\n".join(id_list)
 
 
 @tool
 def update_task_status(
-    task_id: str, 
-    status: str, 
-    progress: int = 0, 
+    completed_task_id: str = "", 
+    started_task_id: str = "",
     result: str = ""
 ) -> str:
-    """更新任务状态
+    """更新任务状态（支持同时完成一个任务并开始另一个任务）
     
-    更新指定任务的执行状态。前端会监听此工具的事件，更新对应任务的 UI 状态。
+    可以在一次调用中同时：
+    1. 将某个任务标记为已完成
+    2. 将另一个任务标记为进行中
+    
+    这样可以减少工具调用次数。两个参数都是可选的。
     
     Args:
-        task_id: 任务ID (如 "task_1")
-        status: 任务状态，可选值:
-            - in_progress: 进行中
-            - completed: 已完成
-            - failed: 失败
-            - skipped: 跳过
-        progress: 进度百分比 (0-100)，仅 in_progress 状态有效
-        result: 任务结果摘要，用于展示任务完成后的关键信息
+        completed_task_id: 刚完成的任务ID（可为空）
+        started_task_id: 开始执行的任务ID（可为空）
+        result: 完成任务的结果摘要
     
     Returns:
         确认消息
     
     Example:
-        # 开始任务
-        update_task_status(task_id="task_1", status="in_progress", progress=0)
+        # 任务ID由 create_task_board 返回，格式为 {phase}_{uuid[:8]}
+        # 例如: analysis_abc12345, plan_def67890
         
-        # 更新进度
-        update_task_status(task_id="task_1", status="in_progress", progress=50)
+        # 开始第一个任务
+        update_task_status(started_task_id="analysis_abc12345")
         
-        # 完成任务
-        update_task_status(task_id="task_1", status="completed", result="提取5个功能点")
-    """
-    logger.info(f"[Testing] 更新任务状态: task_id={task_id}, status={status}, progress={progress}")
-    return f"任务 {task_id} 状态已更新为 {status}"
-
-
-@tool
-def transition_phase(
-    session_id: str,
-    from_phase: str,
-    to_phase: str,
-    summary: str = ""
-) -> str:
-    """切换工作流阶段
-    
-    当一个阶段完成时，调用此工具标记阶段切换。前端会更新时间线 UI。
-    
-    **重要：切换阶段前必须先调用 save_phase_summary 保存摘要！**
-    
-    Args:
-        session_id: 测试会话 ID
-        from_phase: 当前阶段 (analysis/plan/generate)
-        to_phase: 目标阶段 (plan/generate/completed)
-        summary: 阶段完成摘要
-    
-    Returns:
-        确认消息，或错误消息（如果摘要未保存）
+        # 完成任务1，开始任务2
+        update_task_status(completed_task_id="analysis_abc12345", started_task_id="analysis_def67890", result="提取5个功能点")
+        
+        # 完成最后一个任务
+        update_task_status(completed_task_id="analysis_ghi11111", result="完成代码分析")
     """
     from backend.app.db.sqlite import SessionLocal
-    from backend.app.models.chat import TestSessionAnalysis
+    from backend.app.models.chat import TestSessionTask
     
-    # 检查摘要是否已保存
-    phase_to_summary_type = {
-        "analysis": "requirement_summary",
-        "plan": "test_plan",
-        "generate": "test_cases",
-    }
+    logger.info(f"[Testing] 更新任务状态: completed={completed_task_id}, started={started_task_id}")
     
-    expected_summary_type = phase_to_summary_type.get(from_phase)
-    if expected_summary_type:
-        db = SessionLocal()
-        try:
-            record = db.query(TestSessionAnalysis).filter(
-                TestSessionAnalysis.session_id == session_id,
-                TestSessionAnalysis.analysis_type == expected_summary_type
-            ).first()
-            
-            if not record or not record.content:
-                logger.warning(f"[Testing] 阶段切换被阻止: 摘要未保存! session={session_id}, expected={expected_summary_type}")
-                return f"错误：无法切换阶段！请先调用 save_phase_summary 保存 {expected_summary_type} 摘要。session_id={session_id}"
-        finally:
-            db.close()
+    messages = []
     
-    logger.info(f"[Testing] 阶段切换: {from_phase} -> {to_phase}, session={session_id}")
-    return f"阶段切换完成: {from_phase} -> {to_phase}"
+    db = SessionLocal()
+    try:
+        # 更新完成的任务
+        if completed_task_id:
+            task = db.query(TestSessionTask).filter(TestSessionTask.id == completed_task_id).first()
+            if task:
+                task.status = "completed"
+                task.progress = 100
+                if result:
+                    task.result = result
+                task.updated_at = datetime.now(timezone.utc)
+                messages.append(f"任务 {completed_task_id} 已完成")
+                logger.info(f"[Testing] 任务完成: {completed_task_id}")
+            else:
+                logger.warning(f"[Testing] 任务不存在: {completed_task_id}")
+        
+        # 更新开始的任务
+        if started_task_id:
+            task = db.query(TestSessionTask).filter(TestSessionTask.id == started_task_id).first()
+            if task:
+                task.status = "in_progress"
+                task.progress = 0
+                task.updated_at = datetime.now(timezone.utc)
+                messages.append(f"任务 {started_task_id} 已开始")
+                logger.info(f"[Testing] 任务开始: {started_task_id}")
+            else:
+                logger.warning(f"[Testing] 任务不存在: {started_task_id}")
+        
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"[Testing] 任务状态更新失败: {e}")
+        return f"更新失败: {str(e)}"
+    finally:
+        db.close()
+    
+    return "; ".join(messages) if messages else "无更新"
+
+
+# NOTE: transition_phase 工具已删除
+# 阶段切换现在由 testing_orchestrator.py 编排器控制
+# 前端阶段切换依赖 WebSocket 的 phase_changed 消息，编排器会自动发送
 
 
 # ============================================================
@@ -155,8 +208,10 @@ def save_phase_summary(
     每个阶段结束时，调用此工具将关键信息压缩成结构化摘要存入数据库。
     下个阶段开始时会读取此摘要，避免传递全量历史消息导致 Token 爆炸。
     
+    **重要**：session_id 必须完整复制，不能截断！格式为 UUID（36字符）。
+    
     Args:
-        session_id: 测试会话 ID
+        session_id: 测试会话 ID（必须是完整的 UUID，36字符，如 "571c124c-953f-43dd-a4c7-64eb578c7176"）
         analysis_type: 摘要类型，可选值:
             - requirement_summary: 需求分析摘要（阶段1输出）
             - test_plan: 测试方案（阶段2输出）
@@ -168,7 +223,7 @@ def save_phase_summary(
     
     Example:
         save_phase_summary(
-            session_id="xxx",
+            session_id="571c124c-953f-43dd-a4c7-64eb578c7176",  # 完整36字符UUID
             analysis_type="requirement_summary",
             content=json.dumps({
                 "requirement": {"id": "12345", "title": "月卡开通功能"},
@@ -180,6 +235,14 @@ def save_phase_summary(
     """
     from backend.app.db.sqlite import SessionLocal
     from backend.app.models.chat import TestSessionAnalysis
+    
+    # 验证 session_id 格式
+    try:
+        uuid.UUID(session_id)
+    except ValueError:
+        error_msg = f"错误：session_id 格式不正确！你传递的是 '{session_id}'（{len(session_id)}字符），但有效的 UUID 应该是36字符。请检查并使用完整的会话ID重新调用此工具。"
+        logger.error(f"[Testing] {error_msg}")
+        return error_msg
     
     # 确定阶段
     phase_map = {
@@ -376,11 +439,10 @@ def get_testing_tools_phase1():
     # 基础知识库工具（代码搜索、知识图谱等）
     base_tools = get_all_chat_tools()
     
-    # 测试专用工具
+    # 测试专用工具（不再包含 transition_phase，阶段切换由编排器控制）
     testing_tools = [
         create_task_board,
         update_task_status,
-        transition_phase,
         save_phase_summary,
         get_phase_summary,
         get_coding_issue_detail,
@@ -397,7 +459,6 @@ def get_testing_tools_phase2():
     return [
         create_task_board,
         update_task_status,
-        transition_phase,
         save_phase_summary,
         get_phase_summary,
     ]
@@ -411,7 +472,6 @@ def get_testing_tools_phase3():
     return [
         create_task_board,
         update_task_status,
-        transition_phase,
         save_phase_summary,
         get_phase_summary,
     ]

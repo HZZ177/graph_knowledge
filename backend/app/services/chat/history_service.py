@@ -174,6 +174,19 @@ async def get_thread_history(thread_id: str) -> list:
                     additional_kwargs = getattr(msg, "additional_kwargs", {}) or {}
                     original_attachments = additional_kwargs.get("original_attachments", [])
                     
+                    # 检查是否为系统自动生成的提示消息（不显示给用户）
+                    is_system_prompt = additional_kwargs.get("is_system_prompt", False)
+                    if is_system_prompt:
+                        logger.debug(f"[HistoryService] 跳过系统提示消息: {content[:50]}...")
+                        continue
+                    
+                    # 检查是否有用户原始消息（intelligent_testing 第一阶段）
+                    original_user_message = additional_kwargs.get("original_user_message")
+                    if original_user_message:
+                        logger.debug(f"[HistoryService] 使用用户原始消息: {original_user_message[:50]}...")
+                        result.append({"role": "user", "content": original_user_message})
+                        continue
+                    
                     if original_attachments:
                         # 有原始附件信息，直接使用
                         logger.info(f"[HistoryService] 从 additional_kwargs 恢复 {len(original_attachments)} 个原始附件")
@@ -223,6 +236,125 @@ async def get_thread_history(thread_id: str) -> list:
     except Exception as e:
         logger.error(f"[HistoryService] 获取会话历史失败: {e}")
         return []
+
+
+async def get_testing_history(session_id: str, db) -> dict:
+    """获取智能测试会话的完整历史
+    
+    合并三个阶段的消息，并返回任务面板状态数据。
+    
+    Args:
+        session_id: 会话 ID
+        db: 数据库会话
+        
+    Returns:
+        {
+            "messages": [...],  # 合并后的消息列表
+            "phases": {...},    # 阶段完成状态
+            "task_history": {...},  # 任务历史（从 TestSessionTask 恢复）
+        }
+    """
+    from backend.app.models.chat import Conversation, TestSessionAnalysis, TestSessionTask
+    
+    try:
+        # 1. 获取会话信息
+        conv = db.query(Conversation).filter(
+            Conversation.id == session_id,
+            Conversation.agent_type == "intelligent_testing"
+        ).first()
+        
+        if not conv:
+            logger.warning(f"[HistoryService] 测试会话不存在: {session_id}")
+            return {"messages": [], "phases": {}, "task_history": {}}
+        
+        # 2. 获取阶段摘要，判断阶段完成状态
+        summaries = db.query(TestSessionAnalysis).filter(
+            TestSessionAnalysis.session_id == session_id
+        ).all()
+        summary_types = {s.analysis_type for s in summaries}
+        
+        # 阶段完成状态基于摘要是否存在
+        phases_status = {
+            "analysis": {
+                "completed": "requirement_summary" in summary_types,
+                "thread_id": conv.thread_id_analysis,
+            },
+            "plan": {
+                "completed": "test_plan" in summary_types,
+                "thread_id": conv.thread_id_plan,
+            },
+            "generate": {
+                "completed": "test_cases" in summary_types,
+                "thread_id": conv.thread_id_generate,
+            },
+        }
+        
+        # 3. 按阶段获取消息并合并
+        all_messages = []
+        phase_configs = [
+            ("analysis", conv.thread_id_analysis, "需求分析"),
+            ("plan", conv.thread_id_plan, "方案生成"),
+            ("generate", conv.thread_id_generate, "用例生成"),
+        ]
+        
+        for idx, (phase, thread_id, phase_name) in enumerate(phase_configs, 1):
+            if not thread_id:
+                continue
+            
+            # 获取该阶段的消息
+            phase_messages = await get_thread_history(thread_id)
+            
+            if phase_messages:
+                # 添加阶段分隔符（模拟实时流的效果）
+                divider = f"\n\n{'─' * 20} 🚀 **阶段 {idx}: {phase_name}** {'─' * 20}\n\n"
+                
+                # 将分隔符添加到第一条 AI 消息的开头
+                for msg in phase_messages:
+                    if msg["role"] == "assistant" and msg.get("content"):
+                        msg["content"] = divider + msg["content"]
+                        break
+                
+                all_messages.extend(phase_messages)
+        
+        # 4. 获取任务历史（从 TestSessionTask 表读取）
+        task_records = db.query(TestSessionTask).filter(
+            TestSessionTask.session_id == session_id
+        ).order_by(TestSessionTask.phase, TestSessionTask.sort_order).all()
+        
+        task_history = {
+            "analysis": [],
+            "plan": [],
+            "generate": [],
+        }
+        for task in task_records:
+            task_history[task.phase].append({
+                "id": task.id,
+                "title": task.title,
+                "scope": task.scope,
+                "status": task.status,
+                "progress": task.progress,
+                "result": task.result,
+            })
+        
+        logger.info(f"[HistoryService] 获取测试历史: session={session_id}, "
+                   f"tasks={sum(len(t) for t in task_history.values())}, "
+                   f"phases_completed={[p for p, v in phases_status.items() if v['completed']]}")
+        
+        # 检查当前状态
+        current_phase = conv.current_phase
+        status = conv.status
+        
+        return {
+            "messages": all_messages,
+            "phases": phases_status,
+            "current_phase": current_phase,
+            "status": status,
+            "task_history": task_history,
+        }
+        
+    except Exception as e:
+        logger.error(f"[HistoryService] 获取测试会话历史失败: {e}")
+        return {"messages": [], "phases": {}, "task_history": {}}
 
 
 def _parse_multimodal_content(content) -> tuple:
@@ -515,6 +647,65 @@ AI回复摘要：{ai_summary}
     except Exception as e:
         logger.error(f"[HistoryService] 生成标题失败: {e}")
         return "新对话"
+
+
+async def generate_testing_title(
+    db: Session, 
+    thread_id: str, 
+    requirement_id: str, 
+    requirement_name: str
+) -> str:
+    """为智能测试会话生成标题
+    
+    基于需求信息生成标题，不需要等待对话完成。
+    
+    Args:
+        db: 数据库会话
+        thread_id: 会话 ID
+        requirement_id: 需求编号
+        requirement_name: 需求标题
+        
+    Returns:
+        生成的标题（15字以内）
+    """
+    try:
+        # 调用轻量 LLM 生成标题
+        llm = get_lite_task_llm(db)
+        
+        prompt = f"""请为一个测试用例生成对话生成一个简短的标题（不超过15个字）。
+这是一个根据需求生成测试方案和用例的对话。
+
+需求编号：{requirement_id}
+需求标题：{requirement_name}
+
+要求：
+- 标题应该简洁明了，能体现需求的核心内容
+- 不超过15个字
+- 只返回标题内容，不要包含引号或其他说明
+
+标题："""
+        
+        response = await llm.ainvoke(prompt)
+        title = response.content.strip().replace('"', '').replace('《', '').replace('》', '')
+        
+        # 截断以防万一
+        title = title[:20]
+        
+        # 更新数据库
+        try:
+            conv = db.query(Conversation).filter(Conversation.id == thread_id).first()
+            if conv:
+                conv.title = title
+                db.commit()
+        except Exception as e:
+            logger.error(f"[HistoryService] 保存测试会话标题到数据库失败: {e}")
+            
+        return title
+        
+    except Exception as e:
+        logger.error(f"[HistoryService] 生成测试会话标题失败: {e}")
+        # 降级：使用需求名称的前15个字符
+        return requirement_name[:15] if requirement_name else "测试用例生成"
 
 
 async def save_error_to_history(

@@ -1,12 +1,11 @@
-"""智能测试助手 API
+"""需求分析测试助手 API
 
-提供测试用例生成相关的 REST API 和 WebSocket 端点。
+提供测试会话管理的 REST API。
 """
 
-import json
 from typing import Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -132,92 +131,3 @@ async def get_session_results(
     except Exception as e:
         logger.error(f"[TestingAPI] 获取测试结果失败: {e}")
         return error_response(message=f"获取测试结果失败: {str(e)}")
-
-
-# ============================================================
-# WebSocket 端点
-# ============================================================
-
-@router.websocket("/generate")
-async def testing_generate(
-    websocket: WebSocket,
-    db: Session = Depends(get_db),
-):
-    """测试用例生成 WebSocket 端点
-    
-    客户端连接后发送配置消息，服务端执行三阶段工作流并流式推送进度。
-    
-    客户端消息格式：
-    {
-        "session_id": "xxx",
-        "requirement_id": "12345",
-        "project_name": "yongcepingtaipro2.0"
-    }
-    
-    服务端消息类型：
-    - start: 工作流开始
-    - stream: LLM 流式输出
-    - tool_start: 工具调用开始
-    - tool_end: 工具调用结束
-    - phase_changed: 阶段切换
-    - result: 工作流完成
-    - error: 错误
-    """
-    await websocket.accept()
-    logger.info("[TestingAPI] WebSocket 连接已建立")
-    
-    try:
-        # 接收初始配置
-        config_text = await websocket.receive_text()
-        config = json.loads(config_text)
-        
-        session_id = config.get("session_id")
-        requirement_id = config.get("requirement_id")
-        project_name = config.get("project_name")
-        requirement_name = config.get("requirement_name", "")  # 需求标题
-        
-        if not all([session_id, requirement_id, project_name]):
-            await websocket.send_text(json.dumps({
-                "type": "error",
-                "message": "缺少必要参数: session_id, requirement_id, project_name",
-            }, ensure_ascii=False))
-            await websocket.close()
-            return
-        
-        logger.info(f"[TestingAPI] 开始生成测试用例: session={session_id}, requirement={requirement_id}, name={requirement_name}")
-        
-        # 执行工作流
-        await testing_service.run_testing_workflow(
-            db=db,
-            session_id=session_id,
-            requirement_id=requirement_id,
-            project_name=project_name,
-            requirement_name=requirement_name,
-            websocket=websocket,
-        )
-        
-    except WebSocketDisconnect:
-        logger.info("[TestingAPI] WebSocket 连接断开")
-    except json.JSONDecodeError as e:
-        logger.error(f"[TestingAPI] JSON 解析失败: {e}")
-        try:
-            await websocket.send_text(json.dumps({
-                "type": "error",
-                "message": f"JSON 解析失败: {str(e)}",
-            }, ensure_ascii=False))
-        except:
-            pass
-    except Exception as e:
-        logger.error(f"[TestingAPI] WebSocket 错误: {e}")
-        try:
-            await websocket.send_text(json.dumps({
-                "type": "error",
-                "message": str(e),
-            }, ensure_ascii=False))
-        except:
-            pass
-    finally:
-        try:
-            await websocket.close()
-        except:
-            pass

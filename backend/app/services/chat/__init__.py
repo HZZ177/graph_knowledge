@@ -13,12 +13,15 @@
 from backend.app.services.chat.chat_service import (
     streaming_chat,
     streaming_regenerate,
+    stream_agent_with_events,
 )
 from backend.app.services.chat.history_service import (
     get_conversation_history,
     clear_conversation,
     truncate_conversation,
     generate_conversation_title,
+    generate_testing_title,
+    get_testing_history,
     get_raw_messages,
     replace_assistant_response,
     save_error_to_history,
@@ -38,11 +41,14 @@ __all__ = [
     # 核心服务
     "streaming_chat",
     "streaming_regenerate",
+    "stream_agent_with_events",
     # 历史管理
     "get_conversation_history",
     "clear_conversation",
     "truncate_conversation",
     "generate_conversation_title",
+    "generate_testing_title",
+    "get_testing_history",
     "get_raw_messages",
     "replace_assistant_response",
     "save_error_to_history",

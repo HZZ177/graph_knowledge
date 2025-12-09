@@ -25,6 +25,7 @@ from backend.app.llm.langchain.configs import (
     get_agent_config,
     get_knowledge_qa_system_prompt,
     get_log_troubleshoot_system_prompt,
+    get_testing_phase_system_prompt,
 )
 from backend.app.llm.factory import get_langchain_llm
 from backend.app.services.ai_model_service import AIModelService
@@ -163,6 +164,10 @@ class AgentRegistry:
         elif agent_type == "log_troubleshoot":
             # 日志排查 Agent 需要注入动态上下文
             system_prompt = get_log_troubleshoot_system_prompt(agent_context)
+        elif agent_type == "intelligent_testing":
+            # 测试助手：根据 agent_context.phase 选择阶段 prompt
+            phase = agent_context.get("phase", "analysis") if agent_context else "analysis"
+            system_prompt = get_testing_phase_system_prompt(phase, agent_context)
         else:
             system_prompt = config.system_prompt
         
