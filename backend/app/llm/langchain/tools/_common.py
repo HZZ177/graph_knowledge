@@ -1,14 +1,85 @@
 """工具共享模块
 
 提供实体发现类工具使用的 LLM 选择器等共享功能。
+
+核心组件：
+- extract_keywords: 从用户查询中提取关键词，用于 SQL 预过滤
+- call_selector_llm: 调用轻量模型进行实体精排
+
+优化策略（针对大数据量场景）：
+1. 关键词提取 → SQL LIKE 预过滤（几百条 → 几十条）
+2. 精简候选字段（只传 id + name）
+3. 小模型精排（从几十条中选 Top N）
 """
 
 import json
+import re
 from typing import List
 
 from backend.app.db.sqlite import SessionLocal
 from backend.app.llm.factory import get_lite_task_llm
 from backend.app.core.logger import logger
+
+
+# ============================================================
+# 关键词提取（用于 SQL 预过滤）
+# ============================================================
+
+# 停用词表：这些词对实体匹配没有区分度，过滤掉
+_STOPWORDS = {
+    # 通用停用词
+    '的', '了', '是', '在', '有', '和', '与', '或', '等', '个', '这', '那', '什么', '怎么', '如何',
+    # 实体搜索场景的无效词（用户常说但无区分度）
+    '接口', '流程', '功能', '查询', '获取', '搜索', '查找', '相关', '信息', '数据', '记录',
+    '表', '库', '服务', '系统', '模块', '方法', '函数', '处理', '操作', '业务', '逻辑',
+}
+
+
+def extract_keywords(query: str, max_keywords: int = 5) -> List[str]:
+    """从用户查询中提取关键词
+    
+    用于 SQL LIKE 预过滤，将几百条候选缩减到几十条，再交给小模型精排。
+    
+    策略：
+    1. 按标点符号和空格切分
+    2. 过滤停用词（对实体匹配无区分度的词）
+    3. 过滤太短的词（< 2字符）
+    4. 最多返回 max_keywords 个关键词
+    
+    Args:
+        query: 用户的自然语言查询，如 "月卡开通支付回调"
+        max_keywords: 最多返回的关键词数量
+    
+    Returns:
+        关键词列表，如 ["月卡", "开通", "支付", "回调"]
+    
+    Examples:
+        >>> extract_keywords("月卡开通接口")
+        ['月卡', '开通']
+        >>> extract_keywords("查询用户订单信息")
+        ['用户', '订单']
+    """
+    # 按标点符号和空格切分
+    tokens = re.split(r'[\s,，。、/\-_()（）【】\[\]]+', query)
+    
+    # 过滤：去停用词、去短词、去空串
+    keywords = [
+        token.strip() 
+        for token in tokens 
+        if token.strip() and len(token.strip()) >= 2 and token.strip() not in _STOPWORDS
+    ]
+    
+    # 去重并保持顺序
+    seen = set()
+    unique_keywords = []
+    for kw in keywords:
+        if kw not in seen:
+            seen.add(kw)
+            unique_keywords.append(kw)
+    
+    result = unique_keywords[:max_keywords]
+    logger.debug(f"[extract_keywords] '{query}' → {result}")
+    return result
 
 
 # ============================================================

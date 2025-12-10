@@ -239,13 +239,23 @@ async def websocket_chat(websocket: WebSocket):
             return
         
         # ----- 分支 2: 日志排查助手 (log_troubleshoot) -----
-        if request.agent_type == "log_troubleshoot":
+        elif request.agent_type == "log_troubleshoot":
             await _handle_log_troubleshoot(db, request, websocket)
             return
         
-        # ----- 分支 3: 业务知识助手 (knowledge_qa) 及其他 Agent -----
-        await _handle_knowledge_qa(db, request, websocket)
-        
+        # ----- 分支 3: 业务知识助手 (knowledge_qa) -----
+        elif request.agent_type == "knowledge_qa":
+            await _handle_knowledge_qa(db, request, websocket)
+            return
+
+        # ----- 暂不支持的agent类型 -----
+        else:
+            logger.error(f"暂不支持的agent类型：{request.agent_type}")
+            await websocket.send_text(json.dumps({
+                "type": "error",
+                "error": f"暂不支持的agent类型：{request.agent_type}",
+            }, ensure_ascii=False))
+
     except WebSocketDisconnect:
         logger.info("WebSocket 连接断开 - 知识图谱问答")
     except Exception as e:

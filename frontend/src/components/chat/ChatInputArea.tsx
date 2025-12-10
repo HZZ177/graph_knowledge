@@ -58,7 +58,7 @@ export const ChatInputArea: React.FC<ChatInputAreaProps> = ({
 }) => {
   const isTestingEmpty = currentAgentType === 'intelligent_testing' && messagesLength === 0
   const testingPresetText: Record<string, string> = {
-    analysis: '点击发送按钮开始分析需求',
+    analysis: '开始分析需求',
     plan: '开始生成测试方案',
     generate: '开始生成测试用例',
   }

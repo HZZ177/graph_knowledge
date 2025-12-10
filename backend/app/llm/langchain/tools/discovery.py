@@ -5,6 +5,19 @@
 - search_implementations: 搜索实现/接口
 - search_data_resources: 搜索数据资源
 - search_steps: 搜索业务步骤
+
+## 搜索流程（两阶段筛选）
+
+1. **SQL 预过滤阶段**：
+   - 从用户 query 提取关键词
+   - 用 SQL LIKE 在 name/description 上过滤
+   - 将几百条候选缩减到 ≤50 条
+
+2. **LLM 精排阶段**：
+   - 将预过滤后的候选（精简字段）交给小模型
+   - 小模型根据语义相关性选出 Top N
+
+这种设计解决了大数据量场景下小模型 token 超限的问题。
 """
 
 import json
@@ -12,11 +25,23 @@ from typing import Optional, List
 
 from langchain_core.tools import tool
 from pydantic import BaseModel, Field
+from sqlalchemy import or_
 
 from backend.app.db.sqlite import SessionLocal
 from backend.app.models.resource_graph import Business, Step, Implementation, DataResource
 from backend.app.core.logger import logger
-from ._common import call_selector_llm
+from ._common import call_selector_llm, extract_keywords
+
+
+# ============================================================
+# 常量配置
+# ============================================================
+
+# SQL 预过滤后的最大候选数量（过滤后超过此数则截断）
+MAX_CANDIDATES_AFTER_FILTER = 50
+
+# 预过滤无结果时的随机采样数量（让模型看看有什么可选的）
+FALLBACK_SAMPLE_SIZE = 20
 
 
 # ============================================================
@@ -37,7 +62,33 @@ def search_businesses(query: str, limit: int = 5) -> str:
     """
     db = SessionLocal()
     try:
-        businesses = db.query(Business).all()
+        # ========== 阶段1: SQL 预过滤 ==========
+        # 从 query 提取关键词，用 LIKE 过滤，减少候选数量
+        keywords = extract_keywords(query)
+        
+        q = db.query(Business)
+        if keywords:
+            # 构造 OR 条件：任一关键词匹配 name 或 description
+            conditions = []
+            for kw in keywords:
+                conditions.append(Business.name.contains(kw))
+                conditions.append(Business.description.contains(kw))
+            q = q.filter(or_(*conditions))
+        
+        businesses = q.limit(MAX_CANDIDATES_AFTER_FILTER).all()
+        
+        # Fallback: 预过滤无结果时，尝试只用第一个关键词，或随机采样
+        if not businesses and keywords:
+            logger.debug(f"[search_businesses] 预过滤无结果，尝试放宽条件")
+            q = db.query(Business).filter(
+                or_(Business.name.contains(keywords[0]), Business.description.contains(keywords[0]))
+            )
+            businesses = q.limit(MAX_CANDIDATES_AFTER_FILTER).all()
+        
+        if not businesses:
+            # 仍无结果，随机采样让模型看看有什么
+            logger.debug(f"[search_businesses] 放宽条件仍无结果，随机采样")
+            businesses = db.query(Business).limit(FALLBACK_SAMPLE_SIZE).all()
         
         if not businesses:
             return json.dumps({
@@ -45,21 +96,19 @@ def search_businesses(query: str, limit: int = 5) -> str:
                 "message": "暂无业务流程数据"
             }, ensure_ascii=False)
         
-        # 构造候选列表（JSON 格式）
+        # ========== 阶段2: LLM 精排 ==========
+        # 构造精简的候选列表（只传 id + name，减少 token）
         candidates_list = []
         for b in businesses:
-            desc = b.description[:80] + "..." if b.description and len(b.description) > 80 else (b.description or "")
             candidates_list.append({
                 "process_id": b.process_id,
                 "name": b.name,
-                "channel": b.channel or "",
-                "description": desc,
             })
         
-        # 调用小 LLM 进行筛选
-        logger.debug(f"[search_businesses] 快速模型输入: query={query}, 候选数={len(candidates_list)}")
+        # 调用小 LLM 进行语义精排
+        logger.info(f"[search_businesses] 预过滤后候选数={len(candidates_list)}, keywords={keywords}")
         selected_ids = call_selector_llm(query, candidates_list, "process_id", limit)
-        logger.info(f"[search_businesses] 快速模型选中: {selected_ids}")
+        logger.info(f"[search_businesses] LLM 精排选中: {selected_ids}")
         
         # 根据选中的 ID 构造结果
         id_to_business = {b.process_id: b for b in businesses}
@@ -114,10 +163,41 @@ def search_implementations(query: str, system: Optional[str] = None, limit: int 
     """
     db = SessionLocal()
     try:
+        # ========== 阶段1: SQL 预过滤 ==========
+        keywords = extract_keywords(query)
+        
         q = db.query(Implementation)
         if system:
             q = q.filter(Implementation.system == system)
-        implementations = q.all()
+        
+        if keywords:
+            # 任一关键词匹配 name 或 description
+            conditions = []
+            for kw in keywords:
+                conditions.append(Implementation.name.contains(kw))
+                conditions.append(Implementation.description.contains(kw))
+            q = q.filter(or_(*conditions))
+        
+        implementations = q.limit(MAX_CANDIDATES_AFTER_FILTER).all()
+        
+        # Fallback: 预过滤无结果
+        if not implementations and keywords:
+            logger.debug(f"[search_implementations] 预过滤无结果，尝试放宽条件")
+            q = db.query(Implementation)
+            if system:
+                q = q.filter(Implementation.system == system)
+            q = q.filter(or_(
+                Implementation.name.contains(keywords[0]),
+                Implementation.description.contains(keywords[0])
+            ))
+            implementations = q.limit(MAX_CANDIDATES_AFTER_FILTER).all()
+        
+        if not implementations:
+            logger.debug(f"[search_implementations] 放宽条件仍无结果，随机采样")
+            q = db.query(Implementation)
+            if system:
+                q = q.filter(Implementation.system == system)
+            implementations = q.limit(FALLBACK_SAMPLE_SIZE).all()
         
         if not implementations:
             return json.dumps({
@@ -125,21 +205,19 @@ def search_implementations(query: str, system: Optional[str] = None, limit: int 
                 "message": "暂无匹配的实现/接口数据" + (f"（系统: {system}）" if system else "")
             }, ensure_ascii=False)
         
-        # 构造候选列表（JSON 格式）
+        # ========== 阶段2: LLM 精排 ==========
+        # 精简字段：只传 id + name + system（system 有助于区分同名接口）
         candidates_list = []
         for impl in implementations:
-            desc = impl.description[:80] + "..." if impl.description and len(impl.description) > 80 else (impl.description or "")
             candidates_list.append({
                 "impl_id": impl.impl_id,
                 "name": impl.name,
-                "type": impl.type or "",
                 "system": impl.system or "",
-                "description": desc,
             })
         
-        # 调用小 LLM 进行筛选
+        logger.info(f"[search_implementations] 预过滤后候选数={len(candidates_list)}, keywords={keywords}")
         selected_ids = call_selector_llm(query, candidates_list, "impl_id", limit)
-        logger.info(f"[search_implementations] 快速模型选中: {selected_ids}")
+        logger.info(f"[search_implementations] LLM 精排选中: {selected_ids}")
         
         # 根据选中的 ID 构造结果
         id_to_impl = {impl.impl_id: impl for impl in implementations}
@@ -197,10 +275,40 @@ def search_data_resources(query: str, system: Optional[str] = None, limit: int =
     """
     db = SessionLocal()
     try:
+        # ========== 阶段1: SQL 预过滤 ==========
+        keywords = extract_keywords(query)
+        
         q = db.query(DataResource)
         if system:
             q = q.filter(DataResource.system == system)
-        resources = q.all()
+        
+        if keywords:
+            conditions = []
+            for kw in keywords:
+                conditions.append(DataResource.name.contains(kw))
+                conditions.append(DataResource.description.contains(kw))
+            q = q.filter(or_(*conditions))
+        
+        resources = q.limit(MAX_CANDIDATES_AFTER_FILTER).all()
+        
+        # Fallback: 预过滤无结果
+        if not resources and keywords:
+            logger.debug(f"[search_data_resources] 预过滤无结果，尝试放宽条件")
+            q = db.query(DataResource)
+            if system:
+                q = q.filter(DataResource.system == system)
+            q = q.filter(or_(
+                DataResource.name.contains(keywords[0]),
+                DataResource.description.contains(keywords[0])
+            ))
+            resources = q.limit(MAX_CANDIDATES_AFTER_FILTER).all()
+        
+        if not resources:
+            logger.debug(f"[search_data_resources] 放宽条件仍无结果，随机采样")
+            q = db.query(DataResource)
+            if system:
+                q = q.filter(DataResource.system == system)
+            resources = q.limit(FALLBACK_SAMPLE_SIZE).all()
         
         if not resources:
             return json.dumps({
@@ -208,21 +316,18 @@ def search_data_resources(query: str, system: Optional[str] = None, limit: int =
                 "message": "暂无匹配的数据资源" + (f"（系统: {system}）" if system else "")
             }, ensure_ascii=False)
         
-        # 构造候选列表（JSON 格式）
+        # ========== 阶段2: LLM 精排 ==========
+        # 精简字段：只传 id + name
         candidates_list = []
         for res in resources:
-            desc = res.description[:80] + "..." if res.description and len(res.description) > 80 else (res.description or "")
             candidates_list.append({
                 "resource_id": res.resource_id,
                 "name": res.name,
-                "type": res.type or "",
-                "system": res.system or "",
-                "description": desc,
             })
         
-        # 调用小 LLM 进行筛选
+        logger.info(f"[search_data_resources] 预过滤后候选数={len(candidates_list)}, keywords={keywords}")
         selected_ids = call_selector_llm(query, candidates_list, "resource_id", limit)
-        logger.info(f"[search_data_resources] 快速模型选中: {selected_ids}")
+        logger.info(f"[search_data_resources] LLM 精排选中: {selected_ids}")
         
         # 根据选中的 ID 构造结果
         id_to_resource = {res.resource_id: res for res in resources}
@@ -279,7 +384,31 @@ def search_steps(query: str, limit: int = 5) -> str:
     """
     db = SessionLocal()
     try:
-        steps = db.query(Step).all()
+        # ========== 阶段1: SQL 预过滤 ==========
+        keywords = extract_keywords(query)
+        
+        q = db.query(Step)
+        if keywords:
+            conditions = []
+            for kw in keywords:
+                conditions.append(Step.name.contains(kw))
+                conditions.append(Step.description.contains(kw))
+            q = q.filter(or_(*conditions))
+        
+        steps = q.limit(MAX_CANDIDATES_AFTER_FILTER).all()
+        
+        # Fallback: 预过滤无结果
+        if not steps and keywords:
+            logger.debug(f"[search_steps] 预过滤无结果，尝试放宽条件")
+            q = db.query(Step).filter(or_(
+                Step.name.contains(keywords[0]),
+                Step.description.contains(keywords[0])
+            ))
+            steps = q.limit(MAX_CANDIDATES_AFTER_FILTER).all()
+        
+        if not steps:
+            logger.debug(f"[search_steps] 放宽条件仍无结果，随机采样")
+            steps = db.query(Step).limit(FALLBACK_SAMPLE_SIZE).all()
         
         if not steps:
             return json.dumps({
@@ -287,20 +416,18 @@ def search_steps(query: str, limit: int = 5) -> str:
                 "message": "暂无步骤数据"
             }, ensure_ascii=False)
         
-        # 构造候选列表（JSON 格式）
+        # ========== 阶段2: LLM 精排 ==========
+        # 精简字段：只传 id + name
         candidates_list = []
         for s in steps:
-            desc = s.description[:80] + "..." if s.description and len(s.description) > 80 else (s.description or "")
             candidates_list.append({
                 "step_id": s.step_id,
                 "name": s.name,
-                "step_type": s.step_type or "",
-                "description": desc,
             })
         
-        # 调用小 LLM 进行筛选
+        logger.info(f"[search_steps] 预过滤后候选数={len(candidates_list)}, keywords={keywords}")
         selected_ids = call_selector_llm(query, candidates_list, "step_id", limit)
-        logger.info(f"[search_steps] 快速模型选中: {selected_ids}")
+        logger.info(f"[search_steps] LLM 精排选中: {selected_ids}")
         
         # 根据选中的 ID 构造结果
         id_to_step = {s.step_id: s for s in steps}

@@ -19,9 +19,9 @@ class AceCodeEngineMcp:
 
         # === 统一配置区域（如需修改，只需改这里） ===
         # acemcp 连接的后端索引服务地址
-        self._base_url = "https://d7.api.augmentcode.com/"
+        self._base_url = "https://d17.api.augmentcode.com/"
         # acemcp 调用该服务使用的 Token
-        self._token = "3e1e9d694889d92432990466938dfd6ba7f04a6a0280a280acd6e7d5a4a2a546"
+        self._token = "eb20f64ccef0393124c7d9980a61232245f8c5fab482e1ea84c8e486c63eda21"
         # acemcp Web 管理端口，对应 --web-port
         self._web_port = 8888
         # 是否优先走 HTTP 接口

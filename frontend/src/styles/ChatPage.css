@@ -1810,6 +1810,7 @@
   padding: 14px;
   margin-bottom: 10px;
   box-shadow: var(--shadow-sm);
+  overflow: hidden; /* 防止内容溢出 */
 }
 
 .testing-task-card.active {
@@ -1827,6 +1828,9 @@
   font-size: 13px;
   line-height: 1.5;
   color: var(--text-primary);
+  /* 长文本换行 */
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .testing-task-title .task-icon {
@@ -1842,6 +1846,9 @@
   font-size: 12px;
   color: var(--text-secondary);
   line-height: 1.5;
+  /* 长文本换行（如接口地址） */
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 /* 任务进度条 */

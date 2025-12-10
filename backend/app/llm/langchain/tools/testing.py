@@ -104,7 +104,7 @@ def create_task_board(session_id: str, phase: str, tasks: List[dict]) -> str:
     
     # 返回任务 ID 映射，方便 AI 后续更新任务状态
     id_list = [f"- {title}: {tid}" for title, tid in task_id_map.items()]
-    return f"任务看板已创建，阶段: {phase}，共 {len(tasks)} 个任务。\n\n任务ID映射（更新状态时使用）:\n" + "\n".join(id_list)
+    return f"任务看板已创建，阶段: {phase}，共 {len(tasks)} 个任务。\n任务ID映射（更新状态时使用）:\n" + "\n".join(id_list)
 
 
 @tool
