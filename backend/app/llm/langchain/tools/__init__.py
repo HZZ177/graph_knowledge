@@ -63,6 +63,12 @@ from .db import (
     DatabaseConfig,
 )
 
+# 永策Pro企业知识库检索工具
+from .opdoc import (
+    search_yongce_docs,
+    get_opdoc_tools,
+)
+
 
 # ============================================================
 # 工具列表导出
@@ -140,6 +146,15 @@ def get_log_troubleshoot_tools():
     ]
 
 
+def get_opdoc_qa_tools():
+    """获取永策Pro智能助手 Agent 的工具集
+    
+    共 1 个工具：
+    - 企业知识库检索: 1 个 (search_yongce_docs)
+    """
+    return get_opdoc_tools()
+
+
 # 测试工具（transition_phase 已删除，阶段切换由编排器控制）
 from .testing import (
     create_task_board,
@@ -176,6 +191,7 @@ __all__ = [
     "search_logs",
     "get_table_schema",
     "query_database",
+    "search_yongce_docs",  # 新增：永策Pro企业知识库检索
     # 测试工具（transition_phase 已删除）
     "create_task_board",
     "update_task_status",
@@ -191,6 +207,8 @@ __all__ = [
     # 工厂函数
     "get_all_chat_tools",
     "get_log_troubleshoot_tools",
+    "get_opdoc_qa_tools",  # 新增：操作文档工具集
+    "get_opdoc_tools",  # 新增：操作文档工具集（别名）
     "get_db_tools",
     "get_all_testing_tools",
     "get_testing_tools_phase1",

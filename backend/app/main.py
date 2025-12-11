@@ -46,6 +46,13 @@ async def lifespan(app: FastAPI):
             logger.info("[Lifespan] Agent 预热完成")
         except Exception as e:
             logger.warning(f"[Lifespan] Agent 预热跳过（LLM 可能未配置）: {e}")
+        
+        # 预热 LightRAG（永策Pro智能助手）
+        try:
+            from backend.app.services.lightrag_service import LightRAGService
+            await LightRAGService.warmup(db)
+        except Exception as e:
+            logger.warning(f"[Lifespan] LightRAG 预热跳过: {e}")
     finally:
         db.close()
 

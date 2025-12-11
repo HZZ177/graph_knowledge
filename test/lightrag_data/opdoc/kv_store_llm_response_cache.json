@@ -526,5 +526,65 @@
     "create_time": 1765443691,
     "update_time": 1765443691,
     "_id": "hybrid:query:fda41ed093a822693ae3465f8b34e4c2"
+  },
+  "hybrid:keywords:e186bd6bdfc01e7e04c4e91decd4ba9d": {
+    "return": "{\"high_level_keywords\": [\"\\u7ecf\\u8425\\u770b\\u677f\", \"\\u6570\\u636e\\u67e5\\u770b\", \"\\u4e1a\\u52a1\\u6307\\u6807\"], \"low_level_keywords\": [\"\\u9500\\u552e\\u6570\\u636e\", \"\\u8d22\\u52a1\\u6570\\u636e\", \"\\u8fd0\\u8425\\u6570\\u636e\", \"\\u7ee9\\u6548\\u6307\\u6807\", \"\\u62a5\\u8868\"]}",
+    "cache_type": "keywords",
+    "chunk_id": null,
+    "original_prompt": "经营看板能看些什么数据",
+    "queryparam": {
+      "mode": "hybrid",
+      "response_type": "Multiple Paragraphs",
+      "top_k": 40,
+      "chunk_top_k": 20,
+      "max_entity_tokens": 6000,
+      "max_relation_tokens": 8000,
+      "max_total_tokens": 30000,
+      "user_prompt": "",
+      "enable_rerank": true
+    },
+    "create_time": 1765462542,
+    "update_time": 1765462542,
+    "_id": "hybrid:keywords:e186bd6bdfc01e7e04c4e91decd4ba9d"
+  },
+  "hybrid:keywords:713122ee9653fd109c11b6003a476950": {
+    "return": "{\"high_level_keywords\": [\"\\u6536\\u5165\\u6570\\u636e\", \"\\u67e5\\u770b\", \"\\u6c38\\u7b56Pro\\u5e73\\u53f0\"], \"low_level_keywords\": [\"\\u6570\\u636e\\u67e5\\u8be2\", \"\\u5e73\\u53f0\\u529f\\u80fd\", \"\\u6c38\\u7b56Pro\"]}",
+    "cache_type": "keywords",
+    "chunk_id": null,
+    "original_prompt": "收入数据在永策Pro平台哪里查看？",
+    "queryparam": {
+      "mode": "hybrid",
+      "response_type": "Multiple Paragraphs",
+      "top_k": 40,
+      "chunk_top_k": 20,
+      "max_entity_tokens": 6000,
+      "max_relation_tokens": 8000,
+      "max_total_tokens": 30000,
+      "user_prompt": "",
+      "enable_rerank": true
+    },
+    "create_time": 1765463081,
+    "update_time": 1765463081,
+    "_id": "hybrid:keywords:713122ee9653fd109c11b6003a476950"
+  },
+  "hybrid:keywords:d18e0b00afcaecb4694c5d0744ce67ef": {
+    "return": "{\"high_level_keywords\": [\"\\u67e5\\u770b\\u6536\\u5165\\u6570\\u636e\", \"\\u529f\\u80fd\", \"\\u6a21\\u5757\"], \"low_level_keywords\": [\"\\u6c38\\u7b56Pro\", \"\\u6536\\u5165\\u6570\\u636e\"]}",
+    "cache_type": "keywords",
+    "chunk_id": null,
+    "original_prompt": "永策Pro中查看收入数据的功能或模块",
+    "queryparam": {
+      "mode": "hybrid",
+      "response_type": "Multiple Paragraphs",
+      "top_k": 40,
+      "chunk_top_k": 20,
+      "max_entity_tokens": 6000,
+      "max_relation_tokens": 8000,
+      "max_total_tokens": 30000,
+      "user_prompt": "",
+      "enable_rerank": true
+    },
+    "create_time": 1765463181,
+    "update_time": 1765463181,
+    "_id": "hybrid:keywords:d18e0b00afcaecb4694c5d0744ce67ef"
   }
 }

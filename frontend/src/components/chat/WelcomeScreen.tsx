@@ -50,6 +50,17 @@ export const agentWelcomeConfig: Record<string, AgentWelcomeConfig> = {
       '设计边界值测试场景',
       '识别潜在的异常场景',
     ]
+  },
+  opdoc_qa: {
+    icon: '💼',
+    title: '永策Pro智能助手',
+    subtitle: '科拓企业永策Pro平台的智能知识助手，掌握项目所有文档，为您解答产品功能、技术架构、操作指南等一切问题',
+    suggestions: [
+      '永策Pro的权限管理功能是怎么设计的？',
+      '订单流程的业务逻辑是什么？',
+      '如何对接永策Pro的API接口？',
+      '永策Pro使用什么技术栈？',
+    ]
   }
 }
 

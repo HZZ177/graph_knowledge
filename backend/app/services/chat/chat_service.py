@@ -228,6 +228,35 @@ def _generate_tool_summaries(tool_name: str, tool_input: dict, tool_output: str)
             elif "error" in output_data or output_data.get("path") is None:
                 output_summary = "未找到路径"
     
+    # ========== 永策Pro企业知识库检索 ==========
+    elif tool_name == "search_yongce_docs":
+        question = tool_input.get("question", "")
+        if question:
+            display_q = question[:30] + "..." if len(question) > 30 else question
+            input_summary = f"问题: {display_q}"
+        
+        # 解析输出
+        if "## 检索结果" in tool_output:
+            # 检索成功
+            lines = tool_output.split("\n")
+            context_lines = [l for l in lines if l.strip() and not l.startswith("#")]
+            context_len = sum(len(l) for l in context_lines)
+            
+            # 统计来源文档数量
+            if "## 来源文档" in tool_output:
+                # 提取来源数量
+                import re
+                sources = re.findall(r'^\d+\.\s+(.+)$', tool_output, re.MULTILINE)
+                output_summary = f"找到相关文档 ({len(sources)} 个来源)"
+            else:
+                output_summary = f"找到相关内容 ({context_len} 字符)"
+        elif "未找到相关文档" in tool_output:
+            output_summary = "未找到相关文档"
+        elif "检索过程中发生错误" in tool_output:
+            output_summary = "检索失败"
+        else:
+            output_summary = "检索完成"
+    
     # ========== 代码精确搜索 ==========
     elif tool_name == "grep_code":
         pattern = tool_input.get("pattern", "")

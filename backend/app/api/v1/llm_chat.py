@@ -178,6 +178,31 @@ async def _handle_knowledge_qa(
     )
 
 
+async def _handle_opdoc_qa(
+    db: Session, 
+    request: StreamChatRequest, 
+    websocket: WebSocket
+) -> None:
+    """处理操作文档问答 (opdoc_qa)
+    
+    特点：
+    - 基于 LightRAG 的操作文档检索
+    - 混合检索模式（向量 + 知识图谱）
+    - 支持多轮对话
+    - 无需额外配置上下文
+    """
+    # 调用通用流式对话服务
+    await streaming_chat(
+        db=db,
+        question=request.question,
+        websocket=websocket,
+        thread_id=request.thread_id,
+        agent_type="opdoc_qa",
+        agent_context=None,
+        attachments=[att.model_dump() for att in (request.attachments or [])],
+    )
+
+
 # ============================================================
 # WebSocket 路由
 # ============================================================
@@ -246,6 +271,11 @@ async def websocket_chat(websocket: WebSocket):
         # ----- 分支 3: 业务知识助手 (knowledge_qa) -----
         elif request.agent_type == "knowledge_qa":
             await _handle_knowledge_qa(db, request, websocket)
+            return
+        
+        # ----- 分支 4: 操作文档问答 (opdoc_qa) -----
+        elif request.agent_type == "opdoc_qa":
+            await _handle_opdoc_qa(db, request, websocket)
             return
 
         # ----- 暂不支持的agent类型 -----
