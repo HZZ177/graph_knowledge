@@ -1,0 +1,3184 @@
+{
+  "最新消息<SEP>消息": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441640,
+    "update_time": 1765441640,
+    "_id": "最新消息<SEP>消息"
+  },
+  "告警<SEP>车场异常": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441640,
+    "update_time": 1765441640,
+    "_id": "告警<SEP>车场异常"
+  },
+  "收费员异常考勤<SEP>未到岗收费员": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441640,
+    "update_time": 1765441640,
+    "_id": "收费员异常考勤<SEP>未到岗收费员"
+  },
+  "收费员<SEP>收费员管理页": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441640,
+    "update_time": 1765441640,
+    "_id": "收费员<SEP>收费员管理页"
+  },
+  "待审批<SEP>日常工作": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441640,
+    "update_time": 1765441640,
+    "_id": "待审批<SEP>日常工作"
+  },
+  "个人工作台<SEP>告警": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441642,
+    "update_time": 1765441642,
+    "_id": "个人工作台<SEP>告警"
+  },
+  "稽核<SEP>车场异常": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441642,
+    "update_time": 1765441642,
+    "_id": "稽核<SEP>车场异常"
+  },
+  "消息<SEP>消息列表页": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441644,
+    "update_time": 1765441644,
+    "_id": "消息<SEP>消息列表页"
+  },
+  "收费员异常考勤<SEP>离岗收费员": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441645,
+    "update_time": 1765441645,
+    "_id": "收费员异常考勤<SEP>离岗收费员"
+  },
+  "工单<SEP>日常工作": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441646,
+    "update_time": 1765441646,
+    "_id": "工单<SEP>日常工作"
+  },
+  "个人工作台<SEP>稽核": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441652,
+    "update_time": 1765441652,
+    "_id": "个人工作台<SEP>稽核"
+  },
+  "经营偏好配置<SEP>项目收入": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441652,
+    "update_time": 1765441652,
+    "_id": "经营偏好配置<SEP>项目收入"
+  },
+  "经营情况<SEP>预算偏差率": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441654,
+    "update_time": 1765441654,
+    "_id": "经营情况<SEP>预算偏差率"
+  },
+  "巡检任务<SEP>日常工作": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441654,
+    "update_time": 1765441654,
+    "_id": "巡检任务<SEP>日常工作"
+  },
+  "个人工作台<SEP>未到岗收费员": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441657,
+    "update_time": 1765441657,
+    "_id": "个人工作台<SEP>未到岗收费员"
+  },
+  "经营偏好配置<SEP>经营情况": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441658,
+    "update_time": 1765441658,
+    "_id": "经营偏好配置<SEP>经营情况"
+  },
+  "投诉<SEP>日常工作": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441659,
+    "update_time": 1765441659,
+    "_id": "投诉<SEP>日常工作"
+  },
+  "营收收入<SEP>项目详情": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441659,
+    "update_time": 1765441659,
+    "_id": "营收收入<SEP>项目详情"
+  },
+  "个人工作台<SEP>离岗收费员": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441660,
+    "update_time": 1765441660,
+    "_id": "个人工作台<SEP>离岗收费员"
+  },
+  "经营情况<SEP>预算达成率": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441663,
+    "update_time": 1765441663,
+    "_id": "经营情况<SEP>预算达成率"
+  },
+  "实收收入<SEP>项目详情": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441665,
+    "update_time": 1765441665,
+    "_id": "实收收入<SEP>项目详情"
+  },
+  "告警<SEP>告警/稽核详情页": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441665,
+    "update_time": 1765441665,
+    "_id": "告警<SEP>告警/稽核详情页"
+  },
+  "个人工作台<SEP>待审批": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441666,
+    "update_time": 1765441666,
+    "_id": "个人工作台<SEP>待审批"
+  },
+  "对比同期收入<SEP>经营情况": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441667,
+    "update_time": 1765441667,
+    "_id": "对比同期收入<SEP>经营情况"
+  },
+  "经营偏好配置<SEP>项目详情": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441669,
+    "update_time": 1765441669,
+    "_id": "经营偏好配置<SEP>项目详情"
+  },
+  "个人工作台<SEP>工单": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441672,
+    "update_time": 1765441672,
+    "_id": "个人工作台<SEP>工单"
+  },
+  "审批/工单/任务/投诉详情页<SEP>待审批": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441672,
+    "update_time": 1765441672,
+    "_id": "审批/工单/任务/投诉详情页<SEP>待审批"
+  },
+  "指定人员/角色<SEP>汇报功能": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441676,
+    "update_time": 1765441676,
+    "_id": "指定人员/角色<SEP>汇报功能"
+  },
+  "今日实时收入<SEP>项目详情": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441676,
+    "update_time": 1765441676,
+    "_id": "今日实时收入<SEP>项目详情"
+  },
+  "告警/稽核详情页<SEP>稽核": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441676,
+    "update_time": 1765441676,
+    "_id": "告警/稽核详情页<SEP>稽核"
+  },
+  "个人工作台<SEP>巡检任务": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441678,
+    "update_time": 1765441678,
+    "_id": "个人工作台<SEP>巡检任务"
+  },
+  "PC端配置的模板<SEP>汇报功能": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441679,
+    "update_time": 1765441679,
+    "_id": "PC端配置的模板<SEP>汇报功能"
+  },
+  "截止昨日的收入<SEP>项目详情": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441682,
+    "update_time": 1765441682,
+    "_id": "截止昨日的收入<SEP>项目详情"
+  },
+  "审批/工单/任务/投诉详情页<SEP>工单": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441683,
+    "update_time": 1765441683,
+    "_id": "审批/工单/任务/投诉详情页<SEP>工单"
+  },
+  "个人工作台<SEP>投诉": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441684,
+    "update_time": 1765441684,
+    "_id": "个人工作台<SEP>投诉"
+  },
+  "项目待办<SEP>项目计划": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441684,
+    "update_time": 1765441684,
+    "_id": "项目待办<SEP>项目计划"
+  },
+  "周报<SEP>汇报功能": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986",
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce",
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 3,
+    "create_time": 1765441685,
+    "update_time": 1765441685,
+    "_id": "周报<SEP>汇报功能"
+  },
+  "永策C端<SEP>隐私模式": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441686,
+    "update_time": 1765441686,
+    "_id": "永策C端<SEP>隐私模式"
+  },
+  "审批/工单/任务/投诉详情页<SEP>巡检任务": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441688,
+    "update_time": 1765441688,
+    "_id": "审批/工单/任务/投诉详情页<SEP>巡检任务"
+  },
+  "月报<SEP>汇报功能": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986",
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce",
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 3,
+    "create_time": 1765441693,
+    "update_time": 1765441693,
+    "_id": "月报<SEP>汇报功能"
+  },
+  "隐私模式<SEP>非认证车主": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441694,
+    "update_time": 1765441694,
+    "_id": "隐私模式<SEP>非认证车主"
+  },
+  "临停缴费自动开票逻辑<SEP>永策C端": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441694,
+    "update_time": 1765441694,
+    "_id": "临停缴费自动开票逻辑<SEP>永策C端"
+  },
+  "审批/工单/任务/投诉详情页<SEP>投诉": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441695,
+    "update_time": 1765441695,
+    "_id": "审批/工单/任务/投诉详情页<SEP>投诉"
+  },
+  "手动更新功能<SEP>设置": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441695,
+    "update_time": 1765441695,
+    "_id": "手动更新功能<SEP>设置"
+  },
+  "工作管理<SEP>汇报功能": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986",
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce",
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 3,
+    "create_time": 1765441696,
+    "update_time": 1765441696,
+    "_id": "工作管理<SEP>汇报功能"
+  },
+  "临停缴费自动开票逻辑<SEP>车主": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441701,
+    "update_time": 1765441701,
+    "_id": "临停缴费自动开票逻辑<SEP>车主"
+  },
+  "出口月租续费功能<SEP>永策C端": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441701,
+    "update_time": 1765441701,
+    "_id": "出口月租续费功能<SEP>永策C端"
+  },
+  "后台集团配置<SEP>隐私模式": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441701,
+    "update_time": 1765441701,
+    "_id": "后台集团配置<SEP>隐私模式"
+  },
+  "手动更新功能<SEP>新版本": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441702,
+    "update_time": 1765441702,
+    "_id": "手动更新功能<SEP>新版本"
+  },
+  "公众号消息<SEP>非认证车主": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441702,
+    "update_time": 1765441702,
+    "_id": "公众号消息<SEP>非认证车主"
+  },
+  "月租车<SEP>车主": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441704,
+    "update_time": 1765441704,
+    "_id": "月租车<SEP>车主"
+  },
+  "工作管理<SEP>项目计划": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441704,
+    "update_time": 1765441704,
+    "_id": "工作管理<SEP>项目计划"
+  },
+  "PC端<SEP>系统": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441708,
+    "update_time": 1765441708,
+    "_id": "PC端<SEP>系统"
+  },
+  "我的<SEP>手动更新功能": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441709,
+    "update_time": 1765441709,
+    "_id": "我的<SEP>手动更新功能"
+  },
+  "出口月租续费功能<SEP>车主": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441711,
+    "update_time": 1765441711,
+    "_id": "出口月租续费功能<SEP>车主"
+  },
+  "月租车<SEP>车卡": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441711,
+    "update_time": 1765441711,
+    "_id": "月租车<SEP>车卡"
+  },
+  "抵扣白名单<SEP>抵扣白名单手动添加功能": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441711,
+    "update_time": 1765441711,
+    "_id": "抵扣白名单<SEP>抵扣白名单手动添加功能"
+  },
+  "列表<SEP>抵扣券收入": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441713,
+    "update_time": 1765441713,
+    "_id": "列表<SEP>抵扣券收入"
+  },
+  "工作管理<SEP>项目移交": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441713,
+    "update_time": 1765441713,
+    "_id": "工作管理<SEP>项目移交"
+  },
+  "新版本<SEP>系统": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441713,
+    "update_time": 1765441713,
+    "_id": "新版本<SEP>系统"
+  },
+  "已稽核记录<SEP>打回功能": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441715,
+    "update_time": 1765441715,
+    "_id": "已稽核记录<SEP>打回功能"
+  },
+  "平台管理<SEP>用户管理": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441717,
+    "update_time": 1765441717,
+    "_id": "平台管理<SEP>用户管理"
+  },
+  "列表<SEP>车场月租价格": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441721,
+    "update_time": 1765441721,
+    "_id": "列表<SEP>车场月租价格"
+  },
+  "工作管理<SEP>异常稽核移动端": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441722,
+    "update_time": 1765441722,
+    "_id": "工作管理<SEP>异常稽核移动端"
+  },
+  "模块<SEP>隐藏列表": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441722,
+    "update_time": 1765441722,
+    "_id": "模块<SEP>隐藏列表"
+  },
+  "移动端<SEP>系统": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441729,
+    "update_time": 1765441729,
+    "_id": "移动端<SEP>系统"
+  },
+  "打回功能<SEP>稽核人员": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441729,
+    "update_time": 1765441729,
+    "_id": "打回功能<SEP>稽核人员"
+  },
+  "用户管理<SEP>组织节点": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441729,
+    "update_time": 1765441729,
+    "_id": "用户管理<SEP>组织节点"
+  },
+  "下拉筛选<SEP>事件查询": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441729,
+    "update_time": 1765441729,
+    "_id": "下拉筛选<SEP>事件查询"
+  },
+  "工作管理<SEP>收费员管理详情页面": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441732,
+    "update_time": 1765441732,
+    "_id": "工作管理<SEP>收费员管理详情页面"
+  },
+  "指标<SEP>经营偏好设置": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441732,
+    "update_time": 1765441732,
+    "_id": "指标<SEP>经营偏好设置"
+  },
+  "手动更新功能<SEP>系统": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441735,
+    "update_time": 1765441735,
+    "_id": "手动更新功能<SEP>系统"
+  },
+  "用户管理<SEP>角色筛选": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441737,
+    "update_time": 1765441737,
+    "_id": "用户管理<SEP>角色筛选"
+  },
+  "企业微信移动端<SEP>项管助手": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441737,
+    "update_time": 1765441737,
+    "_id": "企业微信移动端<SEP>项管助手"
+  },
+  "id<SEP>隐藏列表": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441743,
+    "update_time": 1765441743,
+    "_id": "id<SEP>隐藏列表"
+  },
+  "经营偏好设置<SEP>趋势图": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441743,
+    "update_time": 1765441743,
+    "_id": "经营偏好设置<SEP>趋势图"
+  },
+  "今日收入<SEP>首页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441743,
+    "update_time": 1765441743,
+    "_id": "今日收入<SEP>首页"
+  },
+  "事件查询<SEP>输入搜索": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441746,
+    "update_time": 1765441746,
+    "_id": "事件查询<SEP>输入搜索"
+  },
+  "经营偏好设置<SEP>项目列表(收入排行)": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441749,
+    "update_time": 1765441749,
+    "_id": "经营偏好设置<SEP>项目列表(收入排行)"
+  },
+  "本周收入<SEP>首页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441750,
+    "update_time": 1765441750,
+    "_id": "本周收入<SEP>首页"
+  },
+  "业务主键id<SEP>隐藏列表": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441755,
+    "update_time": 1765441755,
+    "_id": "业务主键id<SEP>隐藏列表"
+  },
+  "本月收入<SEP>首页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441755,
+    "update_time": 1765441755,
+    "_id": "本月收入<SEP>首页"
+  },
+  "项管助手<SEP>首页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441759,
+    "update_time": 1765441759,
+    "_id": "项管助手<SEP>首页"
+  },
+  "永策Pro<SEP>永策Pro1.7.8-1.8.0上线说明": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441759,
+    "update_time": 1765441759,
+    "_id": "永策Pro<SEP>永策Pro1.7.8-1.8.0上线说明"
+  },
+  "本季收入<SEP>首页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441761,
+    "update_time": 1765441761,
+    "_id": "本季收入<SEP>首页"
+  },
+  "PC端<SEP>永策Pro": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441762,
+    "update_time": 1765441762,
+    "_id": "PC端<SEP>永策Pro"
+  },
+  "隐藏放行稽核统计<SEP>集团总览": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441764,
+    "update_time": 1765441764,
+    "_id": "隐藏放行稽核统计<SEP>集团总览"
+  },
+  "本年收入<SEP>首页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441764,
+    "update_time": 1765441764,
+    "_id": "本年收入<SEP>首页"
+  },
+  "快捷菜单<SEP>首页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441767,
+    "update_time": 1765441767,
+    "_id": "快捷菜单<SEP>首页"
+  },
+  "PC端<SEP>集团总览": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441769,
+    "update_time": 1765441769,
+    "_id": "PC端<SEP>集团总览"
+  },
+  "当前角色<SEP>快捷菜单": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441770,
+    "update_time": 1765441770,
+    "_id": "当前角色<SEP>快捷菜单"
+  },
+  "经营偏好设置<SEP>首页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441770,
+    "update_time": 1765441770,
+    "_id": "经营偏好设置<SEP>首页"
+  },
+  "趋势图<SEP>集团总览": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441770,
+    "update_time": 1765441770,
+    "_id": "趋势图<SEP>集团总览"
+  },
+  "PC端<SEP>项目看板": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441771,
+    "update_time": 1765441771,
+    "_id": "PC端<SEP>项目看板"
+  },
+  "导航页<SEP>快捷菜单": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441773,
+    "update_time": 1765441773,
+    "_id": "导航页<SEP>快捷菜单"
+  },
+  "最新消息<SEP>首页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441774,
+    "update_time": 1765441774,
+    "_id": "最新消息<SEP>首页"
+  },
+  "收入日报<SEP>项目看板": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441778,
+    "update_time": 1765441778,
+    "_id": "收入日报<SEP>项目看板"
+  },
+  "日周月季年可切换选项<SEP>趋势图": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441778,
+    "update_time": 1765441778,
+    "_id": "日周月季年可切换选项<SEP>趋势图"
+  },
+  "最新消息<SEP>消息详情页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441782,
+    "update_time": 1765441782,
+    "_id": "最新消息<SEP>消息详情页"
+  },
+  "临停收入(元)<SEP>收入日报": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441783,
+    "update_time": 1765441783,
+    "_id": "临停收入(元)<SEP>收入日报"
+  },
+  "项目动态<SEP>项目看板": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441783,
+    "update_time": 1765441783,
+    "_id": "项目动态<SEP>项目看板"
+  },
+  "月<SEP>趋势图": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441784,
+    "update_time": 1765441784,
+    "_id": "月<SEP>趋势图"
+  },
+  "最新消息<SEP>消息列表页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441785,
+    "update_time": 1765441785,
+    "_id": "最新消息<SEP>消息列表页"
+  },
+  "项目标签<SEP>项目看板": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441787,
+    "update_time": 1765441787,
+    "_id": "项目标签<SEP>项目看板"
+  },
+  "6行<SEP>项目动态": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441787,
+    "update_time": 1765441787,
+    "_id": "6行<SEP>项目动态"
+  },
+  "成本曲线<SEP>趋势图": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0",
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 3,
+    "create_time": 1765441790,
+    "update_time": 1765441790,
+    "_id": "成本曲线<SEP>趋势图"
+  },
+  "收入日报<SEP>月租收入(元)": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441790,
+    "update_time": 1765441790,
+    "_id": "收入日报<SEP>月租收入(元)"
+  },
+  "按资料类型分组<SEP>项目资料": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441790,
+    "update_time": 1765441790,
+    "_id": "按资料类型分组<SEP>项目资料"
+  },
+  "项目标签<SEP>颜色配置": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441793,
+    "update_time": 1765441793,
+    "_id": "项目标签<SEP>颜色配置"
+  },
+  "成本曲线<SEP>经营偏好": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441796,
+    "update_time": 1765441796,
+    "_id": "成本曲线<SEP>经营偏好"
+  },
+  "商家充值(元)<SEP>收入日报": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441797,
+    "update_time": 1765441797,
+    "_id": "商家充值(元)<SEP>收入日报"
+  },
+  "临停收入<SEP>营收情况": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441804,
+    "update_time": 1765441804,
+    "_id": "临停收入<SEP>营收情况"
+  },
+  "项目看板<SEP>项目资料": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441804,
+    "update_time": 1765441804,
+    "_id": "项目看板<SEP>项目资料"
+  },
+  "充电缴费(元)<SEP>收入日报": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441808,
+    "update_time": 1765441808,
+    "_id": "充电缴费(元)<SEP>收入日报"
+  },
+  "套餐收入<SEP>营收情况": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441810,
+    "update_time": 1765441810,
+    "_id": "套餐收入<SEP>营收情况"
+  },
+  "临停情况<SEP>临停收入": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441812,
+    "update_time": 1765441812,
+    "_id": "临停情况<SEP>临停收入"
+  },
+  "项目总览<SEP>项目看板": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9",
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 2,
+    "create_time": 1765441812,
+    "update_time": 1765441812,
+    "_id": "项目总览<SEP>项目看板"
+  },
+  "合计(元)<SEP>收入日报": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441813,
+    "update_time": 1765441813,
+    "_id": "合计(元)<SEP>收入日报"
+  },
+  "商家充值<SEP>营收情况": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441816,
+    "update_time": 1765441816,
+    "_id": "商家充值<SEP>营收情况"
+  },
+  "套餐情况<SEP>套餐销售订单数": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441816,
+    "update_time": 1765441816,
+    "_id": "套餐情况<SEP>套餐销售订单数"
+  },
+  "临停情况<SEP>临停车流": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441816,
+    "update_time": 1765441816,
+    "_id": "临停情况<SEP>临停车流"
+  },
+  "车场id<SEP>项目总览": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441817,
+    "update_time": 1765441817,
+    "_id": "车场id<SEP>项目总览"
+  },
+  "抵扣券充值张数<SEP>抵扣情况": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441817,
+    "update_time": 1765441817,
+    "_id": "抵扣券充值张数<SEP>抵扣情况"
+  },
+  "套餐情况<SEP>套餐收入": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441820,
+    "update_time": 1765441820,
+    "_id": "套餐情况<SEP>套餐收入"
+  },
+  "其他收入<SEP>营收情况": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441821,
+    "update_time": 1765441821,
+    "_id": "其他收入<SEP>营收情况"
+  },
+  "消息列表<SEP>项目动态": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441822,
+    "update_time": 1765441822,
+    "_id": "消息列表<SEP>项目动态"
+  },
+  "抵扣券充值金额<SEP>抵扣情况": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441824,
+    "update_time": 1765441824,
+    "_id": "抵扣券充值金额<SEP>抵扣情况"
+  },
+  "工作台<SEP>项目负责人": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441824,
+    "update_time": 1765441824,
+    "_id": "工作台<SEP>项目负责人"
+  },
+  "商家列表<SEP>项目总览": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9",
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 2,
+    "create_time": 1765441825,
+    "update_time": 1765441825,
+    "_id": "商家列表<SEP>项目总览"
+  },
+  "抵扣券抵扣张数<SEP>抵扣情况": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441830,
+    "update_time": 1765441830,
+    "_id": "抵扣券抵扣张数<SEP>抵扣情况"
+  },
+  "回款管理<SEP>回款管理列表页": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441830,
+    "update_time": 1765441830,
+    "_id": "回款管理<SEP>回款管理列表页"
+  },
+  "工作台<SEP>应收账款待办": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441831,
+    "update_time": 1765441831,
+    "_id": "工作台<SEP>应收账款待办"
+  },
+  "错时商品列表<SEP>项目总览": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9",
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 2,
+    "create_time": 1765441832,
+    "update_time": 1765441832,
+    "_id": "错时商品列表<SEP>项目总览"
+  },
+  "出入口月租续费功能<SEP>车主": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441832,
+    "update_time": 1765441832,
+    "_id": "出入口月租续费功能<SEP>车主"
+  },
+  "抵扣券抵扣金额<SEP>抵扣情况": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441834,
+    "update_time": 1765441834,
+    "_id": "抵扣券抵扣金额<SEP>抵扣情况"
+  },
+  "回款管理列表页<SEP>未回款订单": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441835,
+    "update_time": 1765441835,
+    "_id": "回款管理列表页<SEP>未回款订单"
+  },
+  "回款管理<SEP>款项确认": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441835,
+    "update_time": 1765441835,
+    "_id": "回款管理<SEP>款项确认"
+  },
+  "工作台<SEP>项目计划": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441836,
+    "update_time": 1765441836,
+    "_id": "工作台<SEP>项目计划"
+  },
+  "进行中经营计划<SEP>项目总览": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441837,
+    "update_time": 1765441837,
+    "_id": "进行中经营计划<SEP>项目总览"
+  },
+  "C端<SEP>车主": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441839,
+    "update_time": 1765441839,
+    "_id": "C端<SEP>车主"
+  },
+  "后台<SEP>月卡页底部导航配置": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441844,
+    "update_time": 1765441844,
+    "_id": "后台<SEP>月卡页底部导航配置"
+  },
+  "工作台<SEP>项目移交待办": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441844,
+    "update_time": 1765441844,
+    "_id": "工作台<SEP>项目移交待办"
+  },
+  "车场地图<SEP>项目总览": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 2,
+    "create_time": 1765441845,
+    "update_time": 1765441845,
+    "_id": "车场地图<SEP>项目总览"
+  },
+  "停车场<SEP>车主": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441846,
+    "update_time": 1765441846,
+    "_id": "停车场<SEP>车主"
+  },
+  "平台管理<SEP>重复支付自动退款功能": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441846,
+    "update_time": 1765441846,
+    "_id": "平台管理<SEP>重复支付自动退款功能"
+  },
+  "用户<SEP>经营助手": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441850,
+    "update_time": 1765441850,
+    "_id": "用户<SEP>经营助手"
+  },
+  "发票重开功能<SEP>车主": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441851,
+    "update_time": 1765441851,
+    "_id": "发票重开功能<SEP>车主"
+  },
+  "停车场<SEP>出入口月租续费功能": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441851,
+    "update_time": 1765441851,
+    "_id": "停车场<SEP>出入口月租续费功能"
+  },
+  "通用功能配置<SEP>重复支付自动退款功能": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441852,
+    "update_time": 1765441852,
+    "_id": "通用功能配置<SEP>重复支付自动退款功能"
+  },
+  "月卡申请页<SEP>月卡页底部导航配置": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441853,
+    "update_time": 1765441853,
+    "_id": "月卡申请页<SEP>月卡页底部导航配置"
+  },
+  "经营偏好设置<SEP>项目列表调整": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441853,
+    "update_time": 1765441853,
+    "_id": "经营偏好设置<SEP>项目列表调整"
+  },
+  "趋势图调整<SEP>项目看板": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441856,
+    "update_time": 1765441856,
+    "_id": "趋势图调整<SEP>项目看板"
+  },
+  "发票作废功能<SEP>车主": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441857,
+    "update_time": 1765441857,
+    "_id": "发票作废功能<SEP>车主"
+  },
+  "合同终止<SEP>审批流": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441859,
+    "update_time": 1765441859,
+    "_id": "合同终止<SEP>审批流"
+  },
+  "组织树<SEP>经营助手": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441862,
+    "update_time": 1765441862,
+    "_id": "组织树<SEP>经营助手"
+  },
+  "成本曲线<SEP>趋势图调整": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441863,
+    "update_time": 1765441863,
+    "_id": "成本曲线<SEP>趋势图调整"
+  },
+  "审批管理<SEP>流程配置": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441864,
+    "update_time": 1765441864,
+    "_id": "审批管理<SEP>流程配置"
+  },
+  "实收日期<SEP>营收管理": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441865,
+    "update_time": 1765441865,
+    "_id": "实收日期<SEP>营收管理"
+  },
+  "车主<SEP>重发邮件功能": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441865,
+    "update_time": 1765441865,
+    "_id": "车主<SEP>重发邮件功能"
+  },
+  "合同终止<SEP>多经合同": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441866,
+    "update_time": 1765441866,
+    "_id": "合同终止<SEP>多经合同"
+  },
+  "组织树<SEP>项目": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441868,
+    "update_time": 1765441868,
+    "_id": "组织树<SEP>项目"
+  },
+  "经营偏好设置<SEP>趋势图调整": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441869,
+    "update_time": 1765441869,
+    "_id": "经营偏好设置<SEP>趋势图调整"
+  },
+  "审批流<SEP>流程配置": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441870,
+    "update_time": 1765441870,
+    "_id": "审批流<SEP>流程配置"
+  },
+  "预算录入<SEP>预算管理": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441870,
+    "update_time": 1765441870,
+    "_id": "预算录入<SEP>预算管理"
+  },
+  "导出功能<SEP>归属收入": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441870,
+    "update_time": 1765441870,
+    "_id": "导出功能<SEP>归属收入"
+  },
+  "实收日期<SEP>实收模式": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441873,
+    "update_time": 1765441873,
+    "_id": "实收日期<SEP>实收模式"
+  },
+  "多经合同<SEP>营收管理": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441873,
+    "update_time": 1765441873,
+    "_id": "多经合同<SEP>营收管理"
+  },
+  "商户用券限制管理<SEP>抵扣券": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441876,
+    "update_time": 1765441876,
+    "_id": "商户用券限制管理<SEP>抵扣券"
+  },
+  "指定时间段收入<SEP>预算录入": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441877,
+    "update_time": 1765441877,
+    "_id": "指定时间段收入<SEP>预算录入"
+  },
+  "自动计算功能<SEP>预算管理": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441877,
+    "update_time": 1765441877,
+    "_id": "自动计算功能<SEP>预算管理"
+  },
+  "查看发票功能<SEP>车主": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441881,
+    "update_time": 1765441881,
+    "_id": "查看发票功能<SEP>车主"
+  },
+  "项目计划<SEP>项目计划菜单": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441883,
+    "update_time": 1765441883,
+    "_id": "项目计划<SEP>项目计划菜单"
+  },
+  "Excel文件<SEP>预算录入": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441884,
+    "update_time": 1765441884,
+    "_id": "Excel文件<SEP>预算录入"
+  },
+  "商户<SEP>商户用券限制管理": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441886,
+    "update_time": 1765441886,
+    "_id": "商户<SEP>商户用券限制管理"
+  },
+  "合同终止<SEP>审核": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441887,
+    "update_time": 1765441887,
+    "_id": "合同终止<SEP>审核"
+  },
+  "任务<SEP>项目计划": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441887,
+    "update_time": 1765441887,
+    "_id": "任务<SEP>项目计划"
+  },
+  "车主<SEP>重复支付自动退款功能": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441889,
+    "update_time": 1765441889,
+    "_id": "车主<SEP>重复支付自动退款功能"
+  },
+  "我的项目待办菜单<SEP>项目计划": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441894,
+    "update_time": 1765441894,
+    "_id": "我的项目待办菜单<SEP>项目计划"
+  },
+  "工作安排<SEP>日常工作": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441894,
+    "update_time": 1765441894,
+    "_id": "工作安排<SEP>日常工作"
+  },
+  "商户用券限制管理<SEP>时长券": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441894,
+    "update_time": 1765441894,
+    "_id": "商户用券限制管理<SEP>时长券"
+  },
+  "审批流<SEP>审核": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441894,
+    "update_time": 1765441894,
+    "_id": "审批流<SEP>审核"
+  },
+  "经营偏好<SEP>趋势图": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441896,
+    "update_time": 1765441896,
+    "_id": "经营偏好<SEP>趋势图"
+  },
+  "当前用户<SEP>我的项目待办菜单": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441898,
+    "update_time": 1765441898,
+    "_id": "当前用户<SEP>我的项目待办菜单"
+  },
+  "工作安排<SEP>项目计划": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441898,
+    "update_time": 1765441898,
+    "_id": "工作安排<SEP>项目计划"
+  },
+  "项目状态<SEP>项目管理": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441900,
+    "update_time": 1765441900,
+    "_id": "项目状态<SEP>项目管理"
+  },
+  "商户用券限制管理<SEP>金额券": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441900,
+    "update_time": 1765441900,
+    "_id": "商户用券限制管理<SEP>金额券"
+  },
+  "收入排行<SEP>经营偏好": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441906,
+    "update_time": 1765441906,
+    "_id": "收入排行<SEP>经营偏好"
+  },
+  "工作安排<SEP>移交计划": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441907,
+    "update_time": 1765441907,
+    "_id": "工作安排<SEP>移交计划"
+  },
+  "券面金额<SEP>商户用券限制管理": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441909,
+    "update_time": 1765441909,
+    "_id": "券面金额<SEP>商户用券限制管理"
+  },
+  "标记异常功能<SEP>项目状态": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441910,
+    "update_time": 1765441910,
+    "_id": "标记异常功能<SEP>项目状态"
+  },
+  "项目汇报<SEP>项目管理": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441910,
+    "update_time": 1765441910,
+    "_id": "项目汇报<SEP>项目管理"
+  },
+  "多经合同<SEP>经营管理": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441911,
+    "update_time": 1765441911,
+    "_id": "多经合同<SEP>经营管理"
+  },
+  "快速查询按钮<SEP>收入排行": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441913,
+    "update_time": 1765441913,
+    "_id": "快速查询按钮<SEP>收入排行"
+  },
+  "券面时长<SEP>商户用券限制管理": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441914,
+    "update_time": 1765441914,
+    "_id": "券面时长<SEP>商户用券限制管理"
+  },
+  "汇报功能<SEP>汇报接收人员": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441915,
+    "update_time": 1765441915,
+    "_id": "汇报功能<SEP>汇报接收人员"
+  },
+  "问题汇报<SEP>项目管理": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441916,
+    "update_time": 1765441916,
+    "_id": "问题汇报<SEP>项目管理"
+  },
+  "告警类型<SEP>工作管理": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441916,
+    "update_time": 1765441916,
+    "_id": "告警类型<SEP>工作管理"
+  },
+  "经营计划汇报<SEP>项目汇报": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441916,
+    "update_time": 1765441916,
+    "_id": "经营计划汇报<SEP>项目汇报"
+  },
+  "多经合同<SEP>审批流": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441921,
+    "update_time": 1765441921,
+    "_id": "多经合同<SEP>审批流"
+  },
+  "月租大客户列表<SEP>经营管理": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441921,
+    "update_time": 1765441921,
+    "_id": "月租大客户列表<SEP>经营管理"
+  },
+  "异常放行告警<SEP>遥控放行告警": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441921,
+    "update_time": 1765441921,
+    "_id": "异常放行告警<SEP>遥控放行告警"
+  },
+  "商户用券限制管理<SEP>系统": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441921,
+    "update_time": 1765441921,
+    "_id": "商户用券限制管理<SEP>系统"
+  },
+  "经营计划汇报<SEP>项目看板": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441923,
+    "update_time": 1765441923,
+    "_id": "经营计划汇报<SEP>项目看板"
+  },
+  "工作管理<SEP>收费员指标库": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441925,
+    "update_time": 1765441925,
+    "_id": "工作管理<SEP>收费员指标库"
+  },
+  "免费放行告警<SEP>异常放行告警": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441929,
+    "update_time": 1765441929,
+    "_id": "免费放行告警<SEP>异常放行告警"
+  },
+  "审批流<SEP>工作管理": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441933,
+    "update_time": 1765441933,
+    "_id": "审批流<SEP>工作管理"
+  },
+  "收费员指标库<SEP>有效应打票数": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441933,
+    "update_time": 1765441933,
+    "_id": "收费员指标库<SEP>有效应打票数"
+  },
+  "审批人<SEP>批量设置流程": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441933,
+    "update_time": 1765441933,
+    "_id": "审批人<SEP>批量设置流程"
+  },
+  "临停收入下滑告警<SEP>问题汇报": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441933,
+    "update_time": 1765441933,
+    "_id": "临停收入下滑告警<SEP>问题汇报"
+  },
+  "回款管理<SEP>营收分摊模式": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441935,
+    "update_time": 1765441935,
+    "_id": "回款管理<SEP>营收分摊模式"
+  },
+  "应收费异常放行告警<SEP>异常放行告警": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441935,
+    "update_time": 1765441935,
+    "_id": "应收费异常放行告警<SEP>异常放行告警"
+  },
+  "分组<SEP>审批流": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441937,
+    "update_time": 1765441937,
+    "_id": "分组<SEP>审批流"
+  },
+  "异常抵扣稽核<SEP>抵扣黑名单按钮": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441938,
+    "update_time": 1765441938,
+    "_id": "异常抵扣稽核<SEP>抵扣黑名单按钮"
+  },
+  "收费员指标库<SEP>有效打票数": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441938,
+    "update_time": 1765441938,
+    "_id": "收费员指标库<SEP>有效打票数"
+  },
+  "批量设置流程<SEP>抄送人": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441939,
+    "update_time": 1765441939,
+    "_id": "批量设置流程<SEP>抄送人"
+  },
+  "手动添加功能<SEP>抵扣白名单": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441942,
+    "update_time": 1765441942,
+    "_id": "手动添加功能<SEP>抵扣白名单"
+  },
+  "未回款订单<SEP>营收分摊模式": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441942,
+    "update_time": 1765441942,
+    "_id": "未回款订单<SEP>营收分摊模式"
+  },
+  "趋势图<SEP>项目看板": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441944,
+    "update_time": 1765441944,
+    "_id": "趋势图<SEP>项目看板"
+  },
+  "抵扣黑名单按钮<SEP>集团的商家抵扣黑名单页面": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441944,
+    "update_time": 1765441944,
+    "_id": "抵扣黑名单按钮<SEP>集团的商家抵扣黑名单页面"
+  },
+  "告警类型<SEP>异常放行告警": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441944,
+    "update_time": 1765441944,
+    "_id": "告警类型<SEP>异常放行告警"
+  },
+  "车场ID<SEP>项目总览": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441945,
+    "update_time": 1765441945,
+    "_id": "车场ID<SEP>项目总览"
+  },
+  "分组<SEP>科拓": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441949,
+    "update_time": 1765441949,
+    "_id": "分组<SEP>科拓"
+  },
+  "审批流<SEP>批量设置流程": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441950,
+    "update_time": 1765441950,
+    "_id": "审批流<SEP>批量设置流程"
+  },
+  "周报<SEP>回款率": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441953,
+    "update_time": 1765441953,
+    "_id": "周报<SEP>回款率"
+  },
+  "项目看板<SEP>项目资料展示": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441953,
+    "update_time": 1765441953,
+    "_id": "项目看板<SEP>项目资料展示"
+  },
+  "经营计划<SEP>项目总览": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441956,
+    "update_time": 1765441956,
+    "_id": "经营计划<SEP>项目总览"
+  },
+  "在场车详情页<SEP>路侧助手": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441958,
+    "update_time": 1765441958,
+    "_id": "在场车详情页<SEP>路侧助手"
+  },
+  "异常抵扣稽核<SEP>抵扣白名单": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441960,
+    "update_time": 1765441960,
+    "_id": "异常抵扣稽核<SEP>抵扣白名单"
+  },
+  "待办菜单<SEP>项目任务": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441962,
+    "update_time": 1765441962,
+    "_id": "待办菜单<SEP>项目任务"
+  },
+  "回款率<SEP>月报": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441963,
+    "update_time": 1765441963,
+    "_id": "回款率<SEP>月报"
+  },
+  "移交计划<SEP>项目移交菜单": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441963,
+    "update_time": 1765441963,
+    "_id": "移交计划<SEP>项目移交菜单"
+  },
+  "消息内容<SEP>消息列表": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441964,
+    "update_time": 1765441964,
+    "_id": "消息内容<SEP>消息列表"
+  },
+  "异常状态项目<SEP>项目看板": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441965,
+    "update_time": 1765441965,
+    "_id": "异常状态项目<SEP>项目看板"
+  },
+  "当月回款率<SEP>经营报表": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441968,
+    "update_time": 1765441968,
+    "_id": "当月回款率<SEP>经营报表"
+  },
+  "在场车详情页<SEP>车型": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441968,
+    "update_time": 1765441968,
+    "_id": "在场车详情页<SEP>车型"
+  },
+  "停车订单<SEP>路侧助手": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441968,
+    "update_time": 1765441968,
+    "_id": "停车订单<SEP>路侧助手"
+  },
+  "回款率<SEP>集团配置": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441973,
+    "update_time": 1765441973,
+    "_id": "回款率<SEP>集团配置"
+  },
+  "项目看板<SEP>项目管理": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441974,
+    "update_time": 1765441974,
+    "_id": "项目看板<SEP>项目管理"
+  },
+  "BI分析<SEP>停车时长分析": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441974,
+    "update_time": 1765441974,
+    "_id": "BI分析<SEP>停车时长分析"
+  },
+  "停车时长分析<SEP>饼图": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441984,
+    "update_time": 1765441984,
+    "_id": "停车时长分析<SEP>饼图"
+  },
+  "周报月报<SEP>回款率": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441984,
+    "update_time": 1765441984,
+    "_id": "周报月报<SEP>回款率"
+  },
+  "BI分析<SEP>项目BI分析数据": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441984,
+    "update_time": 1765441984,
+    "_id": "BI分析<SEP>项目BI分析数据"
+  },
+  "导出功能<SEP>指标排行": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441984,
+    "update_time": 1765441984,
+    "_id": "导出功能<SEP>指标排行"
+  },
+  "消息分组<SEP>消息列表": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441984,
+    "update_time": 1765441984,
+    "_id": "消息分组<SEP>消息列表"
+  },
+  "字段统计时间维度<SEP>路侧工作站分析": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441986,
+    "update_time": 1765441986,
+    "_id": "字段统计时间维度<SEP>路侧工作站分析"
+  },
+  "临停缴费应收<SEP>出车时间": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441987,
+    "update_time": 1765441987,
+    "_id": "临停缴费应收<SEP>出车时间"
+  },
+  "当月已收款金额<SEP>经营报表": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441987,
+    "update_time": 1765441987,
+    "_id": "当月已收款金额<SEP>经营报表"
+  },
+  "临停缴费实收<SEP>支付时间": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442005,
+    "update_time": 1765442005,
+    "_id": "临停缴费实收<SEP>支付时间"
+  },
+  "停车时长分析<SEP>分布区间": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442005,
+    "update_time": 1765442005,
+    "_id": "停车时长分析<SEP>分布区间"
+  },
+  "清除时间<SEP>清除金额": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442015,
+    "update_time": 1765442015,
+    "_id": "清除时间<SEP>清除金额"
+  },
+  "BI分析<SEP>指标排行": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442015,
+    "update_time": 1765442015,
+    "_id": "BI分析<SEP>指标排行"
+  },
+  "出车时间<SEP>逃费金额": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442015,
+    "update_time": 1765442015,
+    "_id": "出车时间<SEP>逃费金额"
+  },
+  "优化<SEP>离场待确认": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442015,
+    "update_time": 1765442015,
+    "_id": "优化<SEP>离场待确认"
+  },
+  "当月未收款金额<SEP>经营报表": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442018,
+    "update_time": 1765442018,
+    "_id": "当月未收款金额<SEP>经营报表"
+  },
+  "抵扣金额<SEP>支付时间": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442019,
+    "update_time": 1765442019,
+    "_id": "抵扣金额<SEP>支付时间"
+  },
+  "BI分析数据<SEP>新建项目": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442019,
+    "update_time": 1765442019,
+    "_id": "BI分析数据<SEP>新建项目"
+  },
+  "BI分析<SEP>路侧工作站分析": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442023,
+    "update_time": 1765442023,
+    "_id": "BI分析<SEP>路侧工作站分析"
+  },
+  "订单<SEP>路侧疑似重复支付标签": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442024,
+    "update_time": 1765442024,
+    "_id": "订单<SEP>路侧疑似重复支付标签"
+  },
+  "修改记录<SEP>月租车卡": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442029,
+    "update_time": 1765442029,
+    "_id": "修改记录<SEP>月租车卡"
+  },
+  "支付时间<SEP>钱包抵扣金额": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442029,
+    "update_time": 1765442029,
+    "_id": "支付时间<SEP>钱包抵扣金额"
+  },
+  "打票时间<SEP>路侧车次记录": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442030,
+    "update_time": 1765442030,
+    "_id": "打票时间<SEP>路侧车次记录"
+  },
+  "预约时段<SEP>预约车管理": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442030,
+    "update_time": 1765442030,
+    "_id": "预约时段<SEP>预约车管理"
+  },
+  "巡逻单停车日志<SEP>离场待确认": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442031,
+    "update_time": 1765442031,
+    "_id": "巡逻单停车日志<SEP>离场待确认"
+  },
+  "指定时间段<SEP>新能源计费规则管理": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442037,
+    "update_time": 1765442037,
+    "_id": "指定时间段<SEP>新能源计费规则管理"
+  },
+  "历史欠费追缴<SEP>支付时间": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442037,
+    "update_time": 1765442037,
+    "_id": "历史欠费追缴<SEP>支付时间"
+  },
+  "子类型<SEP>硬件识别率统计": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442042,
+    "update_time": 1765442042,
+    "_id": "子类型<SEP>硬件识别率统计"
+  },
+  "周报<SEP>新增汇报功能": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442042,
+    "update_time": 1765442042,
+    "_id": "周报<SEP>新增汇报功能"
+  },
+  "导出功能<SEP>预约车管理": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442042,
+    "update_time": 1765442042,
+    "_id": "导出功能<SEP>预约车管理"
+  },
+  "异常出车影响打票率配置<SEP>收费员": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442042,
+    "update_time": 1765442042,
+    "_id": "异常出车影响打票率配置<SEP>收费员"
+  },
+  "优化<SEP>巡逻单停车日志": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442042,
+    "update_time": 1765442042,
+    "_id": "优化<SEP>巡逻单停车日志"
+  },
+  "新增汇报功能<SEP>月报": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442048,
+    "update_time": 1765442048,
+    "_id": "新增汇报功能<SEP>月报"
+  },
+  "套餐类型<SEP>预约车管理": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442051,
+    "update_time": 1765442051,
+    "_id": "套餐类型<SEP>预约车管理"
+  },
+  "异常出车<SEP>收费员": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442053,
+    "update_time": 1765442053,
+    "_id": "异常出车<SEP>收费员"
+  },
+  "异常出车影响打票率配置<SEP>有效应打票数": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442054,
+    "update_time": 1765442054,
+    "_id": "异常出车影响打票率配置<SEP>有效应打票数"
+  },
+  "新增汇报功能<SEP>汇报模板": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442057,
+    "update_time": 1765442057,
+    "_id": "新增汇报功能<SEP>汇报模板"
+  },
+  "功能配置<SEP>预约车管理": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442059,
+    "update_time": 1765442059,
+    "_id": "功能配置<SEP>预约车管理"
+  },
+  "套餐管理<SEP>套餐类型": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442059,
+    "update_time": 1765442059,
+    "_id": "套餐管理<SEP>套餐类型"
+  },
+  "异常出车<SEP>打票率": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442060,
+    "update_time": 1765442060,
+    "_id": "异常出车<SEP>打票率"
+  },
+  "新增汇报功能<SEP>汇报接收人员": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442066,
+    "update_time": 1765442066,
+    "_id": "新增汇报功能<SEP>汇报接收人员"
+  },
+  "功能配置<SEP>新能源计费规则管理": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442066,
+    "update_time": 1765442066,
+    "_id": "功能配置<SEP>新能源计费规则管理"
+  },
+  "工作管理<SEP>新增汇报功能": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442069,
+    "update_time": 1765442069,
+    "_id": "工作管理<SEP>新增汇报功能"
+  },
+  "车场月卡和套餐管理<SEP>车场月租设定": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442305,
+    "update_time": 1765442305,
+    "_id": "车场月卡和套餐管理<SEP>车场月租设定"
+  },
+  "新增、编辑、导出操作<SEP>车场车位管理页面": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442305,
+    "update_time": 1765442305,
+    "_id": "新增、编辑、导出操作<SEP>车场车位管理页面"
+  },
+  "充值规则<SEP>车场套餐设定": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442305,
+    "update_time": 1765442305,
+    "_id": "充值规则<SEP>车场套餐设定"
+  },
+  "车场月租设定<SEP>车场车位管理页面": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442312,
+    "update_time": 1765442312,
+    "_id": "车场月租设定<SEP>车场车位管理页面"
+  },
+  "充值规则<SEP>车牌类型": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442313,
+    "update_time": 1765442313,
+    "_id": "充值规则<SEP>车牌类型"
+  },
+  "车场套餐管理<SEP>车场月租设定": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442315,
+    "update_time": 1765442315,
+    "_id": "车场套餐管理<SEP>车场月租设定"
+  },
+  "充值类型<SEP>充值规则": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442316,
+    "update_time": 1765442316,
+    "_id": "充值类型<SEP>充值规则"
+  },
+  "内部车配置<SEP>车牌类型": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442316,
+    "update_time": 1765442316,
+    "_id": "内部车配置<SEP>车牌类型"
+  },
+  "组织树<SEP>车场套餐管理": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442318,
+    "update_time": 1765442318,
+    "_id": "组织树<SEP>车场套餐管理"
+  },
+  "充值<SEP>充值规则": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442319,
+    "update_time": 1765442319,
+    "_id": "充值<SEP>充值规则"
+  },
+  "内部车配置<SEP>套餐": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442321,
+    "update_time": 1765442321,
+    "_id": "内部车配置<SEP>套餐"
+  },
+  "月租车辆管理<SEP>车场月租车": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442321,
+    "update_time": 1765442321,
+    "_id": "月租车辆管理<SEP>车场月租车"
+  },
+  "新增套餐按钮<SEP>车场套餐管理": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442322,
+    "update_time": 1765442322,
+    "_id": "新增套餐按钮<SEP>车场套餐管理"
+  },
+  "充值规则<SEP>赠送优惠": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442323,
+    "update_time": 1765442323,
+    "_id": "充值规则<SEP>赠送优惠"
+  },
+  "新增按钮<SEP>车场月租车": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442324,
+    "update_time": 1765442324,
+    "_id": "新增按钮<SEP>车场月租车"
+  },
+  "内部车信息<SEP>车牌类型": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d",
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 2,
+    "create_time": 1765442324,
+    "update_time": 1765442324,
+    "_id": "内部车信息<SEP>车牌类型"
+  },
+  "内部车<SEP>车场套餐管理": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442329,
+    "update_time": 1765442329,
+    "_id": "内部车<SEP>车场套餐管理"
+  },
+  "充值规则<SEP>赠送递增": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442329,
+    "update_time": 1765442329,
+    "_id": "充值规则<SEP>赠送递增"
+  },
+  "内部车管理<SEP>单车场后台": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442329,
+    "update_time": 1765442329,
+    "_id": "内部车管理<SEP>单车场后台"
+  },
+  "内部车信息<SEP>套餐": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442332,
+    "update_time": 1765442332,
+    "_id": "内部车信息<SEP>套餐"
+  },
+  "车场套餐审核<SEP>车场套餐管理": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442333,
+    "update_time": 1765442333,
+    "_id": "车场套餐审核<SEP>车场套餐管理"
+  },
+  "内部车<SEP>车场月租车": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442333,
+    "update_time": 1765442333,
+    "_id": "内部车<SEP>车场月租车"
+  },
+  "充值规则<SEP>收费": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442334,
+    "update_time": 1765442334,
+    "_id": "充值规则<SEP>收费"
+  },
+  "内部车管理<SEP>内部车配置": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d",
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 2,
+    "create_time": 1765442336,
+    "update_time": 1765442336,
+    "_id": "内部车管理<SEP>内部车配置"
+  },
+  "单车场后台<SEP>车牌类型": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442336,
+    "update_time": 1765442336,
+    "_id": "单车场后台<SEP>车牌类型"
+  },
+  "内部车信息<SEP>计费规则": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442337,
+    "update_time": 1765442337,
+    "_id": "内部车信息<SEP>计费规则"
+  },
+  "充值规则<SEP>开始类型": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442343,
+    "update_time": 1765442343,
+    "_id": "充值规则<SEP>开始类型"
+  },
+  "内部车管理<SEP>车场管理": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442343,
+    "update_time": 1765442343,
+    "_id": "内部车管理<SEP>车场管理"
+  },
+  "套餐<SEP>车牌类型": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442343,
+    "update_time": 1765442343,
+    "_id": "套餐<SEP>车牌类型"
+  },
+  "占用车位数<SEP>车位设置": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442343,
+    "update_time": 1765442343,
+    "_id": "占用车位数<SEP>车位设置"
+  },
+  "充值规则<SEP>按车位计费": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442345,
+    "update_time": 1765442345,
+    "_id": "充值规则<SEP>按车位计费"
+  },
+  "车位编号<SEP>车位设置": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442348,
+    "update_time": 1765442348,
+    "_id": "车位编号<SEP>车位设置"
+  },
+  "车牌<SEP>车牌绑定": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442350,
+    "update_time": 1765442350,
+    "_id": "车牌<SEP>车牌绑定"
+  },
+  "套餐<SEP>计费规则": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442351,
+    "update_time": 1765442351,
+    "_id": "套餐<SEP>计费规则"
+  },
+  "内部车信息<SEP>线上合同": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442351,
+    "update_time": 1765442351,
+    "_id": "内部车信息<SEP>线上合同"
+  },
+  "充值套餐配置<SEP>充值规则": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442352,
+    "update_time": 1765442352,
+    "_id": "充值套餐配置<SEP>充值规则"
+  },
+  "车位编号<SEP>车位资源管理": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442354,
+    "update_time": 1765442354,
+    "_id": "车位编号<SEP>车位资源管理"
+  },
+  "月租车辆审核<SEP>车场月租车审核": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442354,
+    "update_time": 1765442354,
+    "_id": "月租车辆审核<SEP>车场月租车审核"
+  },
+  "单车场后台<SEP>套餐": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442356,
+    "update_time": 1765442356,
+    "_id": "单车场后台<SEP>套餐"
+  },
+  "充值规则<SEP>首充时间": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442359,
+    "update_time": 1765442359,
+    "_id": "充值规则<SEP>首充时间"
+  },
+  "卡号<SEP>车牌绑定": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442360,
+    "update_time": 1765442360,
+    "_id": "卡号<SEP>车牌绑定"
+  },
+  "车位备注<SEP>车位编号": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442361,
+    "update_time": 1765442361,
+    "_id": "车位备注<SEP>车位编号"
+  },
+  "C端公众号<SEP>月租车辆审核": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442363,
+    "update_time": 1765442363,
+    "_id": "C端公众号<SEP>月租车辆审核"
+  },
+  "单车场后台<SEP>车场管理": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442367,
+    "update_time": 1765442367,
+    "_id": "单车场后台<SEP>车场管理"
+  },
+  "当前时间<SEP>首充时间": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442367,
+    "update_time": 1765442367,
+    "_id": "当前时间<SEP>首充时间"
+  },
+  "允许超车位进场<SEP>车牌绑定": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442367,
+    "update_time": 1765442367,
+    "_id": "允许超车位进场<SEP>车牌绑定"
+  },
+  "充值规则<SEP>内部车信息": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442367,
+    "update_time": 1765442367,
+    "_id": "充值规则<SEP>内部车信息"
+  },
+  "占用车位数<SEP>车位编号": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442368,
+    "update_time": 1765442368,
+    "_id": "占用车位数<SEP>车位编号"
+  },
+  "月卡充值<SEP>月租车辆审核": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442370,
+    "update_time": 1765442370,
+    "_id": "月卡充值<SEP>月租车辆审核"
+  },
+  "C端公众号<SEP>车主": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442371,
+    "update_time": 1765442371,
+    "_id": "C端公众号<SEP>车主"
+  },
+  "允许超车位进场<SEP>计费规则": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442372,
+    "update_time": 1765442372,
+    "_id": "允许超车位进场<SEP>计费规则"
+  },
+  "审核<SEP>线上续费": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442372,
+    "update_time": 1765442372,
+    "_id": "审核<SEP>线上续费"
+  },
+  "进场时间<SEP>首充时间": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442374,
+    "update_time": 1765442374,
+    "_id": "进场时间<SEP>首充时间"
+  },
+  "充值规则<SEP>有效期": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442375,
+    "update_time": 1765442375,
+    "_id": "充值规则<SEP>有效期"
+  },
+  "组织树<SEP>车场": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442375,
+    "update_time": 1765442375,
+    "_id": "组织树<SEP>车场"
+  },
+  "后台内部车充值需要审核<SEP>月租车辆审核": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442379,
+    "update_time": 1765442379,
+    "_id": "后台内部车充值需要审核<SEP>月租车辆审核"
+  },
+  "线上续费<SEP>通过": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442382,
+    "update_time": 1765442382,
+    "_id": "线上续费<SEP>通过"
+  },
+  "线上支付金额<SEP>驳回": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442382,
+    "update_time": 1765442382,
+    "_id": "线上支付金额<SEP>驳回"
+  },
+  "审核<SEP>车场": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442388,
+    "update_time": 1765442388,
+    "_id": "审核<SEP>车场"
+  },
+  "支付方式<SEP>资金到账模块": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442388,
+    "update_time": 1765442388,
+    "_id": "支付方式<SEP>资金到账模块"
+  },
+  "线上支付金额<SEP>重新退款": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442394,
+    "update_time": 1765442394,
+    "_id": "线上支付金额<SEP>重新退款"
+  },
+  "充值规则<SEP>费用": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442394,
+    "update_time": 1765442394,
+    "_id": "充值规则<SEP>费用"
+  },
+  "月租车辆审核<SEP>车主线上内部车自助续费需要审核": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442394,
+    "update_time": 1765442394,
+    "_id": "月租车辆审核<SEP>车主线上内部车自助续费需要审核"
+  },
+  "审核<SEP>审核按钮": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442394,
+    "update_time": 1765442394,
+    "_id": "审核<SEP>审核按钮"
+  },
+  "支付来源<SEP>资金到账模块": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442395,
+    "update_time": 1765442395,
+    "_id": "支付来源<SEP>资金到账模块"
+  },
+  "支付方式<SEP>现金": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442395,
+    "update_time": 1765442395,
+    "_id": "支付方式<SEP>现金"
+  },
+  "审核<SEP>通过": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442399,
+    "update_time": 1765442399,
+    "_id": "审核<SEP>通过"
+  },
+  "云助手<SEP>支付来源": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442400,
+    "update_time": 1765442400,
+    "_id": "云助手<SEP>支付来源"
+  },
+  "支付方式<SEP>线上转账": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442401,
+    "update_time": 1765442401,
+    "_id": "支付方式<SEP>线上转账"
+  },
+  "审核<SEP>驳回": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442405,
+    "update_time": 1765442405,
+    "_id": "审核<SEP>驳回"
+  },
+  "支付来源<SEP>永策": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442405,
+    "update_time": 1765442405,
+    "_id": "支付来源<SEP>永策"
+  }
+}

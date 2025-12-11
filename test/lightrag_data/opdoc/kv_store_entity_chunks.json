@@ -1,0 +1,3428 @@
+{
+  "最新消息": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30",
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 2,
+    "create_time": 1765441256,
+    "update_time": 1765441256,
+    "_id": "最新消息"
+  },
+  "稽核": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441258,
+    "update_time": 1765441258,
+    "_id": "稽核"
+  },
+  "收费员": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30",
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 2,
+    "create_time": 1765441258,
+    "update_time": 1765441258,
+    "_id": "收费员"
+  },
+  "消息列表页": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30",
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 2,
+    "create_time": 1765441258,
+    "update_time": 1765441258,
+    "_id": "消息列表页"
+  },
+  "未到岗收费员": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441258,
+    "update_time": 1765441258,
+    "_id": "未到岗收费员"
+  },
+  "告警": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441258,
+    "update_time": 1765441258,
+    "_id": "告警"
+  },
+  "车场异常": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441258,
+    "update_time": 1765441258,
+    "_id": "车场异常"
+  },
+  "收费员异常考勤": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441258,
+    "update_time": 1765441258,
+    "_id": "收费员异常考勤"
+  },
+  "个人工作台": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441258,
+    "update_time": 1765441258,
+    "_id": "个人工作台"
+  },
+  "收费员管理页": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441259,
+    "update_time": 1765441259,
+    "_id": "收费员管理页"
+  },
+  "日常工作": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 2,
+    "create_time": 1765441259,
+    "update_time": 1765441259,
+    "_id": "日常工作"
+  },
+  "消息": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441259,
+    "update_time": 1765441259,
+    "_id": "消息"
+  },
+  "离岗收费员": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441259,
+    "update_time": 1765441259,
+    "_id": "离岗收费员"
+  },
+  "待审批": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441260,
+    "update_time": 1765441260,
+    "_id": "待审批"
+  },
+  "工单": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441262,
+    "update_time": 1765441262,
+    "_id": "工单"
+  },
+  "巡检任务": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441263,
+    "update_time": 1765441263,
+    "_id": "巡检任务"
+  },
+  "投诉": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441264,
+    "update_time": 1765441264,
+    "_id": "投诉"
+  },
+  "经营情况": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441273,
+    "update_time": 1765441273,
+    "_id": "经营情况"
+  },
+  "经营偏好配置": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441273,
+    "update_time": 1765441273,
+    "_id": "经营偏好配置"
+  },
+  "项目收入": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441273,
+    "update_time": 1765441273,
+    "_id": "项目收入"
+  },
+  "预算偏差率": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441274,
+    "update_time": 1765441274,
+    "_id": "预算偏差率"
+  },
+  "预算达成率": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441275,
+    "update_time": 1765441275,
+    "_id": "预算达成率"
+  },
+  "对比同期收入": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441277,
+    "update_time": 1765441277,
+    "_id": "对比同期收入"
+  },
+  "项目详情": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441278,
+    "update_time": 1765441278,
+    "_id": "项目详情"
+  },
+  "实收收入": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30",
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 2,
+    "create_time": 1765441282,
+    "update_time": 1765441282,
+    "_id": "实收收入"
+  },
+  "今日实时收入": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441282,
+    "update_time": 1765441282,
+    "_id": "今日实时收入"
+  },
+  "营收收入": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30",
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 2,
+    "create_time": 1765441282,
+    "update_time": 1765441282,
+    "_id": "营收收入"
+  },
+  "截止昨日的收入": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441283,
+    "update_time": 1765441283,
+    "_id": "截止昨日的收入"
+  },
+  "汇报功能": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef",
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce",
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 3,
+    "create_time": 1765441284,
+    "update_time": 1765441284,
+    "_id": "汇报功能"
+  },
+  "周报": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef",
+      "chunk-a335ee2e69605ffea482cf7f34eaba46",
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce",
+      "chunk-5c69cecf2df371573b615f404f952986",
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 5,
+    "create_time": 1765441285,
+    "update_time": 1765441285,
+    "_id": "周报"
+  },
+  "月报": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef",
+      "chunk-a335ee2e69605ffea482cf7f34eaba46",
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce",
+      "chunk-5c69cecf2df371573b615f404f952986",
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 5,
+    "create_time": 1765441287,
+    "update_time": 1765441287,
+    "_id": "月报"
+  },
+  "PC端配置的模板": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441289,
+    "update_time": 1765441289,
+    "_id": "PC端配置的模板"
+  },
+  "指定人员/角色": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441291,
+    "update_time": 1765441291,
+    "_id": "指定人员/角色"
+  },
+  "项目计划": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986",
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce",
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 4,
+    "create_time": 1765441294,
+    "update_time": 1765441294,
+    "_id": "项目计划"
+  },
+  "项目移交": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441294,
+    "update_time": 1765441294,
+    "_id": "项目移交"
+  },
+  "工作管理": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef",
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce",
+      "chunk-5c69cecf2df371573b615f404f952986",
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 4,
+    "create_time": 1765441294,
+    "update_time": 1765441294,
+    "_id": "工作管理"
+  },
+  "项目待办": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441296,
+    "update_time": 1765441296,
+    "_id": "项目待办"
+  },
+  "异常稽核移动端": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441298,
+    "update_time": 1765441298,
+    "_id": "异常稽核移动端"
+  },
+  "收费员管理详情页面": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441299,
+    "update_time": 1765441299,
+    "_id": "收费员管理详情页面"
+  },
+  "我的": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441300,
+    "update_time": 1765441300,
+    "_id": "我的"
+  },
+  "手动更新功能": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441301,
+    "update_time": 1765441301,
+    "_id": "手动更新功能"
+  },
+  "永策C端": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441303,
+    "update_time": 1765441303,
+    "_id": "永策C端"
+  },
+  "非认证车主": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441307,
+    "update_time": 1765441307,
+    "_id": "非认证车主"
+  },
+  "隐私模式": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441307,
+    "update_time": 1765441307,
+    "_id": "隐私模式"
+  },
+  "临停缴费自动开票逻辑": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441308,
+    "update_time": 1765441308,
+    "_id": "临停缴费自动开票逻辑"
+  },
+  "出口月租续费功能": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441309,
+    "update_time": 1765441309,
+    "_id": "出口月租续费功能"
+  },
+  "车主": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986",
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c",
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 3,
+    "update_time": 1765442266,
+    "_id": "车主"
+  },
+  "后台集团配置": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441312,
+    "update_time": 1765441312,
+    "_id": "后台集团配置"
+  },
+  "通用配置": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441313,
+    "update_time": 1765441313,
+    "_id": "通用配置"
+  },
+  "车主运营": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986",
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 2,
+    "create_time": 1765441314,
+    "update_time": 1765441314,
+    "_id": "车主运营"
+  },
+  "PC端": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986",
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 2,
+    "create_time": 1765441315,
+    "update_time": 1765441315,
+    "_id": "PC端"
+  },
+  "设置": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441318,
+    "update_time": 1765441318,
+    "_id": "设置"
+  },
+  "移动端": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441318,
+    "update_time": 1765441318,
+    "_id": "移动端"
+  },
+  "新版本": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441319,
+    "update_time": 1765441319,
+    "_id": "新版本"
+  },
+  "月租车": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986",
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 2,
+    "update_time": 1765442237,
+    "_id": "月租车"
+  },
+  "车卡": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986",
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 2,
+    "create_time": 1765441322,
+    "update_time": 1765441322,
+    "_id": "车卡"
+  },
+  "公众号消息": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441323,
+    "update_time": 1765441323,
+    "_id": "公众号消息"
+  },
+  "发票": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986"
+    ],
+    "count": 1,
+    "create_time": 1765441324,
+    "update_time": 1765441324,
+    "_id": "发票"
+  },
+  "系统": {
+    "chunk_ids": [
+      "chunk-5c69cecf2df371573b615f404f952986",
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 2,
+    "create_time": 1765441326,
+    "update_time": 1765441326,
+    "_id": "系统"
+  },
+  "抵扣白名单": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef",
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 2,
+    "create_time": 1765441327,
+    "update_time": 1765441327,
+    "_id": "抵扣白名单"
+  },
+  "列表": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441330,
+    "update_time": 1765441330,
+    "_id": "列表"
+  },
+  "抵扣白名单手动添加功能": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441330,
+    "update_time": 1765441330,
+    "_id": "抵扣白名单手动添加功能"
+  },
+  "抵扣券收入": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441331,
+    "update_time": 1765441331,
+    "_id": "抵扣券收入"
+  },
+  "车场月租价格": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441332,
+    "update_time": 1765441332,
+    "_id": "车场月租价格"
+  },
+  "打回功能": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441333,
+    "update_time": 1765441333,
+    "_id": "打回功能"
+  },
+  "已稽核记录": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441335,
+    "update_time": 1765441335,
+    "_id": "已稽核记录"
+  },
+  "未稽核记录": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441336,
+    "update_time": 1765441336,
+    "_id": "未稽核记录"
+  },
+  "稽核人员": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441338,
+    "update_time": 1765441338,
+    "_id": "稽核人员"
+  },
+  "工单提醒": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441339,
+    "update_time": 1765441339,
+    "_id": "工单提醒"
+  },
+  "用户管理": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441342,
+    "update_time": 1765441342,
+    "_id": "用户管理"
+  },
+  "平台管理": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6",
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 2,
+    "create_time": 1765441342,
+    "update_time": 1765441342,
+    "_id": "平台管理"
+  },
+  "组织节点": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441343,
+    "update_time": 1765441343,
+    "_id": "组织节点"
+  },
+  "角色筛选": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441344,
+    "update_time": 1765441344,
+    "_id": "角色筛选"
+  },
+  "隐藏列表": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441346,
+    "update_time": 1765441346,
+    "_id": "隐藏列表"
+  },
+  "事件查询": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441347,
+    "update_time": 1765441347,
+    "_id": "事件查询"
+  },
+  "经营偏好设置": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6",
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 2,
+    "create_time": 1765441349,
+    "update_time": 1765441349,
+    "_id": "经营偏好设置"
+  },
+  "指标": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441350,
+    "update_time": 1765441350,
+    "_id": "指标"
+  },
+  "趋势图": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46",
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0",
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 4,
+    "create_time": 1765441351,
+    "update_time": 1765441351,
+    "_id": "趋势图"
+  },
+  "项管助手": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441355,
+    "update_time": 1765441355,
+    "_id": "项管助手"
+  },
+  "项目列表(收入排行)": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441355,
+    "update_time": 1765441355,
+    "_id": "项目列表(收入排行)"
+  },
+  "企业微信移动端": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441355,
+    "update_time": 1765441355,
+    "_id": "企业微信移动端"
+  },
+  "首页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441357,
+    "update_time": 1765441357,
+    "_id": "首页"
+  },
+  "今日收入": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441358,
+    "update_time": 1765441358,
+    "_id": "今日收入"
+  },
+  "本周收入": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441359,
+    "update_time": 1765441359,
+    "_id": "本周收入"
+  },
+  "本月收入": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441360,
+    "update_time": 1765441360,
+    "_id": "本月收入"
+  },
+  "本季收入": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441362,
+    "update_time": 1765441362,
+    "_id": "本季收入"
+  },
+  "本年收入": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441363,
+    "update_time": 1765441363,
+    "_id": "本年收入"
+  },
+  "当前角色": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441366,
+    "update_time": 1765441366,
+    "_id": "当前角色"
+  },
+  "快捷菜单": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441366,
+    "update_time": 1765441366,
+    "_id": "快捷菜单"
+  },
+  "导航页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441367,
+    "update_time": 1765441367,
+    "_id": "导航页"
+  },
+  "消息详情页": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441368,
+    "update_time": 1765441368,
+    "_id": "消息详情页"
+  },
+  "永策Pro1.7.8-1.8.0上线说明": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441370,
+    "update_time": 1765441370,
+    "_id": "永策Pro1.7.8-1.8.0上线说明"
+  },
+  "永策Pro": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441371,
+    "update_time": 1765441371,
+    "_id": "永策Pro"
+  },
+  "集团总览": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441372,
+    "update_time": 1765441372,
+    "_id": "集团总览"
+  },
+  "隐藏放行稽核统计": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441374,
+    "update_time": 1765441374,
+    "_id": "隐藏放行稽核统计"
+  },
+  "日周月季年可切换选项": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441375,
+    "update_time": 1765441375,
+    "_id": "日周月季年可切换选项"
+  },
+  "月": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441377,
+    "update_time": 1765441377,
+    "_id": "月"
+  },
+  "成本曲线": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46",
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0",
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 4,
+    "create_time": 1765441381,
+    "update_time": 1765441381,
+    "_id": "成本曲线"
+  },
+  "经营偏好": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 2,
+    "create_time": 1765441383,
+    "update_time": 1765441383,
+    "_id": "经营偏好"
+  },
+  "项目看板": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46",
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0",
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 4,
+    "create_time": 1765441384,
+    "update_time": 1765441384,
+    "_id": "项目看板"
+  },
+  "收入日报": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441386,
+    "update_time": 1765441386,
+    "_id": "收入日报"
+  },
+  "临停收入(元)": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441393,
+    "update_time": 1765441393,
+    "_id": "临停收入(元)"
+  },
+  "月租收入(元)": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441395,
+    "update_time": 1765441395,
+    "_id": "月租收入(元)"
+  },
+  "商家充值(元)": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441396,
+    "update_time": 1765441396,
+    "_id": "商家充值(元)"
+  },
+  "合计(元)": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441405,
+    "update_time": 1765441405,
+    "_id": "合计(元)"
+  },
+  "充电缴费(元)": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441405,
+    "update_time": 1765441405,
+    "_id": "充电缴费(元)"
+  },
+  "项目动态": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9",
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 2,
+    "create_time": 1765441405,
+    "update_time": 1765441405,
+    "_id": "项目动态"
+  },
+  "项目标签": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441405,
+    "update_time": 1765441405,
+    "_id": "项目标签"
+  },
+  "项目资料": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441405,
+    "update_time": 1765441405,
+    "_id": "项目资料"
+  },
+  "项目总览": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46",
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 3,
+    "create_time": 1765441406,
+    "update_time": 1765441406,
+    "_id": "项目总览"
+  },
+  "车场id": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441408,
+    "update_time": 1765441408,
+    "_id": "车场id"
+  },
+  "商家列表": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46",
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 2,
+    "create_time": 1765441409,
+    "update_time": 1765441409,
+    "_id": "商家列表"
+  },
+  "错时商品列表": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46",
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 2,
+    "create_time": 1765441410,
+    "update_time": 1765441410,
+    "_id": "错时商品列表"
+  },
+  "进行中经营计划": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441411,
+    "update_time": 1765441411,
+    "_id": "进行中经营计划"
+  },
+  "车场地图": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 2,
+    "create_time": 1765441413,
+    "update_time": 1765441413,
+    "_id": "车场地图"
+  },
+  "营收情况": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441414,
+    "update_time": 1765441414,
+    "_id": "营收情况"
+  },
+  "临停收入": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441417,
+    "update_time": 1765441417,
+    "_id": "临停收入"
+  },
+  "套餐销售订单数": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441417,
+    "update_time": 1765441417,
+    "_id": "套餐销售订单数"
+  },
+  "套餐收入": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441417,
+    "update_time": 1765441417,
+    "_id": "套餐收入"
+  },
+  "抵扣券充值张数": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441419,
+    "update_time": 1765441419,
+    "_id": "抵扣券充值张数"
+  },
+  "抵扣券充值金额": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441420,
+    "update_time": 1765441420,
+    "_id": "抵扣券充值金额"
+  },
+  "抵扣券抵扣张数": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441421,
+    "update_time": 1765441421,
+    "_id": "抵扣券抵扣张数"
+  },
+  "抵扣券抵扣金额": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441422,
+    "update_time": 1765441422,
+    "_id": "抵扣券抵扣金额"
+  },
+  "消息列表": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14",
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 2,
+    "create_time": 1765441423,
+    "update_time": 1765441423,
+    "_id": "消息列表"
+  },
+  "工作台": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441425,
+    "update_time": 1765441425,
+    "_id": "工作台"
+  },
+  "项目负责人": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441426,
+    "update_time": 1765441426,
+    "_id": "项目负责人"
+  },
+  "项目移交待办": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441429,
+    "update_time": 1765441429,
+    "_id": "项目移交待办"
+  },
+  "应收账款待办": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441429,
+    "update_time": 1765441429,
+    "_id": "应收账款待办"
+  },
+  "回款管理": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef",
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 2,
+    "create_time": 1765441429,
+    "update_time": 1765441429,
+    "_id": "回款管理"
+  },
+  "回款管理列表页": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441430,
+    "update_time": 1765441430,
+    "_id": "回款管理列表页"
+  },
+  "未回款订单": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef",
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 2,
+    "create_time": 1765441432,
+    "update_time": 1765441432,
+    "_id": "未回款订单"
+  },
+  "款项确认": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441433,
+    "update_time": 1765441433,
+    "_id": "款项确认"
+  },
+  "临停情况": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441434,
+    "update_time": 1765441434,
+    "_id": "临停情况"
+  },
+  "套餐情况": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441435,
+    "update_time": 1765441435,
+    "_id": "套餐情况"
+  },
+  "抵扣情况": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441436,
+    "update_time": 1765441436,
+    "_id": "抵扣情况"
+  },
+  "临停车流": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441437,
+    "update_time": 1765441437,
+    "_id": "临停车流"
+  },
+  "商家充值": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441438,
+    "update_time": 1765441438,
+    "_id": "商家充值"
+  },
+  "出入口月租续费功能": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441441,
+    "update_time": 1765441441,
+    "_id": "出入口月租续费功能"
+  },
+  "其他收入": {
+    "chunk_ids": [
+      "chunk-3870c286f4fa65c8e555bbc3fe0a5cce"
+    ],
+    "count": 1,
+    "create_time": 1765441441,
+    "update_time": 1765441441,
+    "_id": "其他收入"
+  },
+  "C端": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441442,
+    "update_time": 1765441442,
+    "_id": "C端"
+  },
+  "停车场": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441444,
+    "update_time": 1765441444,
+    "_id": "停车场"
+  },
+  "临时停车缴费": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441446,
+    "update_time": 1765441446,
+    "_id": "临时停车缴费"
+  },
+  "发票重开功能": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441447,
+    "update_time": 1765441447,
+    "_id": "发票重开功能"
+  },
+  "发票作废功能": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441449,
+    "update_time": 1765441449,
+    "_id": "发票作废功能"
+  },
+  "重发邮件功能": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441450,
+    "update_time": 1765441450,
+    "_id": "重发邮件功能"
+  },
+  "页面配置": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441456,
+    "update_time": 1765441456,
+    "_id": "页面配置"
+  },
+  "月卡页底部导航配置": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441456,
+    "update_time": 1765441456,
+    "_id": "月卡页底部导航配置"
+  },
+  "查看发票功能": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441456,
+    "update_time": 1765441456,
+    "_id": "查看发票功能"
+  },
+  "月卡申请页": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441456,
+    "update_time": 1765441456,
+    "_id": "月卡申请页"
+  },
+  "重复支付自动退款功能": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441460,
+    "update_time": 1765441460,
+    "_id": "重复支付自动退款功能"
+  },
+  "通用功能配置": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441461,
+    "update_time": 1765441461,
+    "_id": "通用功能配置"
+  },
+  "经营助手": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441462,
+    "update_time": 1765441462,
+    "_id": "经营助手"
+  },
+  "组织树": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c",
+      "chunk-7d1dd388254a987892f97ff4949ed79d",
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 3,
+    "update_time": 1765442194,
+    "_id": "组织树"
+  },
+  "项目": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441465,
+    "update_time": 1765441465,
+    "_id": "项目"
+  },
+  "快速查询按钮": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 2,
+    "create_time": 1765441470,
+    "update_time": 1765441470,
+    "_id": "快速查询按钮"
+  },
+  "趋势图调整": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441470,
+    "update_time": 1765441470,
+    "_id": "趋势图调整"
+  },
+  "项目列表调整": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441470,
+    "update_time": 1765441470,
+    "_id": "项目列表调整"
+  },
+  "日周月季年切换选项": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441470,
+    "update_time": 1765441470,
+    "_id": "日周月季年切换选项"
+  },
+  "多经合同": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 2,
+    "create_time": 1765441471,
+    "update_time": 1765441471,
+    "_id": "多经合同"
+  },
+  "合同终止": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441472,
+    "update_time": 1765441472,
+    "_id": "合同终止"
+  },
+  "审批流": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0",
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 3,
+    "create_time": 1765441474,
+    "update_time": 1765441474,
+    "_id": "审批流"
+  },
+  "审批管理": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441475,
+    "update_time": 1765441475,
+    "_id": "审批管理"
+  },
+  "流程配置": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441476,
+    "update_time": 1765441476,
+    "_id": "流程配置"
+  },
+  "营收管理": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441477,
+    "update_time": 1765441477,
+    "_id": "营收管理"
+  },
+  "实收日期": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441479,
+    "update_time": 1765441479,
+    "_id": "实收日期"
+  },
+  "实收模式": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441482,
+    "update_time": 1765441482,
+    "_id": "实收模式"
+  },
+  "导出功能": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b",
+      "chunk-c7a9da45be3b22448fee2e777642152d",
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 3,
+    "update_time": 1765441984,
+    "_id": "导出功能"
+  },
+  "归属收入": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441482,
+    "update_time": 1765441482,
+    "_id": "归属收入"
+  },
+  "预算管理": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441483,
+    "update_time": 1765441483,
+    "_id": "预算管理"
+  },
+  "预算录入": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441485,
+    "update_time": 1765441485,
+    "_id": "预算录入"
+  },
+  "指定时间段收入": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441486,
+    "update_time": 1765441486,
+    "_id": "指定时间段收入"
+  },
+  "Excel文件": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441487,
+    "update_time": 1765441487,
+    "_id": "Excel文件"
+  },
+  "自动计算功能": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441488,
+    "update_time": 1765441488,
+    "_id": "自动计算功能"
+  },
+  "抵扣券": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441489,
+    "update_time": 1765441489,
+    "_id": "抵扣券"
+  },
+  "商户用券限制管理": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441490,
+    "update_time": 1765441490,
+    "_id": "商户用券限制管理"
+  },
+  "时长券": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441494,
+    "update_time": 1765441494,
+    "_id": "时长券"
+  },
+  "商户": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441494,
+    "update_time": 1765441494,
+    "_id": "商户"
+  },
+  "金额券": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441495,
+    "update_time": 1765441495,
+    "_id": "金额券"
+  },
+  "券面金额": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441496,
+    "update_time": 1765441496,
+    "_id": "券面金额"
+  },
+  "券面时长": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441497,
+    "update_time": 1765441497,
+    "_id": "券面时长"
+  },
+  "项目计划菜单": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441498,
+    "update_time": 1765441498,
+    "_id": "项目计划菜单"
+  },
+  "任务": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441499,
+    "update_time": 1765441499,
+    "_id": "任务"
+  },
+  "我的项目待办菜单": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441501,
+    "update_time": 1765441501,
+    "_id": "我的项目待办菜单"
+  },
+  "当前用户": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b"
+    ],
+    "count": 1,
+    "create_time": 1765441502,
+    "update_time": 1765441502,
+    "_id": "当前用户"
+  },
+  "审核": {
+    "chunk_ids": [
+      "chunk-eee0bacc3558f3a0bf6d4f654e034c1b",
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 2,
+    "update_time": 1765442269,
+    "_id": "审核"
+  },
+  "工作安排": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441506,
+    "update_time": 1765441506,
+    "_id": "工作安排"
+  },
+  "移交计划": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0",
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 2,
+    "update_time": 1765441963,
+    "_id": "移交计划"
+  },
+  "收入排行": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441508,
+    "update_time": 1765441508,
+    "_id": "收入排行"
+  },
+  "项目管理": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46",
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 2,
+    "create_time": 1765441509,
+    "update_time": 1765441509,
+    "_id": "项目管理"
+  },
+  "项目状态": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441511,
+    "update_time": 1765441511,
+    "_id": "项目状态"
+  },
+  "标记异常功能": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441513,
+    "update_time": 1765441513,
+    "_id": "标记异常功能"
+  },
+  "项目汇报": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441514,
+    "update_time": 1765441514,
+    "_id": "项目汇报"
+  },
+  "问题汇报": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441520,
+    "update_time": 1765441520,
+    "_id": "问题汇报"
+  },
+  "经营计划汇报": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441520,
+    "update_time": 1765441520,
+    "_id": "经营计划汇报"
+  },
+  "经营管理": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441520,
+    "update_time": 1765441520,
+    "_id": "经营管理"
+  },
+  "月租大客户列表": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441522,
+    "update_time": 1765441522,
+    "_id": "月租大客户列表"
+  },
+  "临停收入下滑告警": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441523,
+    "update_time": 1765441523,
+    "_id": "临停收入下滑告警"
+  },
+  "车场地图列表": {
+    "chunk_ids": [
+      "chunk-7a1cbed4b080951d3b569d1fb27e48c0"
+    ],
+    "count": 1,
+    "create_time": 1765441525,
+    "update_time": 1765441525,
+    "_id": "车场地图列表"
+  },
+  "汇报接收人员": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef",
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 2,
+    "create_time": 1765441526,
+    "update_time": 1765441526,
+    "_id": "汇报接收人员"
+  },
+  "告警类型": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441527,
+    "update_time": 1765441527,
+    "_id": "告警类型"
+  },
+  "异常放行告警": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441529,
+    "update_time": 1765441529,
+    "_id": "异常放行告警"
+  },
+  "免费放行告警": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441532,
+    "update_time": 1765441532,
+    "_id": "免费放行告警"
+  },
+  "遥控放行告警": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441532,
+    "update_time": 1765441532,
+    "_id": "遥控放行告警"
+  },
+  "应收费异常放行告警": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441534,
+    "update_time": 1765441534,
+    "_id": "应收费异常放行告警"
+  },
+  "收费员指标库": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441535,
+    "update_time": 1765441535,
+    "_id": "收费员指标库"
+  },
+  "有效应打票数": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef",
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 2,
+    "create_time": 1765441536,
+    "update_time": 1765441536,
+    "_id": "有效应打票数"
+  },
+  "有效打票数": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441538,
+    "update_time": 1765441538,
+    "_id": "有效打票数"
+  },
+  "分组": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441539,
+    "update_time": 1765441539,
+    "_id": "分组"
+  },
+  "科拓": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441543,
+    "update_time": 1765441543,
+    "_id": "科拓"
+  },
+  "批量设置流程": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441543,
+    "update_time": 1765441543,
+    "_id": "批量设置流程"
+  },
+  "审批人": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441544,
+    "update_time": 1765441544,
+    "_id": "审批人"
+  },
+  "抄送人": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441546,
+    "update_time": 1765441546,
+    "_id": "抄送人"
+  },
+  "营收分摊模式": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441548,
+    "update_time": 1765441548,
+    "_id": "营收分摊模式"
+  },
+  "异常抵扣稽核": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441549,
+    "update_time": 1765441549,
+    "_id": "异常抵扣稽核"
+  },
+  "抵扣黑名单按钮": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441551,
+    "update_time": 1765441551,
+    "_id": "抵扣黑名单按钮"
+  },
+  "集团的商家抵扣黑名单页面": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441552,
+    "update_time": 1765441552,
+    "_id": "集团的商家抵扣黑名单页面"
+  },
+  "车场ID": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441555,
+    "update_time": 1765441555,
+    "_id": "车场ID"
+  },
+  "项目资料展示": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441555,
+    "update_time": 1765441555,
+    "_id": "项目资料展示"
+  },
+  "经营计划": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441556,
+    "update_time": 1765441556,
+    "_id": "经营计划"
+  },
+  "异常状态项目": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441557,
+    "update_time": 1765441557,
+    "_id": "异常状态项目"
+  },
+  "回款率": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46",
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 2,
+    "update_time": 1765441984,
+    "_id": "回款率"
+  },
+  "集团配置": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441563,
+    "update_time": 1765441563,
+    "_id": "集团配置"
+  },
+  "路侧助手": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441564,
+    "update_time": 1765441564,
+    "_id": "路侧助手"
+  },
+  "安保助手": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441566,
+    "update_time": 1765441566,
+    "_id": "安保助手"
+  },
+  "车型": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441566,
+    "update_time": 1765441566,
+    "_id": "车型"
+  },
+  "在场车详情页": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441567,
+    "update_time": 1765441567,
+    "_id": "在场车详情页"
+  },
+  "停车订单": {
+    "chunk_ids": [
+      "chunk-a335ee2e69605ffea482cf7f34eaba46"
+    ],
+    "count": 1,
+    "create_time": 1765441567,
+    "update_time": 1765441567,
+    "_id": "停车订单"
+  },
+  "待办菜单": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441569,
+    "update_time": 1765441569,
+    "_id": "待办菜单"
+  },
+  "项目移交菜单": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441570,
+    "update_time": 1765441570,
+    "_id": "项目移交菜单"
+  },
+  "经营报表": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441571,
+    "update_time": 1765441571,
+    "_id": "经营报表"
+  },
+  "周报月报": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441572,
+    "update_time": 1765441572,
+    "_id": "周报月报"
+  },
+  "BI分析": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441574,
+    "update_time": 1765441574,
+    "_id": "BI分析"
+  },
+  "停车时长分析": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441575,
+    "update_time": 1765441575,
+    "_id": "停车时长分析"
+  },
+  "指标排行": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441577,
+    "update_time": 1765441577,
+    "_id": "指标排行"
+  },
+  "路侧工作站分析": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441580,
+    "update_time": 1765441580,
+    "_id": "路侧工作站分析"
+  },
+  "临停缴费应收": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441581,
+    "update_time": 1765441581,
+    "_id": "临停缴费应收"
+  },
+  "逃费金额": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441590,
+    "update_time": 1765441590,
+    "_id": "逃费金额"
+  },
+  "临停缴费实收": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441590,
+    "update_time": 1765441590,
+    "_id": "临停缴费实收"
+  },
+  "抵扣金额": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441590,
+    "update_time": 1765441590,
+    "_id": "抵扣金额"
+  },
+  "钱包抵扣金额": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441590,
+    "update_time": 1765441590,
+    "_id": "钱包抵扣金额"
+  },
+  "清除金额": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441592,
+    "update_time": 1765441592,
+    "_id": "清除金额"
+  },
+  "历史欠费追缴": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441593,
+    "update_time": 1765441593,
+    "_id": "历史欠费追缴"
+  },
+  "离场待确认": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14",
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 2,
+    "create_time": 1765441595,
+    "update_time": 1765441595,
+    "_id": "离场待确认"
+  },
+  "巡逻单停车日志": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14",
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 2,
+    "create_time": 1765441596,
+    "update_time": 1765441596,
+    "_id": "巡逻单停车日志"
+  },
+  "项目任务": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441597,
+    "update_time": 1765441597,
+    "_id": "项目任务"
+  },
+  "路侧疑似重复支付标签": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441599,
+    "update_time": 1765441599,
+    "_id": "路侧疑似重复支付标签"
+  },
+  "月租车卡": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441600,
+    "update_time": 1765441600,
+    "_id": "月租车卡"
+  },
+  "修改记录": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441601,
+    "update_time": 1765441601,
+    "_id": "修改记录"
+  },
+  "路侧车次记录": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441603,
+    "update_time": 1765441603,
+    "_id": "路侧车次记录"
+  },
+  "打票时间": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441604,
+    "update_time": 1765441604,
+    "_id": "打票时间"
+  },
+  "预约车管理": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441606,
+    "update_time": 1765441606,
+    "_id": "预约车管理"
+  },
+  "预约时段": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441607,
+    "update_time": 1765441607,
+    "_id": "预约时段"
+  },
+  "套餐类型": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441608,
+    "update_time": 1765441608,
+    "_id": "套餐类型"
+  },
+  "G套餐编码": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441613,
+    "update_time": 1765441613,
+    "_id": "G套餐编码"
+  },
+  "套餐管理": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441613,
+    "update_time": 1765441613,
+    "_id": "套餐管理"
+  },
+  "新能源计费规则管理": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441613,
+    "update_time": 1765441613,
+    "_id": "新能源计费规则管理"
+  },
+  "硬件识别率统计": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441614,
+    "update_time": 1765441614,
+    "_id": "硬件识别率统计"
+  },
+  "子类型": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441614,
+    "update_time": 1765441614,
+    "_id": "子类型"
+  },
+  "异常出车影响打票率配置": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441616,
+    "update_time": 1765441616,
+    "_id": "异常出车影响打票率配置"
+  },
+  "汇报模板": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441617,
+    "update_time": 1765441617,
+    "_id": "汇报模板"
+  },
+  "新增汇报功能": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441618,
+    "update_time": 1765441618,
+    "_id": "新增汇报功能"
+  },
+  "功能配置": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441620,
+    "update_time": 1765441620,
+    "_id": "功能配置"
+  },
+  "异常出车": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441621,
+    "update_time": 1765441621,
+    "_id": "异常出车"
+  },
+  "打票率": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765441625,
+    "update_time": 1765441625,
+    "_id": "打票率"
+  },
+  "告警/稽核详情页": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441666,
+    "update_time": 1765441666,
+    "_id": "告警/稽核详情页"
+  },
+  "审批/工单/任务/投诉详情页": {
+    "chunk_ids": [
+      "chunk-c858f0711ac7760b98e5492343464b30"
+    ],
+    "count": 1,
+    "create_time": 1765441673,
+    "update_time": 1765441673,
+    "_id": "审批/工单/任务/投诉详情页"
+  },
+  "模块": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441723,
+    "update_time": 1765441723,
+    "_id": "模块"
+  },
+  "下拉筛选": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441732,
+    "update_time": 1765441732,
+    "_id": "下拉筛选"
+  },
+  "id": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441744,
+    "update_time": 1765441744,
+    "_id": "id"
+  },
+  "输入搜索": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441748,
+    "update_time": 1765441748,
+    "_id": "输入搜索"
+  },
+  "业务主键id": {
+    "chunk_ids": [
+      "chunk-6eba5d55c9e63b8b961aec87141dd6c6"
+    ],
+    "count": 1,
+    "create_time": 1765441755,
+    "update_time": 1765441755,
+    "_id": "业务主键id"
+  },
+  "6行": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441788,
+    "update_time": 1765441788,
+    "_id": "6行"
+  },
+  "按资料类型分组": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441791,
+    "update_time": 1765441791,
+    "_id": "按资料类型分组"
+  },
+  "颜色配置": {
+    "chunk_ids": [
+      "chunk-555007e6755cf13c442ecc1d6d1c2ba9"
+    ],
+    "count": 1,
+    "create_time": 1765441795,
+    "update_time": 1765441795,
+    "_id": "颜色配置"
+  },
+  "后台": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441845,
+    "update_time": 1765441845,
+    "_id": "后台"
+  },
+  "用户": {
+    "chunk_ids": [
+      "chunk-0f5a7ccc465dbee6c84fe30c9fc7441c"
+    ],
+    "count": 1,
+    "create_time": 1765441851,
+    "update_time": 1765441851,
+    "_id": "用户"
+  },
+  "手动添加功能": {
+    "chunk_ids": [
+      "chunk-629c037630fe48f6ae90d0437eb374ef"
+    ],
+    "count": 1,
+    "create_time": 1765441943,
+    "update_time": 1765441943,
+    "_id": "手动添加功能"
+  },
+  "消息内容": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441965,
+    "update_time": 1765441965,
+    "_id": "消息内容"
+  },
+  "当月回款率": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441969,
+    "update_time": 1765441969,
+    "_id": "当月回款率"
+  },
+  "饼图": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441985,
+    "update_time": 1765441985,
+    "_id": "饼图"
+  },
+  "项目BI分析数据": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441985,
+    "update_time": 1765441985,
+    "_id": "项目BI分析数据"
+  },
+  "字段统计时间维度": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441986,
+    "update_time": 1765441986,
+    "_id": "字段统计时间维度"
+  },
+  "消息分组": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441986,
+    "update_time": 1765441986,
+    "_id": "消息分组"
+  },
+  "出车时间": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441988,
+    "update_time": 1765441988,
+    "_id": "出车时间"
+  },
+  "当月已收款金额": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765441989,
+    "update_time": 1765441989,
+    "_id": "当月已收款金额"
+  },
+  "支付时间": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442006,
+    "update_time": 1765442006,
+    "_id": "支付时间"
+  },
+  "分布区间": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442006,
+    "update_time": 1765442006,
+    "_id": "分布区间"
+  },
+  "清除时间": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442016,
+    "update_time": 1765442016,
+    "_id": "清除时间"
+  },
+  "优化": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442016,
+    "update_time": 1765442016,
+    "_id": "优化"
+  },
+  "当月未收款金额": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442019,
+    "update_time": 1765442019,
+    "_id": "当月未收款金额"
+  },
+  "BI分析数据": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442019,
+    "update_time": 1765442019,
+    "_id": "BI分析数据"
+  },
+  "订单": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442029,
+    "update_time": 1765442029,
+    "_id": "订单"
+  },
+  "新建项目": {
+    "chunk_ids": [
+      "chunk-d4084ec1353df60dfbf7238bf2d2cd14"
+    ],
+    "count": 1,
+    "create_time": 1765442029,
+    "update_time": 1765442029,
+    "_id": "新建项目"
+  },
+  "指定时间段": {
+    "chunk_ids": [
+      "chunk-c7a9da45be3b22448fee2e777642152d"
+    ],
+    "count": 1,
+    "create_time": 1765442038,
+    "update_time": 1765442038,
+    "_id": "指定时间段"
+  },
+  "车牌类型": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d",
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 2,
+    "create_time": 1765442192,
+    "update_time": 1765442192,
+    "_id": "车牌类型"
+  },
+  "充值": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442192,
+    "update_time": 1765442192,
+    "_id": "充值"
+  },
+  "充值类型": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442192,
+    "update_time": 1765442192,
+    "_id": "充值类型"
+  },
+  "车场月租设定": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442192,
+    "update_time": 1765442192,
+    "_id": "车场月租设定"
+  },
+  "车场套餐管理": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442192,
+    "update_time": 1765442192,
+    "_id": "车场套餐管理"
+  },
+  "车场月卡和套餐管理": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442192,
+    "update_time": 1765442192,
+    "_id": "车场月卡和套餐管理"
+  },
+  "内部车": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442192,
+    "update_time": 1765442192,
+    "_id": "内部车"
+  },
+  "充值规则": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d",
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 2,
+    "create_time": 1765442192,
+    "update_time": 1765442192,
+    "_id": "充值规则"
+  },
+  "新增套餐按钮": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442193,
+    "update_time": 1765442193,
+    "_id": "新增套餐按钮"
+  },
+  "车场车位管理页面": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442193,
+    "update_time": 1765442193,
+    "_id": "车场车位管理页面"
+  },
+  "赠送优惠": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442193,
+    "update_time": 1765442193,
+    "_id": "赠送优惠"
+  },
+  "赠送配置项": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442194,
+    "update_time": 1765442194,
+    "_id": "赠送配置项"
+  },
+  "赠送": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442196,
+    "update_time": 1765442196,
+    "_id": "赠送"
+  },
+  "赠送递增": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442197,
+    "update_time": 1765442197,
+    "_id": "赠送递增"
+  },
+  "收费": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442199,
+    "update_time": 1765442199,
+    "_id": "收费"
+  },
+  "开始类型": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442200,
+    "update_time": 1765442200,
+    "_id": "开始类型"
+  },
+  "本月1日": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442203,
+    "update_time": 1765442203,
+    "_id": "本月1日"
+  },
+  "当前时间": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d",
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 2,
+    "create_time": 1765442203,
+    "update_time": 1765442203,
+    "_id": "当前时间"
+  },
+  "过期时间": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442204,
+    "update_time": 1765442204,
+    "_id": "过期时间"
+  },
+  "按车位计费": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442205,
+    "update_time": 1765442205,
+    "_id": "按车位计费"
+  },
+  "禁用/启用操作": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442206,
+    "update_time": 1765442206,
+    "_id": "禁用/启用操作"
+  },
+  "编辑操作": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442207,
+    "update_time": 1765442207,
+    "_id": "编辑操作"
+  },
+  "删除操作": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442209,
+    "update_time": 1765442209,
+    "_id": "删除操作"
+  },
+  "使用中/审核中/待续费车位数": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442210,
+    "update_time": 1765442210,
+    "_id": "使用中/审核中/待续费车位数"
+  },
+  "月租车界面": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442211,
+    "update_time": 1765442211,
+    "_id": "月租车界面"
+  },
+  "车场套餐审核": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442213,
+    "update_time": 1765442213,
+    "_id": "车场套餐审核"
+  },
+  "月租车辆管理": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442223,
+    "update_time": 1765442223,
+    "_id": "月租车辆管理"
+  },
+  "车场月租车": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442223,
+    "update_time": 1765442223,
+    "_id": "车场月租车"
+  },
+  "新增按钮": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442223,
+    "update_time": 1765442223,
+    "_id": "新增按钮"
+  },
+  "基础信息": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442224,
+    "update_time": 1765442224,
+    "_id": "基础信息"
+  },
+  "线上合同": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d",
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 2,
+    "create_time": 1765442225,
+    "update_time": 1765442225,
+    "_id": "线上合同"
+  },
+  "内部车信息": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d",
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 2,
+    "create_time": 1765442226,
+    "update_time": 1765442226,
+    "_id": "内部车信息"
+  },
+  "单车场后台": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d",
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 2,
+    "create_time": 1765442228,
+    "update_time": 1765442228,
+    "_id": "单车场后台"
+  },
+  "内部车管理": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d",
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 2,
+    "create_time": 1765442229,
+    "update_time": 1765442229,
+    "_id": "内部车管理"
+  },
+  "内部车配置": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d",
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 2,
+    "create_time": 1765442230,
+    "update_time": 1765442230,
+    "_id": "内部车配置"
+  },
+  "套餐": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426",
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 2,
+    "update_time": 1765442321,
+    "_id": "套餐"
+  },
+  "计费规则": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426",
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 2,
+    "update_time": 1765442337,
+    "_id": "计费规则"
+  },
+  "车场管理": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442236,
+    "update_time": 1765442236,
+    "_id": "车场管理"
+  },
+  "充值套餐配置": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442236,
+    "update_time": 1765442236,
+    "_id": "充值套餐配置"
+  },
+  "充次车": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442238,
+    "update_time": 1765442238,
+    "_id": "充次车"
+  },
+  "充值车": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442239,
+    "update_time": 1765442239,
+    "_id": "充值车"
+  },
+  "充时车": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442240,
+    "update_time": 1765442240,
+    "_id": "充时车"
+  },
+  "充天车": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442242,
+    "update_time": 1765442242,
+    "_id": "充天车"
+  },
+  "首充时间": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442245,
+    "update_time": 1765442245,
+    "_id": "首充时间"
+  },
+  "车位设置": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442248,
+    "update_time": 1765442248,
+    "_id": "车位设置"
+  },
+  "车位编号": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442248,
+    "update_time": 1765442248,
+    "_id": "车位编号"
+  },
+  "车位资源管理": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442249,
+    "update_time": 1765442249,
+    "_id": "车位资源管理"
+  },
+  "车位备注": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442250,
+    "update_time": 1765442250,
+    "_id": "车位备注"
+  },
+  "车牌绑定": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442252,
+    "update_time": 1765442252,
+    "_id": "车牌绑定"
+  },
+  "卡号": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442253,
+    "update_time": 1765442253,
+    "_id": "卡号"
+  },
+  "允许超车位进场": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442254,
+    "update_time": 1765442254,
+    "_id": "允许超车位进场"
+  },
+  "月租车辆审核": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442255,
+    "update_time": 1765442255,
+    "_id": "月租车辆审核"
+  },
+  "车场月租车审核": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442257,
+    "update_time": 1765442257,
+    "_id": "车场月租车审核"
+  },
+  "C端公众号": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426",
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 2,
+    "create_time": 1765442258,
+    "update_time": 1765442258,
+    "_id": "C端公众号"
+  },
+  "占用车位数": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442261,
+    "update_time": 1765442261,
+    "_id": "占用车位数"
+  },
+  "进场时间": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442261,
+    "update_time": 1765442261,
+    "_id": "进场时间"
+  },
+  "月卡充值": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442263,
+    "update_time": 1765442263,
+    "_id": "月卡充值"
+  },
+  "后台内部车充值需要审核": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442264,
+    "update_time": 1765442264,
+    "_id": "后台内部车充值需要审核"
+  },
+  "车主线上内部车自助续费需要审核": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442265,
+    "update_time": 1765442265,
+    "_id": "车主线上内部车自助续费需要审核"
+  },
+  "线上续费": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442268,
+    "update_time": 1765442268,
+    "_id": "线上续费"
+  },
+  "车场": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442271,
+    "update_time": 1765442271,
+    "_id": "车场"
+  },
+  "待审数据": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442273,
+    "update_time": 1765442273,
+    "_id": "待审数据"
+  },
+  "审核按钮": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442274,
+    "update_time": 1765442274,
+    "_id": "审核按钮"
+  },
+  "通过": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442276,
+    "update_time": 1765442276,
+    "_id": "通过"
+  },
+  "驳回": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442277,
+    "update_time": 1765442277,
+    "_id": "驳回"
+  },
+  "线上支付金额": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442278,
+    "update_time": 1765442278,
+    "_id": "线上支付金额"
+  },
+  "重新退款": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442280,
+    "update_time": 1765442280,
+    "_id": "重新退款"
+  },
+  "支付方式": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442281,
+    "update_time": 1765442281,
+    "_id": "支付方式"
+  },
+  "现金": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442283,
+    "update_time": 1765442283,
+    "_id": "现金"
+  },
+  "线上转账": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442285,
+    "update_time": 1765442285,
+    "_id": "线上转账"
+  },
+  "支付来源": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442285,
+    "update_time": 1765442285,
+    "_id": "支付来源"
+  },
+  "云助手": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442286,
+    "update_time": 1765442286,
+    "_id": "云助手"
+  },
+  "永策": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442288,
+    "update_time": 1765442288,
+    "_id": "永策"
+  },
+  "资金到账模块": {
+    "chunk_ids": [
+      "chunk-d7ec8ffaecd2a0ffc69f5905bb865400"
+    ],
+    "count": 1,
+    "create_time": 1765442289,
+    "update_time": 1765442289,
+    "_id": "资金到账模块"
+  },
+  "新增、编辑、导出操作": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442306,
+    "update_time": 1765442306,
+    "_id": "新增、编辑、导出操作"
+  },
+  "车场套餐设定": {
+    "chunk_ids": [
+      "chunk-7d1dd388254a987892f97ff4949ed79d"
+    ],
+    "count": 1,
+    "create_time": 1765442306,
+    "update_time": 1765442306,
+    "_id": "车场套餐设定"
+  },
+  "车牌": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442351,
+    "update_time": 1765442351,
+    "_id": "车牌"
+  },
+  "有效期": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442376,
+    "update_time": 1765442376,
+    "_id": "有效期"
+  },
+  "费用": {
+    "chunk_ids": [
+      "chunk-eb6423147acbe527a4dbaed99a0c7426"
+    ],
+    "count": 1,
+    "create_time": 1765442395,
+    "update_time": 1765442395,
+    "_id": "费用"
+  }
+}
