@@ -48,7 +48,7 @@ export interface ToolCallInfo {
 
 /** WebSocket 消息类型 */
 export interface ChatStreamMessage {
-  type: 'start' | 'stream' | 'tool_start' | 'tool_end' | 'phase_changed' | 'phase_completed' | 'title_generated' | 'result' | 'error'
+  type: 'start' | 'stream' | 'tool_start' | 'tool_progress' | 'tool_end' | 'phase_changed' | 'phase_completed' | 'title_generated' | 'result' | 'error'
   // start 消息
   request_id?: string
   thread_id?: string
@@ -61,12 +61,15 @@ export interface ChatStreamMessage {
   batch_id?: number        // 批次 ID（同一批工具调用共享）
   batch_size?: number      // 批次大小（该批次共有多少个工具）
   batch_index?: number     // 在批次中的索引（0-based）
+  // tool_progress 消息（LightRAG 等工具的内部进度）
+  phase?: string           // 阶段名称，如 "local_query" | "global_query" | "rerank" | "finalize"
+  detail?: string          // 阶段详情，如 "40 实体, 100 关系"
   // tool_end 消息
   input_summary?: string   // 输入摘要，如 "关键词: 开卡"
   output_summary?: string  // 输出摘要，如 "找到 3 个结果"
   elapsed?: number         // 耗时（秒）
   // phase_changed 消息（智能测试 Agent 专用）
-  phase?: string           // 阶段名称，如 "analysis" | "plan" | "generate" | "completed"
+  // phase 字段已在 tool_progress 中定义
   // title_generated 消息（智能测试 Agent 专用）
   title?: string           // 生成的会话标题
   // result 消息
@@ -91,6 +94,8 @@ export interface ChatCallbacks {
   onToolStart?: (toolName: string, toolInput: Record<string, unknown>, toolId?: number, batch?: BatchInfo) => void
   /** 工具调用结束 */
   onToolEnd?: (toolName: string, inputSummary: string, outputSummary: string, elapsed: number, toolId?: number, batch?: BatchInfo) => void
+  /** 工具内部进度（LightRAG 等工具的子步骤）*/
+  onToolProgress?: (toolName: string, toolId: number, phase: string, detail: string) => void
   /** 阶段切换（智能测试 Agent 专用）*/
   onPhaseChanged?: (phase: string) => void
   /** 阶段完成（智能测试 Agent 专用）*/
@@ -222,6 +227,15 @@ export class ChatClient {
             batchSize: message.batch_size || 1,
             batchIndex: message.batch_index || 0,
           } : undefined
+        )
+        break
+      
+      case 'tool_progress':
+        this.callbacks.onToolProgress?.(
+          message.tool_name || '',
+          message.tool_id || 0,
+          message.phase || '',
+          message.detail || ''
         )
         break
       

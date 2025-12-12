@@ -8,6 +8,7 @@ import {
   MenuUnfoldOutlined,
   RobotOutlined,
   MessageOutlined,
+  FileTextOutlined,
 } from '@ant-design/icons'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useModelContext } from '../contexts/ModelContext'
@@ -53,6 +54,11 @@ const MainLayout: React.FC = () => {
       key: '/business',
       icon: <AppstoreOutlined />,
       label: <Link to="/business">业务库</Link>,
+    },
+    {
+      key: '/doc-center',
+      icon: <FileTextOutlined />,
+      label: <Link to="/doc-center">文档中心</Link>,
     },
     {
       key: '/llm-models',

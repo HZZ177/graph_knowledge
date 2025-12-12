@@ -3,12 +3,22 @@
  */
 
 import React, { useState } from 'react'
+import { LoadingOutlined } from '@ant-design/icons'
 import { ExpandableContent } from './ExpandableContent'
-import { BatchToolItemInfo } from '../../types/chat'
+import { BatchToolItemInfo, ToolProgressStep } from '../../types/chat'
 
 // ==========================================
 // 单个工具调用展示
 // ==========================================
+
+// 阶段名称映射（英文 -> 中文）
+const PHASE_LABELS: Record<string, string> = {
+  local_query: '本地查询',
+  global_query: '全局查询',
+  search_complete: '检索完成',
+  rerank: '结果重排',
+  finalize: '生成上下文',
+}
 
 interface ToolProcessProps {
   name: string
@@ -16,10 +26,27 @@ interface ToolProcessProps {
   inputSummary?: string   // 输入摘要，如 "关键词: 开卡"
   outputSummary?: string  // 输出摘要，如 "找到 3 个结果"
   elapsed?: number        // 耗时（秒）
+  progressSteps?: ToolProgressStep[]  // 工具内部进度步骤
 }
 
-export const ToolProcess: React.FC<ToolProcessProps> = ({ name, isActive, inputSummary, outputSummary, elapsed }) => {
-  const [isExpanded, setIsExpanded] = useState(false)
+export const ToolProcess: React.FC<ToolProcessProps> = ({ name, isActive, inputSummary, outputSummary, elapsed, progressSteps }) => {
+  const hasProgress = progressSteps && progressSteps.length > 0
+  // 工具执行中时默认展开，完成后保持用户的展开状态
+  const [isExpanded, setIsExpanded] = useState(isActive)
+  const [wasManuallyToggled, setWasManuallyToggled] = useState(false)
+  
+  // 工具开始执行时自动展开（除非用户手动操作过）
+  React.useEffect(() => {
+    if (isActive && !wasManuallyToggled) {
+      setIsExpanded(true)
+    }
+  }, [isActive, wasManuallyToggled])
+  
+  // 处理用户手动点击
+  const handleToggle = () => {
+    setWasManuallyToggled(true)
+    setIsExpanded(!isExpanded)
+  }
   
   if (!name) return null
   const prettyName = name.replace(/_/g, ' ')
@@ -42,14 +69,14 @@ export const ToolProcess: React.FC<ToolProcessProps> = ({ name, isActive, inputS
     label = `called tool: ${prettyName}${suffix}`
   }
 
-  // 只有完成后有摘要时才能展开
-  const canExpand = !isActive && (inputSummary || outputSummary)
+  // 工具执行中、有摘要或有进度步骤时可以展开
+  const canExpand = (isActive || inputSummary || outputSummary || hasProgress)
 
   return (
     <div className={`inline-expandable ${isExpanded ? 'expanded' : ''}`}>
       <span 
         className="inline-expandable-toggle" 
-        onClick={() => canExpand && setIsExpanded(!isExpanded)}
+        onClick={() => canExpand && handleToggle()}
         style={{ cursor: canExpand ? 'pointer' : 'default' }}
       >
         {label}
@@ -57,6 +84,26 @@ export const ToolProcess: React.FC<ToolProcessProps> = ({ name, isActive, inputS
       </span>
       {canExpand && (
         <ExpandableContent isExpanded={isExpanded} className="inline-expandable-content">
+          {/* 进度步骤（工具执行中或有进度时显示） */}
+          {(isActive || hasProgress) && (
+            <div className={`tool-progress-steps ${isActive ? 'active' : ''}`}>
+              {hasProgress && progressSteps.map((step, idx) => (
+                <div key={`${step.phase}-${idx}`} className="tool-progress-step">
+                  <span className="tool-progress-icon">✓</span>
+                  <span className="tool-progress-label">{PHASE_LABELS[step.phase] || step.phase}</span>
+                  <span className="tool-progress-detail">{step.detail}</span>
+                </div>
+              ))}
+              {/* 工具执行中时显示"处理中"占位 */}
+              {isActive && (
+                <div className="tool-progress-step loading">
+                  <LoadingOutlined className="tool-progress-icon" style={{ color: 'var(--text-tertiary)' }} />
+                  <span className="tool-progress-label status-text">处理中</span>
+                </div>
+              )}
+            </div>
+          )}
+          {/* 输入输出摘要 */}
           {inputSummary && (
             <div className="tool-summary-item">
               <span className="tool-summary-label">查询:</span> {inputSummary}

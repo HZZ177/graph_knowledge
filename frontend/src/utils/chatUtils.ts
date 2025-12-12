@@ -13,6 +13,7 @@ import {
   RenderItem,
   ActiveToolInfo,
   BatchToolItemInfo,
+  ToolProgressStep,
 } from '../types/chat'
 
 /**
@@ -593,7 +594,8 @@ export const buildRenderItems = (
   currentToolName?: string,
   toolSummaries?: Map<string, ToolSummaryInfo>,
   activeTools?: Map<number, ActiveToolInfo>,  // toolId -> 活跃工具信息
-  activeToolsRef?: React.MutableRefObject<Map<number, ActiveToolInfo>>  // ref版本，用于同步获取最新值
+  activeToolsRef?: React.MutableRefObject<Map<number, ActiveToolInfo>>,  // ref版本，用于同步获取最新值
+  toolProgress?: Map<number, ToolProgressStep[]>  // 工具内部进度步骤
 ): RenderItem[] => {
   const segments = parseContentSegments(content, currentToolName, toolSummaries)
   
@@ -662,6 +664,9 @@ export const buildRenderItems = (
         // 单个工具调用 - 使用与批量工具相同的活跃状态判断逻辑
         const singleToolActive = activeInfo !== undefined || (!!seg.isToolActive && !summary?.output)
         
+        // 获取工具进度步骤
+        const progressSteps = seg.toolId ? toolProgress?.get(seg.toolId) : undefined
+        
         result.push({
           type: 'tool' as const,
           key: `tool-${i}-${seg.content}-${seg.toolId}`,
@@ -671,6 +676,7 @@ export const buildRenderItems = (
           toolInputSummary: summary?.input || seg.inputSummary,
           toolOutputSummary: summary?.output || seg.outputSummary,
           toolElapsed: summary?.elapsed,
+          toolProgressSteps: progressSteps,
         })
         i++
       }
