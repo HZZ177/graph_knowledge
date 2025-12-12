@@ -10,7 +10,7 @@ import {
   ReloadOutlined,
   RollbackOutlined,
 } from '@ant-design/icons'
-import { DisplayMessage, ToolSummaryInfo, ActiveToolInfo } from '../../types/chat'
+import { DisplayMessage, ToolSummaryInfo, ActiveToolInfo, ToolProgressStep } from '../../types/chat'
 import { buildRenderItems } from '../../utils/chatUtils'
 import { MemoizedMarkdown } from './MemoizedMarkdown'
 import { ThinkBlock } from './ThinkBlock'
@@ -26,6 +26,7 @@ interface MessageItemProps {
   toolSummaries?: Map<string, ToolSummaryInfo>  // 工具摘要（包含批次信息）
   activeTools?: Map<number, ActiveToolInfo>     // 活跃工具信息（用于批次分组）
   activeToolsRef?: React.MutableRefObject<Map<number, ActiveToolInfo>>  // ref版本，用于同步获取
+  toolProgress?: Map<number, ToolProgressStep[]>  // 工具内部进度步骤
 }
 
 export const MessageItem: React.FC<MessageItemProps> = React.memo(({ 
@@ -36,7 +37,8 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
   onRollback, 
   toolSummaries, 
   activeTools, 
-  activeToolsRef 
+  activeToolsRef,
+  toolProgress,
 }) => {
   const isUser = message.role === 'user'
   
@@ -98,7 +100,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
   // 通过合理的组件设计避免无限循环，而不是依赖 useMemo
   // 优先使用消息自带的 toolSummaries（已完成的历史消息），否则使用 props 传入的全局 toolSummaries（当前正在流式输出）
   const effectiveToolSummaries = message.toolSummaries || toolSummaries
-  const renderItems = buildRenderItems(message.content, message.currentToolName, effectiveToolSummaries, activeTools, activeToolsRef)
+  const renderItems = buildRenderItems(message.content, message.currentToolName, effectiveToolSummaries, activeTools, activeToolsRef, toolProgress)
   
   // 初始思考状态：正在思考但还没有任何内容
   const isInitialThinking = message.isThinking && renderItems.length === 0
@@ -157,6 +159,7 @@ export const MessageItem: React.FC<MessageItemProps> = React.memo(({
                   inputSummary={item.toolInputSummary}
                   outputSummary={item.toolOutputSummary}
                   elapsed={item.toolElapsed}
+                  progressSteps={item.toolProgressSteps}
                 />
               )
             }

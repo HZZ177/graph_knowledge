@@ -73,6 +73,13 @@ export interface BatchToolItemInfo {
   elapsed?: number
 }
 
+// 工具内部进度步骤（如 LightRAG 的检索阶段）
+export interface ToolProgressStep {
+  phase: string    // 阶段名称，如 "local_query" | "global_query" | "rerank" | "finalize"
+  detail: string   // 阶段详情，如 "40 实体, 100 关系"
+  timestamp: number // 时间戳
+}
+
 // 活跃工具信息（包含批次信息）
 export interface ActiveToolInfo {
   toolId: number
@@ -96,6 +103,7 @@ export interface RenderItem {
   toolInputSummary?: string
   toolOutputSummary?: string
   toolElapsed?: number
+  toolProgressSteps?: ToolProgressStep[]  // 工具内部进度步骤
   // batch_tool 类型（批量工具）
   batchId?: number
   batchTools?: BatchToolItemInfo[]

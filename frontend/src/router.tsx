@@ -6,6 +6,7 @@ import ResourceLibraryPage from './pages/ResourceLibraryPage'
 import BusinessLibraryPage from './pages/BusinessLibraryPage'
 import LLMModelManagePage from './pages/LLMModelManagePage'
 import ChatPage from './pages/ChatPage'
+import DocCenterPage from './pages/DocCenterPage'
 
 const router = createBrowserRouter(
   [
@@ -28,6 +29,10 @@ const router = createBrowserRouter(
         {
           path: '/business',
           element: <BusinessLibraryPage />,
+        },
+        {
+          path: '/doc-center',
+          element: <DocCenterPage />,
         },
         {
           path: '/llm-models',

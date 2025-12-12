@@ -42,6 +42,7 @@ import {
   DisplayMessage,
   ConversationSummary,
   ActiveToolInfo,
+  ToolProgressStep,
 } from '../types/chat'
 
 // 导入拆分的工具函数
@@ -160,6 +161,11 @@ const ChatPage: React.FC = () => {
   const activeToolsRef = useRef<Map<number, ActiveToolInfo>>(new Map())
   const [activeToolsVersion, setActiveToolsVersion] = useState(0)
   const activeTools = activeToolsRef.current
+  
+  // 工具内部进度步骤（key 为 toolId）
+  const toolProgressRef = useRef<Map<number, ToolProgressStep[]>>(new Map())
+  const [toolProgressVersion, setToolProgressVersion] = useState(0)
+  const toolProgress = toolProgressRef.current
   
   const updateMessageRafRef = useRef<number | null>(null)
   const pendingContentRef = useRef<string>('')
@@ -533,8 +539,10 @@ const ChatPage: React.FC = () => {
     toolCallIdRef.current = 0
     toolSummariesRef.current.clear()
     activeToolsRef.current.clear()
+    toolProgressRef.current.clear()
     setToolSummariesVersion(v => v + 1)
     setActiveToolsVersion(v => v + 1)
+    setToolProgressVersion(v => v + 1)
     setCurrentTool(null)
     userScrolledUpRef.current = false
     
@@ -683,6 +691,14 @@ const ChatPage: React.FC = () => {
              }
              return newPrev
           })
+        },
+        
+        onToolProgress: (toolName, toolId, phase, detail) => {
+          // 存储工具内部进度步骤
+          const steps = toolProgressRef.current.get(toolId) || []
+          steps.push({ phase, detail, timestamp: Date.now() })
+          toolProgressRef.current.set(toolId, steps)
+          setToolProgressVersion(v => v + 1)
         },
         
         onToolEnd: (name, inputSummary, outputSummary, elapsed, toolId, batch) => {
@@ -878,6 +894,7 @@ const ChatPage: React.FC = () => {
     resetTestingPhaseState()
     phaseMessagesRef.current.clear()
     toolSummariesRef.current.clear()
+    toolProgressRef.current.clear()
   }
 
   // 重新生成
@@ -909,8 +926,10 @@ const ChatPage: React.FC = () => {
     toolCallIdRef.current = 0
     toolSummariesRef.current.clear()
     activeToolsRef.current.clear()
+    toolProgressRef.current.clear()
     setToolSummariesVersion(v => v + 1)
     setActiveToolsVersion(v => v + 1)
+    setToolProgressVersion(v => v + 1)
     
     const client = createRegenerateClient()
     
@@ -1095,6 +1114,7 @@ const ChatPage: React.FC = () => {
           
           const phases: PhaseId[] = ['analysis', 'plan', 'generate']
           toolSummariesRef.current.clear()
+          toolProgressRef.current.clear()
           phaseMessagesRef.current.clear()
           
           for (const phase of phases) {
@@ -1142,6 +1162,7 @@ const ChatPage: React.FC = () => {
           }
           const result = convertRawMessagesToDisplay(testingResult.messages, sessionId)
           toolSummariesRef.current.clear()
+          toolProgressRef.current.clear()
           result.toolSummaries.forEach((value, key) => {
             toolSummariesRef.current.set(key, value)
           })
@@ -1153,6 +1174,7 @@ const ChatPage: React.FC = () => {
         const result = convertRawMessagesToDisplay(rawMessages, conv.threadId)
         
         toolSummariesRef.current.clear()
+        toolProgressRef.current.clear()
         result.toolSummaries.forEach((value, key) => {
           toolSummariesRef.current.set(key, value)
         })
@@ -1343,6 +1365,7 @@ const ChatPage: React.FC = () => {
                       toolSummaries={toolSummaries}
                       activeTools={activeTools}
                       activeToolsRef={activeToolsRef}
+                      toolProgress={toolProgress}
                     />
                   )
                 })}

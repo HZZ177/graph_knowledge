@@ -15,6 +15,7 @@ from backend.app.api.v1 import (
     files,
     coding,
     testing,
+    doc_center,
 )
 from backend.app.core.file_path import storage_yml_path
 
@@ -22,7 +23,7 @@ from backend.app.db.sqlite import Base, engine, SessionLocal
 from backend.app.db.init_db import init_db
 from backend.app.core.middleware import trace_id_middleware
 from backend.app.core.logger import logger
-from backend.app.models import ai_models, chat as chat_models  # noqa: F401  确保 ai_models 表被创建
+from backend.app.models import ai_models, chat as chat_models, doc_center as doc_center_models  # noqa: F401  确保表被创建
 from backend.mcp.ace_code_engine import warmup_ace_mcp
 from backend.app.llm.langchain.registry import AgentRegistry
 from backend.app.core.ripgrep import ensure_ripgrep_installed
@@ -98,6 +99,7 @@ app.include_router(llm_models.router, prefix="/api/v1")
 app.include_router(files.router, prefix="/api/v1")
 app.include_router(coding.router, prefix="/api/v1")
 app.include_router(testing.router, prefix="/api/v1")
+app.include_router(doc_center.router, prefix="/api/v1")
 
 
 @app.get("/health")

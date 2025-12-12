@@ -29,6 +29,7 @@ from backend.app.services.chat.history_service import (
     save_error_to_history,
 )
 from backend.app.core.logger import logger
+from backend.app.services.lightrag_service import LightRAGService
 
 
 def _generate_tool_summaries(tool_name: str, tool_input: dict, tool_output: str) -> tuple[str, str]:
@@ -494,6 +495,24 @@ async def stream_agent_with_events(
             input_str = json.dumps(tool_input, ensure_ascii=False) if isinstance(tool_input, dict) else str(tool_input)
             input_preview = input_str[:300] + "..." if len(input_str) > 300 else input_str
             logger.info(f"{log_prefix} 工具执行开始: {tool_name}, run_id={run_id}, 输入: {input_preview}")
+            
+            # 如果是 search_yongce_docs 工具，设置进度推送的上下文
+            if tool_name == "search_yongce_docs":
+                logger.info(f"{log_prefix} 检测到 search_yongce_docs 工具开始，准备设置进度上下文")
+                logger.info(f"{log_prefix} 当前 tool_call_to_placeholder: {list(tool_call_to_placeholder.keys())}")
+                # 查找对应的 placeholder_id
+                found = False
+                for tc_id, info in tool_call_to_placeholder.items():
+                    if not tc_id.startswith("run_") and info.get("tool_name") == tool_name:
+                        placeholder_id = info.get("placeholder_id")
+                        logger.info(f"{log_prefix} 找到匹配: tc_id={tc_id}, placeholder_id={placeholder_id}")
+                        if placeholder_id:
+                            LightRAGService.set_progress_context(websocket, placeholder_id, tool_name)
+                            logger.info(f"{log_prefix} 已设置 LightRAG 进度上下文: tool_id={placeholder_id}")
+                            found = True
+                        break
+                if not found:
+                    logger.warning(f"{log_prefix} 未找到 search_yongce_docs 的 placeholder_id")
         
         # ========== 工具结束事件 ==========
         elif event_type == "on_tool_end":
@@ -552,6 +571,11 @@ async def stream_agent_with_events(
                 "batch_size": batch_size,
                 "batch_index": batch_index,
             }, ensure_ascii=False))
+            
+            # 如果是 search_yongce_docs 工具，清除进度推送的上下文
+            if tool_name == "search_yongce_docs":
+                LightRAGService.clear_progress_context()
+                logger.debug(f"{log_prefix} 清除 LightRAG 进度上下文")
             
             # 特殊处理：save_phase_summary 完成后发送 phase_completed 消息
             if tool_name == 'save_phase_summary':

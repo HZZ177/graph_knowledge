@@ -100,6 +100,9 @@ async def activate_task_model(
     obj = AIModelService.set_task_active_model(db, payload.id)
     if not obj:
         return error_response(message="Not found")
+
+    # 清除 LightRAG 缓存，确保永策Pro智能助手使用新的小任务模型配置
+    LightRAGService.invalidate()
     return success_response(message="激活小任务模型成功")
 
 

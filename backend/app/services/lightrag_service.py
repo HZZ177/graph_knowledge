@@ -11,11 +11,14 @@
 
 import os
 import re
+import json
+import asyncio
 import logging
 from pathlib import Path
 from typing import Optional
 
 from sqlalchemy.orm import Session
+from starlette.websockets import WebSocket
 from functools import partial
 
 from lightrag import LightRAG, QueryParam
@@ -45,6 +48,11 @@ class LightRAGService:
     
     _instance: Optional[LightRAG] = None
     _db_session: Optional[Session] = None
+    
+    # 进度推送上下文（类变量，用于跨异步任务传递）
+    _progress_websocket: Optional[WebSocket] = None
+    _progress_tool_id: Optional[int] = None
+    _progress_tool_name: Optional[str] = None
     
     # 基础配置 - 使用绝对路径指向 test/lightrag_data
     # 获取项目根目录（backend/app/services -> backend -> 项目根）
@@ -91,10 +99,14 @@ class LightRAGService:
         Returns:
             配置好的 LightRAG 实例
         """
-        # 获取系统激活的 LLM 配置
+        # 获取 LLM 配置（优先使用小任务模型，未配置则 fallback 到主力模型）
         try:
-            llm_config = AIModelService.get_active_llm_config(db)
-            logger.info(f"[LightRAG] 使用系统 LLM 配置: model={llm_config.model_name}")
+            task_model = AIModelService.get_task_active_model(db)
+            llm_config = AIModelService.get_task_llm_config(db)
+            if task_model:
+                logger.info(f"[LightRAG] 使用小任务 LLM 配置: model={llm_config.model_name}")
+            else:
+                logger.info(f"[LightRAG] 未配置小任务模型，fallback 使用主力 LLM: model={llm_config.model_name}")
         except RuntimeError as e:
             logger.error(f"[LightRAG] 获取 LLM 配置失败: {e}")
             raise
@@ -227,7 +239,7 @@ class LightRAGService:
         """配置 LightRAG 内部日志，使其输出到我们的 logger
         
         LightRAG 内部使用标准的 logging 模块，我们将其日志
-        桥接到系统的 loguru logger。
+        桥接到系统的 loguru logger，同时解析阶段信息用于进度追踪。
         """
         # 获取 LightRAG 的 logger
         lightrag_logger = logging.getLogger("lightrag")
@@ -238,9 +250,9 @@ class LightRAGService:
         # 清除现有 handlers，避免重复输出
         lightrag_logger.handlers.clear()
         
-        # 添加自定义 handler，桥接到 loguru
+        # 添加自定义 handler，桥接到 loguru 并解析阶段
         class LoguruHandler(logging.Handler):
-            """将 logging 日志桥接到 loguru"""
+            """将 logging 日志桥接到 loguru，同时解析阶段信息并推送 WebSocket 进度"""
             
             def emit(self, record):
                 # 获取对应的 loguru 级别
@@ -251,6 +263,32 @@ class LightRAGService:
                 
                 # 格式化消息
                 message = self.format(record)
+                
+                # 解析阶段信息并推送 WebSocket
+                phase_info = cls._parse_lightrag_phase(message)
+                if phase_info:
+                    phase, detail = phase_info
+                    logger.info(f"[LightRAG:Phase] 阶段={phase}, 详情={detail}")
+                    
+                    # 尝试推送 WebSocket 进度消息（使用类变量）
+                    ws = cls._progress_websocket
+                    tool_id = cls._progress_tool_id
+                    tool_name = cls._progress_tool_name
+                    logger.info(f"[LightRAG:Phase] 进度上下文: ws={ws is not None}, tool_id={tool_id}, tool_name={tool_name}")
+                    if ws and tool_id is not None:
+                        try:
+                            # 获取事件循环并创建任务发送消息
+                            loop = asyncio.get_running_loop()
+                            logger.info(f"[LightRAG:Phase] 准备推送进度: phase={phase}")
+                            asyncio.run_coroutine_threadsafe(
+                                cls._send_progress(ws, tool_name, tool_id, phase, detail),
+                                loop
+                            )
+                        except RuntimeError as e:
+                            # 没有运行中的事件循环，跳过推送
+                            logger.warning(f"[LightRAG:Phase] 无法获取事件循环: {e}")
+                    else:
+                        logger.debug(f"[LightRAG:Phase] 跳过推送: ws或tool_id未设置")
                 
                 # 输出到 loguru（添加 [LightRAG] 前缀）
                 logger.opt(depth=6, exception=record.exc_info).log(
@@ -265,6 +303,89 @@ class LightRAGService:
         lightrag_logger.propagate = False
         
         logger.debug("[LightRAG] 已配置 LightRAG 内部日志桥接")
+    
+    @classmethod
+    def _parse_lightrag_phase(cls, message: str) -> tuple[str, str] | None:
+        """解析 LightRAG 日志中的阶段信息
+        
+        Args:
+            message: LightRAG 的日志消息
+            
+        Returns:
+            (phase, detail) 元组，或 None 表示不是阶段日志
+        """
+        # Local query 阶段
+        match = re.match(r'Local query: (\d+) entites?, (\d+) relations?', message)
+        if match:
+            return ("local_query", f"{match.group(1)} 实体, {match.group(2)} 关系")
+        
+        # Global query 阶段
+        match = re.match(r'Global query: (\d+) entites?, (\d+) relations?', message)
+        if match:
+            return ("global_query", f"{match.group(1)} 实体, {match.group(2)} 关系")
+        
+        # Rerank 阶段
+        match = re.match(r'Successfully reranked: (\d+) chunks from (\d+)', message)
+        if match:
+            return ("rerank", f"从 {match.group(2)} 个片段中筛选出 {match.group(1)} 个")
+        
+        # Final context 阶段
+        match = re.match(r'Final context: (\d+) entities?, (\d+) relations?, (\d+) chunks?', message)
+        if match:
+            return ("finalize", f"{match.group(1)} 实体, {match.group(2)} 关系, {match.group(3)} 片段")
+        
+        # Raw search results（检索完成）
+        match = re.match(r'Raw search results: (\d+) entities?, (\d+) relations?, (\d+) vector chunks?', message)
+        if match:
+            return ("search_complete", f"{match.group(1)} 实体, {match.group(2)} 关系, {match.group(3)} 向量片段")
+        
+        return None
+    
+    @classmethod
+    async def _send_progress(cls, ws: WebSocket, tool_name: str, tool_id: int, phase: str, detail: str):
+        """发送 tool_progress 消息到 WebSocket
+        
+        Args:
+            ws: WebSocket 连接
+            tool_name: 工具名称
+            tool_id: 工具占位符 ID
+            phase: 阶段名称
+            detail: 阶段详情
+        """
+        try:
+            await ws.send_text(json.dumps({
+                "type": "tool_progress",
+                "tool_name": tool_name,
+                "tool_id": tool_id,
+                "phase": phase,
+                "detail": detail,
+            }, ensure_ascii=False))
+            logger.debug(f"[LightRAG] 已推送进度: phase={phase}")
+        except Exception as e:
+            logger.warning(f"[LightRAG] 推送进度失败: {e}")
+    
+    @classmethod
+    def set_progress_context(cls, ws: Optional[WebSocket], tool_id: Optional[int], tool_name: Optional[str] = None):
+        """设置进度推送的上下文
+        
+        在工具执行前调用，设置 WebSocket 和 tool_id，
+        使得 LightRAG 内部日志捕获时能推送进度消息。
+        
+        Args:
+            ws: WebSocket 连接，None 表示清除
+            tool_id: 工具占位符 ID
+            tool_name: 工具名称
+        """
+        cls._progress_websocket = ws
+        cls._progress_tool_id = tool_id
+        cls._progress_tool_name = tool_name
+    
+    @classmethod
+    def clear_progress_context(cls):
+        """清除进度推送的上下文"""
+        cls._progress_websocket = None
+        cls._progress_tool_id = None
+        cls._progress_tool_name = None
     
     @classmethod
     def invalidate(cls) -> None:
@@ -317,11 +438,10 @@ class LightRAGService:
             logger.info(f"[LightRAG] 开始检索: question={question[:50]}...")
             
             # 调用 LightRAG 查询（only_need_context=True 只返回检索结果）
-            # hybrid 模式 = local + global，基于知识图谱检索，不依赖 chunks 向量
             context = await rag.aquery(
                 question,
                 param=QueryParam(
-                    mode="hybrid",  # 知识图谱检索（local + global）
+                    mode="mix",
                     only_need_context=True,  # 只返回上下文，不生成回答
                 )
             )
