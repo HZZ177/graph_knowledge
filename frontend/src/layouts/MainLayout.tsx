@@ -8,7 +8,7 @@ import {
   MenuUnfoldOutlined,
   RobotOutlined,
   MessageOutlined,
-  FileTextOutlined,
+  FolderOutlined,
 } from '@ant-design/icons'
 import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useModelContext } from '../contexts/ModelContext'
@@ -57,7 +57,7 @@ const MainLayout: React.FC = () => {
     },
     {
       key: '/doc-center',
-      icon: <FileTextOutlined />,
+      icon: <FolderOutlined />,
       label: <Link to="/doc-center">文档中心</Link>,
     },
     {

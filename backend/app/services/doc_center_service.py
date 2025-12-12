@@ -378,7 +378,6 @@ class DocCenterService:
                 "is_folder": False,
                 "sync_status": doc.sync_status,
                 "index_status": doc.index_status,
-                "index_progress": doc.index_progress,
                 "children": [],
             }
             nodes_map[node["id"]] = node
@@ -427,8 +426,11 @@ class DocCenterService:
                     "sync_status": doc.sync_status,
                     "synced_at": doc.synced_at.isoformat() if doc.synced_at else None,
                     "index_status": doc.index_status,
-                    "index_progress": doc.index_progress,
-                    "index_phase": doc.index_phase,
+                    "extraction_progress": doc.extraction_progress,
+                    "entities_total": doc.entities_total,
+                    "entities_done": doc.entities_done,
+                    "relations_total": doc.relations_total,
+                    "relations_done": doc.relations_done,
                 }
                 for doc in items
             ],
@@ -454,7 +456,8 @@ class DocCenterService:
         db: Session,
         source_doc_id: str,
         title: str,
-        parent_id: Optional[str] = None
+        parent_id: Optional[str] = None,
+        progress_callback: Optional[callable] = None
     ) -> Dict[str, Any]:
         """
         同步单个文档
@@ -466,9 +469,15 @@ class DocCenterService:
         4. 保存到本地
         5. 更新数据库记录
 
+        Args:
+            progress_callback: 进度回调函数，签名: async def callback(phase, current, total, detail)
+
         Returns:
             {success: bool, document: {...}, error: str}
         """
+        async def report_progress(phase: str, current: int, total: int, detail: str = ""):
+            if progress_callback:
+                await progress_callback(phase, current, total, detail)
         logger.info(f"[DocCenter] 开始同步文档: {source_doc_id} - {title}")
 
         # 检查是否已存在
@@ -497,6 +506,9 @@ class DocCenterService:
             if not share_url:
                 raise Exception("获取分享码失败")
 
+            # 保存云端地址
+            doc.source_url = share_url
+
             # 2. 获取文档内容
             doc_data = help_client.get_doc_content(share_url)
             if not doc_data or not doc_data.get("md"):
@@ -509,12 +521,14 @@ class DocCenterService:
             image_urls = extract_image_urls(content)
             if image_urls:
                 logger.info(f"[DocCenter] 发现 {len(image_urls)} 张图片，开始处理...")
+                await report_progress("image_processing", 0, len(image_urls), "开始处理图片")
                 oss_client = SimpleOSSClient(OSS_CONFIG)
 
                 async with httpx.AsyncClient(timeout=30.0, verify=False) as http_client:
                     url_mapping = {}
                     for i, url in enumerate(image_urls, 1):
                         logger.debug(f"[DocCenter] [{i}/{len(image_urls)}] 处理图片: {url[:60]}...")
+                        await report_progress("image_processing", i, len(image_urls), f"处理图片 {i}/{len(image_urls)}")
 
                         # 下载
                         image_bytes = await download_image(url, http_client)
@@ -540,27 +554,14 @@ class DocCenterService:
                 doc.image_count = len(url_mapping)
                 logger.info(f"[DocCenter] 图片处理完成: {len(url_mapping)}/{len(image_urls)}")
 
-            # 4. 保存到本地
-            DOCS_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-            safe_title = sanitize_filename(title)
-            output_path = DOCS_OUTPUT_DIR / f"{safe_title}.md"
-
-            # 避免重名
-            counter = 1
-            while output_path.exists():
-                output_path = DOCS_OUTPUT_DIR / f"{safe_title}_{counter}.md"
-                counter += 1
-
-            output_path.write_text(content, encoding="utf-8")
-            logger.info(f"[DocCenter] 文档保存到: {output_path}")
-
-            # 5. 更新数据库记录
-            doc.local_path = str(output_path)
+            # 4. 保存到数据库
+            doc.content = content
             doc.content_hash = hashlib.md5(content.encode()).hexdigest()
             doc.sync_status = "synced"
             doc.synced_at = datetime.utcnow()
             doc.sync_error = None
             db.commit()
+            logger.info(f"[DocCenter] 文档内容已保存到数据库, 长度={len(content)}")
 
             help_client.close()
 
@@ -571,7 +572,6 @@ class DocCenterService:
                     "source_doc_id": doc.source_doc_id,
                     "title": doc.title,
                     "sync_status": doc.sync_status,
-                    "local_path": doc.local_path,
                     "image_count": doc.image_count,
                 },
                 "error": None,
@@ -596,13 +596,8 @@ class DocCenterService:
 
     @staticmethod
     def get_document_content(db: Session, doc_id: str) -> Optional[str]:
-        """获取文档内容"""
+        """获取文档内容（从数据库）"""
         doc = DocCenterService.get_document_by_id(db, doc_id)
-        if not doc or not doc.local_path:
+        if not doc or not doc.content:
             return None
-
-        local_path = Path(doc.local_path)
-        if not local_path.exists():
-            return None
-
-        return local_path.read_text(encoding="utf-8")
+        return doc.content
