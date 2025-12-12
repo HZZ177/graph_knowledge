@@ -54,6 +54,15 @@ async def lifespan(app: FastAPI):
             await LightRAGService.warmup(db)
         except Exception as e:
             logger.warning(f"[Lifespan] LightRAG 预热跳过: {e}")
+        
+        # 重置卡在 running 状态的索引任务（服务非正常退出时可能遗留）
+        try:
+            from backend.app.services.lightrag_index_service import LightRAGIndexService
+            reset_count = LightRAGIndexService.reset_stale_tasks(db)
+            if reset_count > 0:
+                logger.info(f"[Lifespan] 重置了 {reset_count} 个卡住的索引任务")
+        except Exception as e:
+            logger.warning(f"[Lifespan] 索引任务重置失败: {e}")
     finally:
         db.close()
 

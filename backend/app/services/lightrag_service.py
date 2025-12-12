@@ -33,6 +33,26 @@ from backend.app.db.neo4j_client import (
     DEFAULT_NEO4J_PASSWORD,
 )
 from backend.app.core.logger import logger
+from backend.app.core.lightrag_config import (
+    LIGHTRAG_WORKING_DIR,
+    LIGHTRAG_WORKSPACE,
+    EMBEDDING_MODEL,
+    EMBEDDING_API_KEY,
+    EMBEDDING_BASE_URL,
+    EMBEDDING_DIM,
+    RERANK_MODEL,
+    RERANK_API_KEY,
+    RERANK_BASE_URL,
+    CHUNK_TOKEN_SIZE,
+    CHUNK_OVERLAP_TOKEN_SIZE,
+    EMBEDDING_BATCH_NUM,
+    EMBEDDING_FUNC_MAX_ASYNC,
+    LLM_MODEL_MAX_ASYNC,
+    KV_STORAGE,
+    VECTOR_STORAGE,
+    GRAPH_STORAGE,
+    DOC_STATUS_STORAGE,
+)
 
 
 class LightRAGService:
@@ -53,24 +73,6 @@ class LightRAGService:
     _progress_websocket: Optional[WebSocket] = None
     _progress_tool_id: Optional[int] = None
     _progress_tool_name: Optional[str] = None
-    
-    # 基础配置 - 使用绝对路径指向 test/lightrag_data
-    # 获取项目根目录（backend/app/services -> backend -> 项目根）
-    _PROJECT_ROOT = Path(__file__).parent.parent.parent.parent
-    WORKING_DIR = str(_PROJECT_ROOT / "test" / "lightrag_data")
-    WORKSPACE = "opdoc"  # Neo4j 数据隔离标识（label 前缀）
-    
-    # Embedding 配置（暂时硬编码，后续可迁移到 AIModel 表）
-    # TODO: 考虑添加 EmbeddingModel 配置表
-    EMBEDDING_MODEL = "Qwen/Qwen3-Embedding-8B"
-    EMBEDDING_API_KEY = "sk-vxyvdnryevgolxatlsqilklzpiyfadxpkkqpvsagrgvuzavi"
-    EMBEDDING_BASE_URL = "https://api.siliconflow.cn/v1"
-    EMBEDDING_DIM = 4096
-    
-    # Rerank 配置（硅基流动平台，兼容 Cohere API）
-    RERANK_MODEL = "Qwen/Qwen3-Reranker-8B"
-    RERANK_API_KEY = "sk-vxyvdnryevgolxatlsqilklzpiyfadxpkkqpvsagrgvuzavi"  # 同 Embedding
-    RERANK_BASE_URL = "https://api.siliconflow.cn/v1/rerank"
     
     @classmethod
     async def get_instance(cls, db: Session) -> LightRAG:
@@ -117,10 +119,10 @@ class LightRAGService:
         os.environ["NEO4J_PASSWORD"] = DEFAULT_NEO4J_PASSWORD
         os.environ["OPENAI_API_KEY"] = llm_config.api_key  # LightRAG 要求必须设置
         
-        logger.info(f"[LightRAG] Neo4j 配置: uri={DEFAULT_NEO4J_URI}, workspace={cls.WORKSPACE}")
+        logger.info(f"[LightRAG] Neo4j 配置: uri={DEFAULT_NEO4J_URI}, workspace={LIGHTRAG_WORKSPACE}")
         
         # 确保工作目录存在
-        os.makedirs(cls.WORKING_DIR, exist_ok=True)
+        os.makedirs(LIGHTRAG_WORKING_DIR, exist_ok=True)
         
         # 自定义 LLM 函数（复用系统配置）
         async def llm_func(prompt, system_prompt=None, history_messages=[], **kwargs):
@@ -151,39 +153,39 @@ class LightRAGService:
                 **kwargs
             )
         
-        # 自定义 Embedding 函数（使用硬编码配置）
+        # 自定义 Embedding 函数（使用统一配置）
         async def embedding_func(texts: list[str]):
-            logger.debug(f"[LightRAG] Embedding: {len(texts)} texts, model={cls.EMBEDDING_MODEL}")
+            logger.debug(f"[LightRAG] Embedding: {len(texts)} texts, model={EMBEDDING_MODEL}")
             return await openai_embed(
                 texts,
-                model=cls.EMBEDDING_MODEL,
-                api_key=cls.EMBEDDING_API_KEY,
-                base_url=cls.EMBEDDING_BASE_URL,
+                model=EMBEDDING_MODEL,
+                api_key=EMBEDDING_API_KEY,
+                base_url=EMBEDDING_BASE_URL,
             )
         
         # 配置 Rerank 函数（硅基流动平台，兼容 Cohere API）
         rerank_func = partial(
             cohere_rerank,
-            model=cls.RERANK_MODEL,
-            api_key=cls.RERANK_API_KEY,
-            base_url=cls.RERANK_BASE_URL,
+            model=RERANK_MODEL,
+            api_key=RERANK_API_KEY,
+            base_url=RERANK_BASE_URL,
         )
-        logger.info(f"[LightRAG] Rerank 配置: model={cls.RERANK_MODEL}")
+        logger.info(f"[LightRAG] Rerank 配置: model={RERANK_MODEL}")
         
         # 配置 LightRAG 的内部日志级别
         cls._configure_lightrag_logging()
         
         # 创建 LightRAG 实例
         rag = LightRAG(
-            working_dir=cls.WORKING_DIR,
-            workspace=cls.WORKSPACE,  # 数据隔离标识（Neo4j label前缀）
+            working_dir=LIGHTRAG_WORKING_DIR,
+            workspace=LIGHTRAG_WORKSPACE,
             
             # LLM 配置
             llm_model_func=llm_func,
             
             # Embedding 配置
             embedding_func=EmbeddingFunc(
-                embedding_dim=cls.EMBEDDING_DIM,
+                embedding_dim=EMBEDDING_DIM,
                 max_token_size=8192,
                 func=embedding_func,
             ),
@@ -192,17 +194,17 @@ class LightRAGService:
             rerank_model_func=rerank_func,
             
             # 存储配置
-            graph_storage="Neo4JStorage",  # 复用现有 Neo4j
-            vector_storage="NanoVectorDBStorage",  # 轻量向量库
-            kv_storage="JsonKVStorage",
-            doc_status_storage="JsonDocStatusStorage",
+            graph_storage=GRAPH_STORAGE,
+            vector_storage=VECTOR_STORAGE,
+            kv_storage=KV_STORAGE,
+            doc_status_storage=DOC_STATUS_STORAGE,
             
             # 性能参数
-            chunk_token_size=1200,
-            chunk_overlap_token_size=100,
-            embedding_batch_num=8,
-            embedding_func_max_async=1,  # 避免并发过高
-            llm_model_max_async=6,
+            chunk_token_size=CHUNK_TOKEN_SIZE,
+            chunk_overlap_token_size=CHUNK_OVERLAP_TOKEN_SIZE,
+            embedding_batch_num=EMBEDDING_BATCH_NUM,
+            embedding_func_max_async=EMBEDDING_FUNC_MAX_ASYNC,
+            llm_model_max_async=LLM_MODEL_MAX_ASYNC,
             
             # 语言配置
             addon_params={
@@ -225,11 +227,11 @@ class LightRAGService:
         
         logger.info(
             f"[LightRAG] 存储初始化完成: "
-            f"working_dir={cls.WORKING_DIR}, "
-            f"workspace={cls.WORKSPACE}, "
+            f"working_dir={LIGHTRAG_WORKING_DIR}, "
+            f"workspace={LIGHTRAG_WORKSPACE}, "
             f"llm={llm_config.model_name}, "
-            f"embedding={cls.EMBEDDING_MODEL}, "
-            f"rerank={cls.RERANK_MODEL}"
+            f"embedding={EMBEDDING_MODEL}, "
+            f"rerank={RERANK_MODEL}"
         )
         
         return rag

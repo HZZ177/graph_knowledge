@@ -9,6 +9,11 @@ export interface TreeNode {
   parent_id: string | null
   is_folder: boolean
   children: TreeNode[]
+  // 文档节点额外字段
+  local_id?: string
+  sync_status?: string
+  index_status?: string
+  index_progress?: number
 }
 
 // 源文档（帮助中心）
@@ -27,15 +32,19 @@ export interface LocalDocument {
   sync_status: 'pending' | 'syncing' | 'synced' | 'failed'
   sync_error?: string | null
   synced_at: string | null
-  local_path: string | null
   image_count?: number
   index_status: 'pending' | 'queued' | 'indexing' | 'indexed' | 'failed'
-  index_progress: number
-  index_phase: string | null
-  index_phase_detail?: string | null
   index_error?: string | null
+  // 三阶段进度
+  extraction_progress: number  // 提取阶段进度 0-100
+  entities_total: number       // 实体总数
+  entities_done: number        // 已处理实体数
+  relations_total: number      // 关系总数
+  relations_done: number       // 已处理关系数
+  // 统计信息
   chunk_count?: number
   entity_count?: number
+  relation_count?: number
   created_at: string | null
   updated_at?: string | null
 }
@@ -92,15 +101,29 @@ export interface QueueStatus {
   } | null
 }
 
-// WebSocket 进度消息
+// WebSocket 进度消息（三阶段）
 export interface IndexProgressMessage {
   type: 'index_progress'
   task_id: string
   document_id: string
-  phase: string
-  phase_name: string
-  phase_progress: number
-  overall_progress: number
+  current_phase: 'extraction' | 'entities' | 'relations' | 'completed'
+  extraction_progress: number
+  entities_total: number
+  entities_done: number
+  entities_progress: number
+  relations_total: number
+  relations_done: number
+  relations_progress: number
+}
+
+// WebSocket 同步进度消息
+export interface SyncProgressMessage {
+  type: 'sync_progress'
+  document_id: string
+  title: string
+  phase: string  // 'image_processing' | 'completed' | 'failed'
+  current: number
+  total: number
   detail: string
 }
 

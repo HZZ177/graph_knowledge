@@ -54,9 +54,12 @@ class DocumentResponse(BaseModel):
     sync_status: str
     synced_at: Optional[str] = None
     index_status: str
-    index_progress: int = 0
-    index_phase: Optional[str] = None
-    local_path: Optional[str] = None
+    # 三阶段进度
+    extraction_progress: int = 0
+    entities_total: int = 0
+    entities_done: int = 0
+    relations_total: int = 0
+    relations_done: int = 0
     created_at: Optional[str] = None
 
 
@@ -135,15 +138,17 @@ async def get_document(doc_id: str, db: Session = Depends(get_db)):
             "sync_status": doc.sync_status,
             "sync_error": doc.sync_error,
             "synced_at": doc.synced_at.isoformat() if doc.synced_at else None,
-            "local_path": doc.local_path,
             "image_count": doc.image_count,
             "index_status": doc.index_status,
-            "index_progress": doc.index_progress,
-            "index_phase": doc.index_phase,
-            "index_phase_detail": doc.index_phase_detail,
+            "extraction_progress": doc.extraction_progress,
+            "entities_total": doc.entities_total,
+            "entities_done": doc.entities_done,
+            "relations_total": doc.relations_total,
+            "relations_done": doc.relations_done,
             "index_error": doc.index_error,
             "chunk_count": doc.chunk_count,
             "entity_count": doc.entity_count,
+            "relation_count": doc.relation_count,
             "created_at": doc.created_at.isoformat() if doc.created_at else None,
             "updated_at": doc.updated_at.isoformat() if doc.updated_at else None,
         },
@@ -172,13 +177,45 @@ async def sync_document_content(doc_id: str, db: Session = Depends(get_db)):
     if not doc:
         raise HTTPException(status_code=404, detail="文档不存在")
 
+    # 进度回调：通过 WebSocket 广播
+    async def progress_callback(phase: str, current: int, total: int, detail: str):
+        await ws_manager.broadcast({
+            "type": "sync_progress",
+            "document_id": doc_id,
+            "title": doc.title,
+            "phase": phase,
+            "current": current,
+            "total": total,
+            "detail": detail,
+        })
+
     try:
         result = await DocCenterService.sync_document(
-            db, doc.source_doc_id, doc.title, doc.source_parent_id
+            db, doc.source_doc_id, doc.title, doc.source_parent_id,
+            progress_callback=progress_callback
         )
+        # 同步完成后广播完成状态
+        await ws_manager.broadcast({
+            "type": "sync_progress",
+            "document_id": doc_id,
+            "title": doc.title,
+            "phase": "completed" if result["success"] else "failed",
+            "current": 0,
+            "total": 0,
+            "detail": "同步完成" if result["success"] else result.get("error", "同步失败"),
+        })
         return {"code": 0, "data": result, "message": "success" if result["success"] else result.get("error")}
     except Exception as e:
         logger.error(f"[DocCenterAPI] 同步文档内容失败: {doc_id}, {e}")
+        await ws_manager.broadcast({
+            "type": "sync_progress",
+            "document_id": doc_id,
+            "title": doc.title,
+            "phase": "failed",
+            "current": 0,
+            "total": 0,
+            "detail": str(e),
+        })
         raise HTTPException(status_code=500, detail=str(e))
 
 

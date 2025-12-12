@@ -15,6 +15,7 @@ import type {
   QueueStatus,
   IndexProgressMessage,
   QueueStatusMessage,
+  SyncProgressMessage,
 } from '../types/docCenter'
 
 const BASE_URL = `${API_BASE_PATH}/doc-center`
@@ -78,6 +79,14 @@ export async function getDocumentDetail(docId: string): Promise<LocalDocument> {
 export async function getDocumentContent(docId: string): Promise<string> {
   const res = await fetch(`${BASE_URL}/documents/${docId}/content`)
   const data = await res.json()
+
+  // 无内容视为正常情况
+  if (res.status === 404) return ''
+
+  // 兼容后端错误返回格式
+  if (!res.ok) {
+    throw new Error(data?.detail || data?.message || `HTTP ${res.status}`)
+  }
   if (data.code !== 0) throw new Error(data.message)
   return data.data.content
 }
@@ -132,10 +141,11 @@ export async function triggerProcessQueue(): Promise<void> {
 
 // ============== WebSocket ==============
 
-export type WSMessage = IndexProgressMessage | QueueStatusMessage | { type: 'heartbeat' } | { type: 'pong' }
+export type WSMessage = IndexProgressMessage | QueueStatusMessage | SyncProgressMessage | { type: 'heartbeat' } | { type: 'pong' }
 
 export interface DocCenterWSCallbacks {
   onProgress?: (msg: IndexProgressMessage) => void
+  onSyncProgress?: (msg: SyncProgressMessage) => void
   onQueueStatus?: (msg: QueueStatusMessage) => void
   onError?: (error: Error) => void
   onClose?: () => void
@@ -158,6 +168,8 @@ export function createDocCenterWS(callbacks: DocCenterWSCallbacks): WebSocket {
       
       if (msg.type === 'index_progress' && callbacks.onProgress) {
         callbacks.onProgress(msg as IndexProgressMessage)
+      } else if (msg.type === 'sync_progress' && callbacks.onSyncProgress) {
+        callbacks.onSyncProgress(msg as SyncProgressMessage)
       } else if (msg.type === 'queue_status' && callbacks.onQueueStatus) {
         callbacks.onQueueStatus(msg as QueueStatusMessage)
       }

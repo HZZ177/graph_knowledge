@@ -90,6 +90,7 @@ class DocCenterDocument(Base):
     # === 文档基本信息 ===
     title = Column(String(255), nullable=False, comment="文档标题")
     path = Column(String(512), nullable=True, comment="完整路径，如 /产品文档/功能说明")
+    source_url = Column(String(512), nullable=True, comment="文档中心云端地址")
 
     # === 同步状态 ===
     # pending: 未同步, syncing: 同步中, synced: 已同步, failed: 同步失败
@@ -101,8 +102,8 @@ class DocCenterDocument(Base):
     sync_error = Column(Text, nullable=True, comment="同步错误信息")
     synced_at = Column(DateTime, nullable=True, comment="最后同步时间")
 
-    # === 本地存储 ===
-    local_path = Column(String(512), nullable=True, comment="本地文件路径")
+    # === 文档内容 ===
+    content = Column(Text, nullable=True, comment="文档Markdown内容")
     content_hash = Column(String(32), nullable=True, comment="内容MD5哈希")
     image_count = Column(Integer, default=0, comment="文档中的图片数量")
 
@@ -113,12 +114,19 @@ class DocCenterDocument(Base):
         default="pending",
         comment="索引状态: pending|queued|indexing|indexed|failed"
     )
-    index_progress = Column(Integer, default=0, comment="索引进度 0-100")
-    index_phase = Column(String(50), nullable=True, comment="当前索引阶段")
-    index_phase_detail = Column(String(255), nullable=True, comment="阶段详情")
     index_error = Column(Text, nullable=True, comment="索引错误信息")
     index_started_at = Column(DateTime, nullable=True, comment="索引开始时间")
     index_finished_at = Column(DateTime, nullable=True, comment="索引完成时间")
+
+    # === 三阶段进度 ===
+    # 阶段1: LLM分块+提取
+    extraction_progress = Column(Integer, default=0, comment="提取阶段进度 0-100")
+    # 阶段2: 实体处理 (Phase 1)
+    entities_total = Column(Integer, default=0, comment="实体总数")
+    entities_done = Column(Integer, default=0, comment="已处理实体数")
+    # 阶段3: 关系处理 (Phase 2)
+    relations_total = Column(Integer, default=0, comment="关系总数")
+    relations_done = Column(Integer, default=0, comment="已处理关系数")
 
     # === LightRAG 统计信息 ===
     chunk_count = Column(Integer, default=0, comment="分块数量")

@@ -213,3 +213,4 @@ node_modules/
 /backend/resource/rg.exe
 /docs/
 /test/lightrag_data/opdoc/
+/backend/data/lightrag/
