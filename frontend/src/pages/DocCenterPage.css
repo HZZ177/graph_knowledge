@@ -1,0 +1,139 @@
+/**
+ * 文档中心页面样式
+ */
+
+.doc-center-page {
+  height: 100vh;
+  background: #f5f5f5;
+}
+
+/* 左侧边栏 */
+.doc-center-sider {
+  background: #fff;
+  border-right: 1px solid #e8e8e8;
+  display: flex;
+  flex-direction: column;
+}
+
+.doc-center-sider .sider-header {
+  padding: 16px;
+  border-bottom: 1px solid #e8e8e8;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.doc-center-sider .sider-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.doc-center-sider .tree-container {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+}
+
+.doc-center-sider .action-panel {
+  padding: 16px;
+  border-top: 1px solid #e8e8e8;
+  background: #fafafa;
+}
+
+/* 右侧内容区 */
+.doc-center-content {
+  padding: 16px;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* 文档列表卡片 */
+.document-list-card {
+  flex-shrink: 0;
+}
+
+.document-list-card .ant-card-body {
+  padding: 0;
+}
+
+.document-list-card .ant-table-wrapper {
+  border-radius: 0;
+}
+
+/* 文档预览卡片 */
+.document-preview-card {
+  flex: 1;
+  min-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.document-preview-card .ant-card-body {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
+}
+
+.document-preview-card .markdown-preview {
+  max-height: 400px;
+  overflow: auto;
+  background: #fff;
+  padding: 16px;
+  border-radius: 4px;
+}
+
+/* 状态标签 */
+.ant-tag {
+  margin-right: 0;
+}
+
+/* 进度条 */
+.ant-progress-small {
+  margin-bottom: 0;
+}
+
+/* 树形控件 */
+.doc-center-sider .ant-tree {
+  background: transparent;
+}
+
+.doc-center-sider .ant-tree-node-content-wrapper {
+  display: flex;
+  align-items: center;
+}
+
+/* 表格行选中状态 */
+.ant-table-tbody > tr.ant-table-row-selected > td {
+  background: #e6f7ff;
+}
+
+/* 响应式调整 */
+@media (max-width: 1200px) {
+  .doc-center-sider {
+    width: 240px !important;
+    min-width: 240px !important;
+    max-width: 240px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .doc-center-page {
+    flex-direction: column;
+  }
+  
+  .doc-center-sider {
+    width: 100% !important;
+    min-width: 100% !important;
+    max-width: 100% !important;
+    height: auto;
+    border-right: none;
+    border-bottom: 1px solid #e8e8e8;
+  }
+  
+  .doc-center-sider .tree-container {
+    max-height: 200px;
+  }
+}
