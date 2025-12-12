@@ -198,13 +198,14 @@ class LightRAGDemo:
                 vector_storage="NanoVectorDBStorage",   # 默认轻量向量
                 kv_storage="JsonKVStorage",
                 doc_status_storage="JsonDocStatusStorage",
+
                 # 隔离配置
                 workspace=LIGHTRAG_WORKSPACE,
                 # 性能优化
                 chunk_token_size=1200,                  # 分块大小 (默认1200)
                 chunk_overlap_token_size=100,           # 重叠大小 (默认100)
                 embedding_batch_num=8,                 # 每批 embedding 数量
-                embedding_func_max_async=1,             # embedding 并发数 (关键!)
+                embedding_func_max_async=1,             # embedding 并发数 - 硅基流动rpm限制比较狠，配置为2都会导致rate limit
                 llm_model_max_async=6,                  # LLM 并发数
                 # 语言配置
                 addon_params={
@@ -316,7 +317,8 @@ class LightRAGDemo:
         monitor_task = asyncio.create_task(monitor_progress())
         
         try:
-            await self.rag.ainsert(doc_content)
+            # 传入 file_paths 参数，使 LightRAG 生成正确的 reference_id
+            await self.rag.ainsert(doc_content, file_paths=[file_path])
             monitor_task.cancel()
             try:
                 await monitor_task

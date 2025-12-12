@@ -4,6 +4,7 @@
 
 import React from 'react'
 import MarkdownPreview from '@uiw/react-markdown-preview'
+import { Image } from 'antd'
 
 interface MemoizedMarkdownProps {
   source: string
@@ -16,6 +17,16 @@ export const MemoizedMarkdown = React.memo<MemoizedMarkdownProps>(({ source, fon
       source={source}
       style={{ background: 'transparent', fontSize }}
       wrapperElement={{ "data-color-mode": "light" }}
+      components={{
+        img: ({ src, alt }) => (
+          <Image
+            src={src}
+            alt={alt}
+            style={{ maxWidth: '100%', borderRadius: '8px', cursor: 'pointer' }}
+            preview={{ mask: <div style={{ fontSize: 12 }}>点击预览</div> }}
+          />
+        )
+      }}
     />
   )
 }, (prevProps, nextProps) => {

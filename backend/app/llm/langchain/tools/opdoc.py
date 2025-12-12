@@ -71,6 +71,7 @@ async def search_yongce_docs(question: str) -> str:
         output = "\n".join(output_parts)
         
         logger.info(f"[YongceTool] 检索成功: context_length={len(context)}, sources_count={len(sources)}")
+        logger.debug(f"[YongceTool] 完整检索内容:\n{context}")  # DEBUG: 查看完整内容是否包含图片
         
         return output
     

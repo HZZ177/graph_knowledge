@@ -211,3 +211,5 @@ node_modules/
 */logs
 /backend/app/llm_checkpoints.db
 /backend/resource/rg.exe
+/docs/
+/test/lightrag_data/opdoc/

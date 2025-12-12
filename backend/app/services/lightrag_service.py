@@ -16,8 +16,11 @@ from pathlib import Path
 from typing import Optional
 
 from sqlalchemy.orm import Session
+from functools import partial
+
 from lightrag import LightRAG, QueryParam
 from lightrag.llm.openai import openai_complete_if_cache, openai_embed
+from lightrag.rerank import cohere_rerank
 from lightrag.utils import EmbeddingFunc
 
 from backend.app.services.ai_model_service import AIModelService
@@ -55,6 +58,11 @@ class LightRAGService:
     EMBEDDING_API_KEY = "sk-vxyvdnryevgolxatlsqilklzpiyfadxpkkqpvsagrgvuzavi"
     EMBEDDING_BASE_URL = "https://api.siliconflow.cn/v1"
     EMBEDDING_DIM = 4096
+    
+    # Rerank 配置（硅基流动平台，兼容 Cohere API）
+    RERANK_MODEL = "Qwen/Qwen3-Reranker-8B"
+    RERANK_API_KEY = "sk-vxyvdnryevgolxatlsqilklzpiyfadxpkkqpvsagrgvuzavi"  # 同 Embedding
+    RERANK_BASE_URL = "https://api.siliconflow.cn/v1/rerank"
     
     @classmethod
     async def get_instance(cls, db: Session) -> LightRAG:
@@ -141,6 +149,15 @@ class LightRAGService:
                 base_url=cls.EMBEDDING_BASE_URL,
             )
         
+        # 配置 Rerank 函数（硅基流动平台，兼容 Cohere API）
+        rerank_func = partial(
+            cohere_rerank,
+            model=cls.RERANK_MODEL,
+            api_key=cls.RERANK_API_KEY,
+            base_url=cls.RERANK_BASE_URL,
+        )
+        logger.info(f"[LightRAG] Rerank 配置: model={cls.RERANK_MODEL}")
+        
         # 配置 LightRAG 的内部日志级别
         cls._configure_lightrag_logging()
         
@@ -158,6 +175,9 @@ class LightRAGService:
                 max_token_size=8192,
                 func=embedding_func,
             ),
+            
+            # Rerank 配置
+            rerank_model_func=rerank_func,
             
             # 存储配置
             graph_storage="Neo4JStorage",  # 复用现有 Neo4j
@@ -196,7 +216,8 @@ class LightRAGService:
             f"working_dir={cls.WORKING_DIR}, "
             f"workspace={cls.WORKSPACE}, "
             f"llm={llm_config.model_name}, "
-            f"embedding={cls.EMBEDDING_MODEL}"
+            f"embedding={cls.EMBEDDING_MODEL}, "
+            f"rerank={cls.RERANK_MODEL}"
         )
         
         return rag
@@ -246,6 +267,20 @@ class LightRAGService:
         logger.debug("[LightRAG] 已配置 LightRAG 内部日志桥接")
     
     @classmethod
+    def invalidate(cls) -> None:
+        """清除 LightRAG 单例实例
+        
+        用于 LLM 配置变更后强制重建实例，确保使用新的 LLM 配置。
+        下次调用 get_instance() 时会自动重新创建实例。
+        """
+        if cls._instance is not None:
+            logger.info("[LightRAG] 清除实例缓存，下次请求将使用新 LLM 配置重建")
+            cls._instance = None
+            cls._db_session = None
+        else:
+            logger.debug("[LightRAG] 实例未初始化，无需清除")
+    
+    @classmethod
     async def warmup(cls, db: Session) -> None:
         """预热 LightRAG 实例
         
@@ -282,10 +317,11 @@ class LightRAGService:
             logger.info(f"[LightRAG] 开始检索: question={question[:50]}...")
             
             # 调用 LightRAG 查询（only_need_context=True 只返回检索结果）
+            # hybrid 模式 = local + global，基于知识图谱检索，不依赖 chunks 向量
             context = await rag.aquery(
                 question,
                 param=QueryParam(
-                    mode="hybrid",  # 向量 + 图谱混合检索
+                    mode="hybrid",  # 知识图谱检索（local + global）
                     only_need_context=True,  # 只返回上下文，不生成回答
                 )
             )

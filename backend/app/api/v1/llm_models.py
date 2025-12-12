@@ -16,6 +16,7 @@ from backend.app.llm.config import get_provider_base_url
 from backend.app.core.utils import success_response, error_response
 from backend.app.core.logger import logger
 from backend.app.llm.langchain.registry import AgentRegistry
+from backend.app.services.lightrag_service import LightRAGService
 
 
 router = APIRouter(prefix="/llm-models", tags=["llm-models"])
@@ -81,7 +82,11 @@ async def activate_llm_model(
     
     # 清除 Agent 缓存，下次请求将使用新配置重建
     AgentRegistry.get_instance().invalidate()
-    logger.info(f"[激活主力模型] 已清除 Agent 缓存，model_id={payload.id}")
+    
+    # 清除 LightRAG 缓存，确保永策Pro智能助手也使用新 LLM 配置
+    LightRAGService.invalidate()
+    
+    logger.info(f"[激活主力模型] 已清除 Agent 和 LightRAG 缓存，model_id={payload.id}")
     
     return success_response(message="激活主力模型成功")
 
