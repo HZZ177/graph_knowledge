@@ -54,6 +54,9 @@ class DocumentResponse(BaseModel):
     sync_status: str
     synced_at: Optional[str] = None
     index_status: str
+    # 图片增强结果
+    image_enhance_total: int = 0
+    image_enhance_success: int = 0
     # 三阶段进度
     extraction_progress: int = 0
     entities_total: int = 0
@@ -200,7 +203,9 @@ async def sync_document_content(doc_id: str, db: Session = Depends(get_db)):
             db, doc.source_doc_id, doc.title, doc.source_parent_id,
             progress_callback=progress_callback
         )
-        # 同步完成后广播完成状态
+        # 同步完成后广播完成状态（包含图片增强结果）
+        # 重新查询获取最新数据
+        db.refresh(doc)
         await ws_manager.broadcast({
             "type": "sync_progress",
             "document_id": doc_id,
@@ -209,6 +214,8 @@ async def sync_document_content(doc_id: str, db: Session = Depends(get_db)):
             "current": 0,
             "total": 0,
             "detail": "同步完成" if result["success"] else result.get("error", "同步失败"),
+            "image_enhance_total": doc.image_enhance_total or 0,
+            "image_enhance_success": doc.image_enhance_success or 0,
         })
         return {"code": 0, "data": result, "message": "success" if result["success"] else result.get("error")}
     except Exception as e:

@@ -26,6 +26,11 @@ from sqlalchemy.orm import Session
 
 from backend.app.core.logger import logger
 from backend.app.models.doc_center import DocCenterDocument, DocCenterFolder
+from backend.app.core.lightrag_config import (
+    ENABLE_IMAGE_UNDERSTANDING,
+    IMAGE_UNDERSTANDING_PROMPT,
+    IMAGE_CONTEXT_MAX_CHARS,
+)
 
 
 # ============== 硬编码配置（参考 doc_image_processor.py）==============
@@ -240,6 +245,243 @@ def sanitize_filename(name: str) -> str:
     return name.strip() or "untitled"
 
 
+def extract_image_info_from_content(content: str) -> List[Dict[str, Any]]:
+    """从 Markdown 内容中提取图片信息（包含位置）
+    
+    Returns:
+        [{alt_text, url, position, context}]
+    """
+    pattern = r'!\[([^\]]*)\]\(([^)]+)\)'
+    results = []
+    
+    for match in re.finditer(pattern, content):
+        alt_text = match.group(1)
+        url = match.group(2)
+        position = match.start()
+        
+        # 只处理 http 链接
+        if not url.startswith(("http://", "https://")):
+            continue
+        
+        # 提取上下文（图片前面的文本）
+        context_start = max(0, position - IMAGE_CONTEXT_MAX_CHARS)
+        context_text = content[context_start:position]
+        
+        # 从最近的句子边界开始
+        last_period = context_text.rfind('。')
+        if last_period > 0:
+            context_text = context_text[last_period + 1:]
+        
+        results.append({
+            "alt_text": alt_text,
+            "url": url,
+            "position": position,
+            "full_match": match.group(0),
+            "context": context_text.strip(),
+        })
+    
+    return results
+
+
+async def call_vlm_for_image(
+    image_url: str,
+    alt_text: str,
+    doc_title: str,
+    context: str,
+    db_session
+) -> str:
+    """调用 VLM 理解图片内容
+    
+    复用系统的 task_llm 配置，通过 OpenAI 兼容 API 发送图片 URL
+    """
+    from backend.app.services.ai_model_service import AIModelService
+    
+    try:
+        llm_config = AIModelService.get_task_llm_config(db_session)
+    except RuntimeError as e:
+        logger.error(f"[VLM] 获取 LLM 配置失败: {e}")
+        return ""
+    
+    # 处理 base_url
+    base_url = llm_config.base_url
+    if llm_config.provider_type == "custom_gateway" and llm_config.gateway_endpoint:
+        base_url = llm_config.gateway_endpoint.rstrip("/")
+        if base_url.endswith("/chat/completions"):
+            base_url = base_url[:-17]
+        elif base_url.endswith("/chat/completions/"):
+            base_url = base_url[:-18]
+        if not base_url.endswith("/v1"):
+            base_url = base_url + "/v1"
+    
+    # 构建 prompt
+    prompt = IMAGE_UNDERSTANDING_PROMPT.format(
+        doc_title=doc_title,
+        context=context if context else "(无上下文)",
+        alt_text=alt_text if alt_text else "(无标题)",
+    )
+    
+    # OpenAI 兼容格式：直接传图片 URL
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": prompt},
+                {
+                    "type": "image_url",
+                    "image_url": {"url": image_url, "detail": "high"}
+                }
+            ]
+        }
+    ]
+    
+    import httpx
+    import asyncio
+    
+    max_retries = 3
+    for attempt in range(1, max_retries + 1):
+        try:
+            async with httpx.AsyncClient(timeout=60.0, verify=False) as client:
+                resp = await client.post(
+                    f"{base_url}/chat/completions",
+                    json={
+                        "model": llm_config.model_name,
+                        "messages": messages,
+                        "max_tokens": 500,
+                        "temperature": 0.3,
+                    },
+                    headers={
+                        "Authorization": f"Bearer {llm_config.api_key}",
+                        "Content-Type": "application/json",
+                    }
+                )
+                
+                if resp.status_code != 200:
+                    logger.warning(f"[VLM] API 调用失败 (尝试 {attempt}/{max_retries}): status={resp.status_code}, body={resp.text[:200]}")
+                    if attempt < max_retries:
+                        await asyncio.sleep(1 * attempt)  # 递增延迟
+                        continue
+                    return ""
+                
+                data = resp.json()
+                result = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+                result = result.strip() if result else ""
+                
+                # 检查结果有效性
+                if result and len(result) >= 50:
+                    return result
+                
+                # 空内容或少于50字视为疑似截断，重试
+                if not result:
+                    logger.warning(f"[VLM] API 返回空内容 (尝试 {attempt}/{max_retries})")
+                else:
+                    logger.warning(f"[VLM] 返回内容过短({len(result)}字)，疑似截断 (尝试 {attempt}/{max_retries})")
+                if attempt < max_retries:
+                    await asyncio.sleep(1 * attempt)
+                    continue
+                return ""
+        
+        except Exception as e:
+            logger.warning(f"[VLM] 图片理解失败 (尝试 {attempt}/{max_retries}): {e}")
+            if attempt < max_retries:
+                await asyncio.sleep(1 * attempt)
+                continue
+            return ""
+    
+    return ""
+
+
+async def enhance_content_with_images(
+    content: str,
+    doc_title: str,
+    db_session,
+    progress_callback: Optional[callable] = None
+) -> Dict[str, Any]:
+    """增强文档内容：将图片链接替换为图片描述
+    
+    Args:
+        content: 原始 Markdown 内容
+        doc_title: 文档标题
+        db_session: 数据库会话
+        progress_callback: 进度回调 async def callback(phase, current, total, detail)
+        
+    Returns:
+        {
+            "content": 增强后的内容,
+            "total": 图片总数,
+            "success": 成功数
+        }
+    """
+    if not ENABLE_IMAGE_UNDERSTANDING:
+        return {"content": content, "total": 0, "success": 0}
+    
+    # 提取图片信息
+    images = extract_image_info_from_content(content)
+    
+    if not images:
+        logger.info(f"[DocCenter] 文档无图片，跳过多模态增强")
+        return {"content": content, "total": 0, "success": 0}
+    
+    logger.info(f"[DocCenter] 发现 {len(images)} 张图片，开始并发 VLM 理解...")
+    
+    import asyncio
+    
+    # 并发限制：同一文档内最多 3 张图片同时处理
+    semaphore = asyncio.Semaphore(3)
+    completed_count = 0
+    results = {}  # {index: description}
+    
+    async def process_image(index: int, img_info: dict):
+        nonlocal completed_count
+        async with semaphore:
+            alt_text = img_info["alt_text"]
+            img_url = img_info["url"]
+            context = img_info["context"]
+            
+            description = await call_vlm_for_image(
+                image_url=img_url,
+                alt_text=alt_text,
+                doc_title=doc_title,
+                context=context,
+                db_session=db_session,
+            )
+            
+            completed_count += 1
+            if progress_callback:
+                detail = f"已完成 {completed_count}/{len(images)}"
+                await progress_callback("image_understanding", completed_count, len(images), detail)
+            
+            if description:
+                logger.info(f"[DocCenter] 图片 {index+1}/{len(images)} 增强完成: {alt_text[:30] if alt_text else '(无标题)'}")
+            else:
+                logger.warning(f"[DocCenter] 图片 {index+1}/{len(images)} 理解失败，保留原样")
+            
+            return index, description
+    
+    # 并发执行所有图片处理
+    tasks = [process_image(i, img) for i, img in enumerate(images)]
+    task_results = await asyncio.gather(*tasks)
+    
+    # 收集结果
+    for index, description in task_results:
+        results[index] = description
+    
+    # 按顺序替换内容
+    enhanced_content = content
+    success_count = 0
+    for i, img_info in enumerate(images):
+        description = results.get(i)
+        if description:
+            alt_text = img_info["alt_text"]
+            full_match = img_info["full_match"]
+            alt_display = alt_text if alt_text else "图片"
+            replacement = f"""\n[图片: {alt_display}]\n{description.strip()}\n{full_match}\n"""
+            enhanced_content = enhanced_content.replace(full_match, replacement, 1)
+            success_count += 1
+    
+    logger.info(f"[DocCenter] 图片增强完成: {success_count}/{len(images)} 成功")
+    return {"content": enhanced_content, "total": len(images), "success": success_count}
+
+
 # ============== 文档中心服务类 ==============
 
 class DocCenterService:
@@ -438,6 +680,8 @@ class DocCenterService:
                     "parent_id": doc.source_parent_id,
                     "sync_status": doc.sync_status,
                     "synced_at": doc.synced_at.isoformat() if doc.synced_at else None,
+                    "image_enhance_total": doc.image_enhance_total or 0,
+                    "image_enhance_success": doc.image_enhance_success or 0,
                     "index_status": doc.index_status,
                     "extraction_progress": doc.extraction_progress,
                     "entities_total": doc.entities_total,
@@ -567,12 +811,26 @@ class DocCenterService:
                 doc.image_count = len(url_mapping)
                 logger.info(f"[DocCenter] 图片处理完成: {len(url_mapping)}/{len(image_urls)}")
 
-            # 4. 保存到数据库
+            # 4. 图片内容理解增强（VLM）
+            enhance_result = {"total": 0, "success": 0}
+            if ENABLE_IMAGE_UNDERSTANDING:
+                logger.info(f"[DocCenter] 开始图片内容理解增强...")
+                enhance_result = await enhance_content_with_images(
+                    content=content,
+                    doc_title=title,
+                    db_session=db,
+                    progress_callback=progress_callback,
+                )
+                content = enhance_result["content"]
+
+            # 5. 保存到数据库
             doc.content = content
             doc.content_hash = hashlib.md5(content.encode()).hexdigest()
             doc.sync_status = "synced"
-            doc.synced_at = datetime.utcnow()
+            doc.synced_at = datetime.now()
             doc.sync_error = None
+            doc.image_enhance_total = enhance_result["total"]
+            doc.image_enhance_success = enhance_result["success"]
             db.commit()
             logger.info(f"[DocCenter] 文档内容已保存到数据库, 长度={len(content)}")
 

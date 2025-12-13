@@ -948,9 +948,9 @@ class LightRAGIndexService:
 
             # 更新状态为运行中
             task.status = "running"
-            task.started_at = datetime.utcnow()
+            task.started_at = datetime.now()
             doc.index_status = "indexing"
-            doc.index_started_at = datetime.utcnow()
+            doc.index_started_at = datetime.now()
             db.commit()
 
             cls._current_task_id = task_id
@@ -985,10 +985,10 @@ class LightRAGIndexService:
             # 更新最终状态
             if result["success"]:
                 task.status = "completed"
-                task.finished_at = datetime.utcnow()
+                task.finished_at = datetime.now()
                 doc.index_status = "indexed"
                 doc.extraction_progress = 100
-                doc.index_finished_at = datetime.utcnow()
+                doc.index_finished_at = datetime.now()
                 doc.index_error = None
 
                 if result.get("stats"):
@@ -1007,7 +1007,7 @@ class LightRAGIndexService:
                 await cls._broadcast_progress(task_id, doc.id, final_progress)
             else:
                 task.status = "failed"
-                task.finished_at = datetime.utcnow()
+                task.finished_at = datetime.now()
                 task.error_message = result.get("error", "未知错误")
                 doc.index_status = "failed"
                 doc.index_error = task.error_message

@@ -48,11 +48,11 @@ class DocCenterFolder(Base):
     sort_order = Column(Integer, default=0, comment="排序")
 
     # === 时间戳 ===
-    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=datetime.now,
+        onupdate=datetime.now,
         comment="更新时间"
     )
 
@@ -106,6 +106,10 @@ class DocCenterDocument(Base):
     content = Column(Text, nullable=True, comment="文档Markdown内容")
     content_hash = Column(String(32), nullable=True, comment="内容MD5哈希")
     image_count = Column(Integer, default=0, comment="文档中的图片数量")
+    
+    # === 图片增强结果 ===
+    image_enhance_total = Column(Integer, default=0, comment="图片增强总数")
+    image_enhance_success = Column(Integer, default=0, comment="图片增强成功数")
 
     # === LightRAG 索引状态 ===
     # pending: 未索引, queued: 已排队, indexing: 索引中, indexed: 已索引, failed: 索引失败
@@ -134,11 +138,11 @@ class DocCenterDocument(Base):
     relation_count = Column(Integer, default=0, comment="关系数量")
 
     # === 时间戳 ===
-    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=datetime.now,
+        onupdate=datetime.now,
         comment="更新时间"
     )
 
@@ -193,11 +197,11 @@ class DocCenterIndexTask(Base):
     retry_count = Column(Integer, default=0, comment="重试次数")
 
     # === 时间戳 ===
-    created_at = Column(DateTime, default=datetime.utcnow, comment="创建时间")
+    created_at = Column(DateTime, default=datetime.now, comment="创建时间")
     updated_at = Column(
         DateTime,
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow,
+        default=datetime.now,
+        onupdate=datetime.now,
         comment="更新时间"
     )
 

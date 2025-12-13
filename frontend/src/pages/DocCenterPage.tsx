@@ -73,7 +73,13 @@ type ViewMode = 'read' | 'manage'
 
 // ============== 状态标签组件 ==============
 
-const SyncStatusTag: React.FC<{ status: string; progress?: { current: number; total: number } }> = ({ status, progress }) => {
+interface SyncStatusTagProps {
+  status: string
+  enhanceTotal?: number
+  enhanceSuccess?: number
+}
+
+const SyncStatusTag: React.FC<SyncStatusTagProps> = ({ status, enhanceTotal = 0, enhanceSuccess = 0 }) => {
   const config: Record<string, { icon: React.ReactNode; text: string }> = {
     pending: { icon: <ClockCircleOutlined />, text: '待同步' },
     syncing: { icon: <LoadingOutlined />, text: '同步中' },
@@ -82,27 +88,29 @@ const SyncStatusTag: React.FC<{ status: string; progress?: { current: number; to
   }
   const cfg = config[status] || config.pending
 
-  // 同步中显示图片处理进度
-  if (status === 'syncing' && progress && progress.total > 0) {
-    return (
-      <Tooltip title={`处理图片 ${progress.current}/${progress.total}`}>
-        <Tag className={`doc-center-status-tag doc-center-status-tag--${status}`} icon={cfg.icon}>
-          图片 {progress.current}/{progress.total}
-        </Tag>
-      </Tooltip>
-    )
+  // 已同步状态显示图片增强结果
+  let displayText = cfg.text
+  if (status === 'synced' && enhanceTotal > 0) {
+    displayText = `已同步(${enhanceSuccess}/${enhanceTotal})`
   }
 
   return (
     <Tag className={`doc-center-status-tag doc-center-status-tag--${status}`} icon={cfg.icon}>
-      {cfg.text}
+      {displayText}
     </Tag>
   )
 }
 
-// 两阶段进度显示组件（提取 + 图谱构建）
-interface TwoPhaseProgressProps {
-  status: string
+// 统一进度显示组件（同步/索引进度）
+interface UnifiedProgressProps {
+  syncStatus: string
+  indexStatus: string
+  syncProgress?: { 
+    current: number
+    total: number
+    phase?: string
+    detail?: string 
+  }
   extractionProgress: number
   graphBuildTotal: number
   graphBuildDone: number
@@ -111,8 +119,10 @@ interface TwoPhaseProgressProps {
   relationsTotal: number
 }
 
-const TwoPhaseProgress: React.FC<TwoPhaseProgressProps> = ({
-  status,
+const UnifiedProgress: React.FC<UnifiedProgressProps> = ({
+  syncStatus,
+  indexStatus,
+  syncProgress,
   extractionProgress,
   graphBuildTotal,
   graphBuildDone,
@@ -120,25 +130,49 @@ const TwoPhaseProgress: React.FC<TwoPhaseProgressProps> = ({
   entitiesTotal,
   relationsTotal,
 }) => {
-  if (status !== 'indexing') return null
+  // 同步进度（图片处理/图片理解）
+  if (syncStatus === 'syncing' && syncProgress && syncProgress.total > 0) {
+    const percent = Math.round((syncProgress.current / syncProgress.total) * 100)
+    const phaseLabel = syncProgress.phase === 'image_understanding' ? '图片增强' : '图片处理'
+    const strokeColor = syncProgress.phase === 'image_understanding' ? '#722ed1' : '#1890ff'
 
-  return (
-    <div className="two-phase-progress">
-      <div className="phase-item">
-        <span className="phase-label">提取</span>
-        <Progress percent={extractionProgress} size="small" strokeColor="#1890ff" />
-      </div>
-      <div className="phase-item">
-        <div className="phase-text">
-          <span className="phase-label">图谱 {graphBuildTotal > 0 ? `${graphBuildDone}/${graphBuildTotal}` : ''}</span>
-          {graphBuildTotal > 0 && (
-            <span className="phase-detail">({entitiesTotal}实体+{relationsTotal}关系)</span>
-          )}
+    return (
+      <div className="unified-progress">
+        <div className="phase-item">
+          <div className="phase-text">
+            <span className="phase-label">{phaseLabel}</span>
+            <span className="phase-count">{syncProgress.current}/{syncProgress.total}</span>
+          </div>
+          <Tooltip title={syncProgress.detail || `${phaseLabel} ${syncProgress.current}/${syncProgress.total}`}>
+            <Progress percent={percent} size="small" strokeColor={strokeColor} showInfo={false} />
+          </Tooltip>
         </div>
-        <Progress percent={graphBuildProgress} size="small" strokeColor="#52c41a" />
       </div>
-    </div>
-  )
+    )
+  }
+
+  // 索引进度（提取 + 图谱构建）
+  if (indexStatus === 'indexing') {
+    return (
+      <div className="unified-progress">
+        <div className="phase-item">
+          <span className="phase-label">提取</span>
+          <Progress percent={extractionProgress} size="small" strokeColor="#1890ff" />
+        </div>
+        <div className="phase-item">
+          <div className="phase-text">
+            <span className="phase-label">图谱 {graphBuildTotal > 0 ? `${graphBuildDone}/${graphBuildTotal}` : ''}</span>
+            {graphBuildTotal > 0 && (
+              <span className="phase-detail">({entitiesTotal}实体+{relationsTotal}关系)</span>
+            )}
+          </div>
+          <Progress percent={graphBuildProgress} size="small" strokeColor="#52c41a" />
+        </div>
+      </div>
+    )
+  }
+
+  return null
 }
 
 const IndexStatusTag: React.FC<{ status: string }> = ({ status }) => {
@@ -194,8 +228,8 @@ const DocCenterPage: React.FC = () => {
   const [syncing, setSyncing] = useState(false)
   const [indexing, setIndexing] = useState(false)
 
-  // 同步进度状态 { docId: { current, total } }
-  const [syncProgress, setSyncProgress] = useState<Record<string, { current: number; total: number }>>({})
+  // 同步进度状态 { docId: { current, total, phase?, detail? } }
+  const [syncProgress, setSyncProgress] = useState<Record<string, { current: number; total: number; phase?: string; detail?: string }>>({})
 
   // WebSocket
   const wsRef = useRef<WebSocket | null>(null)
@@ -708,11 +742,16 @@ const DocCenterPage: React.FC = () => {
         )
       },
       onSyncProgress: (msg) => {
-        if (msg.phase === 'image_processing') {
-          // 更新同步进度
+        if (msg.phase === 'image_processing' || msg.phase === 'image_understanding') {
+          // 更新同步进度（图片处理或图片理解阶段）
           setSyncProgress((prev) => ({
             ...prev,
-            [msg.document_id]: { current: msg.current, total: msg.total },
+            [msg.document_id]: { 
+              current: msg.current, 
+              total: msg.total,
+              phase: msg.phase,
+              detail: msg.detail,
+            },
           }))
           // 更新文档状态为 syncing
           setDocuments((prev) =>
@@ -725,7 +764,7 @@ const DocCenterPage: React.FC = () => {
           // 更新树节点状态
           updateTreeNodeSyncStatusRef.current(msg.document_id, 'syncing')
         } else if (msg.phase === 'completed') {
-          // 同步完成，清除进度并更新状态
+          // 同步完成，清除进度并更新状态（包含图片增强结果）
           setSyncProgress((prev) => {
             const newProgress = { ...prev }
             delete newProgress[msg.document_id]
@@ -734,7 +773,12 @@ const DocCenterPage: React.FC = () => {
           setDocuments((prev) =>
             prev.map((d) =>
               d.id === msg.document_id
-                ? { ...d, sync_status: 'synced' as const }
+                ? { 
+                    ...d, 
+                    sync_status: 'synced' as const,
+                    image_enhance_total: msg.image_enhance_total ?? d.image_enhance_total,
+                    image_enhance_success: msg.image_enhance_success ?? d.image_enhance_success,
+                  }
                 : d
             )
           )
@@ -802,9 +846,13 @@ const DocCenterPage: React.FC = () => {
       title: '同步状态',
       dataIndex: 'sync_status',
       key: 'sync_status',
-      width: 120,
+      width: 130,
       render: (status, record) => (
-        <SyncStatusTag status={status} progress={syncProgress[record.id]} />
+        <SyncStatusTag
+          status={status}
+          enhanceTotal={record.image_enhance_total}
+          enhanceSuccess={record.image_enhance_success}
+        />
       ),
     },
     {
@@ -815,12 +863,14 @@ const DocCenterPage: React.FC = () => {
       render: (status) => <IndexStatusTag status={status} />,
     },
     {
-      title: '索引进度',
-      key: 'index_progress',
+      title: '同步/索引进度',
+      key: 'unified_progress',
       width: 200,
       render: (_, record) => (
-        <TwoPhaseProgress
-          status={record.index_status}
+        <UnifiedProgress
+          syncStatus={record.sync_status}
+          indexStatus={record.index_status}
+          syncProgress={syncProgress[record.id]}
           extractionProgress={record.extraction_progress}
           graphBuildTotal={record.graph_build_total || 0}
           graphBuildDone={record.graph_build_done || 0}

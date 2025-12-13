@@ -42,5 +42,5 @@ class AIModel(Base):
     
     is_active = Column(Boolean, nullable=False, default=False, comment="是否为主力模型（用于主对话流程）")
     is_task_active = Column(Boolean, nullable=False, default=False, comment="是否为小任务模型（用于工具内部轻量调用）")
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)

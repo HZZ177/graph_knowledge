@@ -33,6 +33,9 @@ export interface LocalDocument {
   sync_error?: string | null
   synced_at: string | null
   image_count?: number
+  // 图片增强结果
+  image_enhance_total: number
+  image_enhance_success: number
   index_status: 'pending' | 'queued' | 'indexing' | 'indexed' | 'failed'
   index_error?: string | null
   // 两阶段进度（提取 + 图谱构建）
@@ -121,10 +124,13 @@ export interface SyncProgressMessage {
   type: 'sync_progress'
   document_id: string
   title: string
-  phase: string  // 'image_processing' | 'completed' | 'failed'
+  phase: string  // 'image_processing' | 'image_understanding' | 'completed' | 'failed'
   current: number
   total: number
   detail: string
+  // 同步完成时返回图片增强结果
+  image_enhance_total?: number
+  image_enhance_success?: number
 }
 
 // WebSocket 队列状态消息

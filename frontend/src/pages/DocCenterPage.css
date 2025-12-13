@@ -331,49 +331,6 @@
   margin-bottom: 0;
 }
 
-/* 两阶段进度组件（提取 + 图谱构建） */
-.two-phase-progress {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 140px;
-}
-
-.two-phase-progress .phase-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.two-phase-progress .phase-text {
-  display: flex;
-  flex-direction: column;
-  min-width: 50px;
-  flex-shrink: 0;
-}
-
-.two-phase-progress .phase-label {
-  font-size: 11px;
-  color: var(--dc-text-secondary);
-  white-space: nowrap;
-  line-height: 1.4;
-}
-
-.two-phase-progress .phase-detail {
-  font-size: 10px;
-  color: var(--dc-text-tertiary, #999);
-  white-space: nowrap;
-  line-height: 1.4;
-}
-
-.two-phase-progress .ant-progress {
-  flex: 1;
-  margin: 0;
-}
-
-.two-phase-progress .ant-progress-inner {
-  background: #f0f0f0;
-}
 
 /* 树形控件 */
 .doc-center-sider .ant-tree {
@@ -549,4 +506,54 @@
 
 .document-filter-bar .filter-bar-right {
   flex-shrink: 0;
+}
+
+/* 统一进度显示组件（同步/索引） */
+.unified-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 140px;
+}
+
+.unified-progress .phase-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.unified-progress .phase-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 50px;
+  flex-shrink: 0;
+}
+
+.unified-progress .phase-label {
+  font-size: 11px;
+  color: var(--dc-text-secondary);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.unified-progress .phase-count {
+  font-size: 11px;
+  color: var(--dc-text-tertiary, #999);
+  white-space: nowrap;
+}
+
+.unified-progress .phase-detail {
+  font-size: 10px;
+  color: var(--dc-text-tertiary, #999);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.unified-progress .ant-progress {
+  flex: 1;
+  margin: 0;
+}
+
+.unified-progress .ant-progress-inner {
+  background: #f0f0f0;
 }

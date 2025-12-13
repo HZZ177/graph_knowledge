@@ -59,3 +59,34 @@ KV_STORAGE = "JsonKVStorage"
 VECTOR_STORAGE = "NanoVectorDBStorage"
 GRAPH_STORAGE = "Neo4JStorage"
 DOC_STATUS_STORAGE = "JsonDocStatusStorage"
+
+
+# ============== 多模态配置 ==============
+
+# 是否启用图片内容理解（VLM）
+ENABLE_IMAGE_UNDERSTANDING = True
+
+# 图片理解 Prompt 模板
+IMAGE_UNDERSTANDING_PROMPT = """请描述这张图片的内容，用于帮助理解文档。
+
+【文档标题】
+{doc_title}
+
+【图片位置的上下文】
+{context}
+
+【图片标题】
+{alt_text}
+
+【要求】
+1. 描述图片展示的功能、操作流程或概念，而非具体数据
+2. 不要提取截图中的示例数据（如用户名、编号、具体数值等），用"某某"或"示例数据"替代
+3. 重点说明界面的用途和操作方式
+4. 如果是流程图，说明步骤逻辑和流向
+5. 如果是架构图，说明各模块的职责和关系
+6. 用中文回答，100-200字
+7. 不要使用任何符号或图标
+"""
+
+# 图片上下文提取配置
+IMAGE_CONTEXT_MAX_CHARS = 300  # 提取图片前后最多300字符作为上下文
