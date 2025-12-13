@@ -47,14 +47,22 @@ export async function getDirectoryTree(): Promise<TreeNode[]> {
  */
 export async function getDocuments(params: {
   parent_id?: string
-  sync_status?: string
-  index_status?: string
+  sync_status?: string[]
+  index_status?: string[]
+  keyword?: string
   page?: number
   page_size?: number
 }): Promise<DocumentListResponse> {
   const searchParams = new URLSearchParams()
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined) searchParams.set(key, String(value))
+    if (value !== undefined) {
+      if (Array.isArray(value)) {
+        // 数组参数用逗号分隔
+        if (value.length > 0) searchParams.set(key, value.join(','))
+      } else {
+        searchParams.set(key, String(value))
+      }
+    }
   })
   
   const res = await fetch(`${BASE_URL}/documents?${searchParams}`)
@@ -139,6 +147,15 @@ export async function triggerProcessQueue(): Promise<void> {
   if (data.code !== 0) throw new Error(data.message)
 }
 
+/**
+ * 取消排队中的索引任务
+ */
+export async function cancelIndexTask(docId: string): Promise<void> {
+  const res = await fetch(`${BASE_URL}/index/${docId}`, { method: 'DELETE' })
+  const data = await res.json()
+  if (data.code !== 0) throw new Error(data.message || data.detail)
+}
+
 // ============== WebSocket ==============
 
 export type WSMessage = IndexProgressMessage | QueueStatusMessage | SyncProgressMessage | { type: 'heartbeat' } | { type: 'pong' }
@@ -152,56 +169,91 @@ export interface DocCenterWSCallbacks {
 }
 
 /**
- * 创建 WebSocket 连接
+ * 创建 WebSocket 连接（带自动重连）
  */
 export function createDocCenterWS(callbacks: DocCenterWSCallbacks): WebSocket {
   const wsUrl = getWebSocketUrl('/api/v1/doc-center/ws')
-  const ws = new WebSocket(wsUrl)
+  let ws: WebSocket
+  let pingInterval: ReturnType<typeof setInterval> | null = null
+  let reconnectTimeout: ReturnType<typeof setTimeout> | null = null
+  let isManualClose = false
+  let reconnectAttempts = 0
+  const maxReconnectAttempts = 10
+  const reconnectDelay = 3000
 
-  ws.onopen = () => {
-    console.log('[DocCenterWS] 连接已建立')
-  }
+  const connect = () => {
+    ws = new WebSocket(wsUrl)
 
-  ws.onmessage = (event) => {
-    try {
-      const msg: WSMessage = JSON.parse(event.data)
-      
-      if (msg.type === 'index_progress' && callbacks.onProgress) {
-        callbacks.onProgress(msg as IndexProgressMessage)
-      } else if (msg.type === 'sync_progress' && callbacks.onSyncProgress) {
-        callbacks.onSyncProgress(msg as SyncProgressMessage)
-      } else if (msg.type === 'queue_status' && callbacks.onQueueStatus) {
-        callbacks.onQueueStatus(msg as QueueStatusMessage)
+    ws.onopen = () => {
+      console.log('[DocCenterWS] 连接成功')
+      reconnectAttempts = 0
+      // 启动心跳
+      if (pingInterval) clearInterval(pingInterval)
+      pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }))
+        }
+      }, 25000)
+    }
+
+    ws.onmessage = (event) => {
+      try {
+        const msg: WSMessage = JSON.parse(event.data)
+        
+        if (msg.type === 'index_progress' && callbacks.onProgress) {
+          callbacks.onProgress(msg as IndexProgressMessage)
+        } else if (msg.type === 'sync_progress' && callbacks.onSyncProgress) {
+          callbacks.onSyncProgress(msg as SyncProgressMessage)
+        } else if (msg.type === 'queue_status' && callbacks.onQueueStatus) {
+          callbacks.onQueueStatus(msg as QueueStatusMessage)
+        }
+      } catch (e) {
+        void e
       }
-      // heartbeat 和 pong 不需要处理
-    } catch (e) {
-      console.warn('[DocCenterWS] 消息解析失败:', e)
+    }
+
+    ws.onerror = (event) => {
+      console.error('[DocCenterWS] 连接错误:', event)
+      callbacks.onError?.(new Error('WebSocket 连接错误'))
+    }
+
+    ws.onclose = () => {
+      if (pingInterval) {
+        clearInterval(pingInterval)
+        pingInterval = null
+      }
+      
+      if (!isManualClose && reconnectAttempts < maxReconnectAttempts) {
+        reconnectAttempts++
+        console.log(`[DocCenterWS] 连接断开，${reconnectDelay/1000}秒后重连 (${reconnectAttempts}/${maxReconnectAttempts})`)
+        reconnectTimeout = setTimeout(connect, reconnectDelay)
+      } else {
+        callbacks.onClose?.()
+      }
     }
   }
 
-  ws.onerror = (event) => {
-    console.error('[DocCenterWS] 连接错误:', event)
-    callbacks.onError?.(new Error('WebSocket 连接错误'))
-  }
+  connect()
 
-  ws.onclose = () => {
-    console.log('[DocCenterWS] 连接已关闭')
-    callbacks.onClose?.()
-  }
+  // 返回一个代理对象，支持手动关闭
+  const wsProxy = {
+    close: () => {
+      isManualClose = true
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout)
+        reconnectTimeout = null
+      }
+      if (pingInterval) {
+        clearInterval(pingInterval)
+        pingInterval = null
+      }
+      if (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING) {
+        ws.close()
+      }
+    },
+    send: (data: string | ArrayBufferLike | Blob | ArrayBufferView) => ws.send(data),
+    get readyState() { return ws.readyState },
+  } as unknown as WebSocket
 
-  // 心跳
-  const pingInterval = setInterval(() => {
-    if (ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: 'ping' }))
-    }
-  }, 25000)
-
-  // 清理
-  const originalClose = ws.close.bind(ws)
-  ws.close = () => {
-    clearInterval(pingInterval)
-    originalClose()
-  }
-
-  return ws
+  return wsProxy
 }

@@ -25,6 +25,7 @@ import {
   Segmented,
   Pagination,
   Input,
+  Select,
 } from 'antd'
 import {
   FolderOutlined,
@@ -38,6 +39,8 @@ import {
   ReadOutlined,
   SettingOutlined,
   SearchOutlined,
+  EyeOutlined,
+  StopOutlined,
 } from '@ant-design/icons'
 import type { DataNode } from 'antd/es/tree'
 import type { ColumnsType } from 'antd/es/table'
@@ -48,8 +51,10 @@ import {
   getDocuments,
   syncDocumentContent,
   createIndexTasks,
+  cancelIndexTask,
   getDocumentContent,
   createDocCenterWS,
+  getIndexQueueStatus,
 } from '../api/docCenter'
 import type {
   TreeNode,
@@ -95,42 +100,42 @@ const SyncStatusTag: React.FC<{ status: string; progress?: { current: number; to
   )
 }
 
-// 三阶段进度显示组件
-interface ThreePhaseProgressProps {
+// 两阶段进度显示组件（提取 + 图谱构建）
+interface TwoPhaseProgressProps {
   status: string
   extractionProgress: number
+  graphBuildTotal: number
+  graphBuildDone: number
+  graphBuildProgress: number
   entitiesTotal: number
-  entitiesDone: number
   relationsTotal: number
-  relationsDone: number
 }
 
-const ThreePhaseProgress: React.FC<ThreePhaseProgressProps> = ({
+const TwoPhaseProgress: React.FC<TwoPhaseProgressProps> = ({
   status,
   extractionProgress,
+  graphBuildTotal,
+  graphBuildDone,
+  graphBuildProgress,
   entitiesTotal,
-  entitiesDone,
   relationsTotal,
-  relationsDone,
 }) => {
   if (status !== 'indexing') return null
 
-  const entitiesProgress = entitiesTotal > 0 ? Math.min(100, Math.round(entitiesDone / entitiesTotal * 100)) : 0
-  const relationsProgress = relationsTotal > 0 ? Math.min(100, Math.round(relationsDone / relationsTotal * 100)) : 0
-
   return (
-    <div className="three-phase-progress">
+    <div className="two-phase-progress">
       <div className="phase-item">
         <span className="phase-label">提取</span>
         <Progress percent={extractionProgress} size="small" strokeColor="#1890ff" />
       </div>
       <div className="phase-item">
-        <span className="phase-label">实体 {entitiesTotal > 0 ? `${entitiesDone}/${entitiesTotal}` : ''}</span>
-        <Progress percent={entitiesProgress} size="small" strokeColor="#52c41a" />
-      </div>
-      <div className="phase-item">
-        <span className="phase-label">关系 {relationsTotal > 0 ? `${relationsDone}/${relationsTotal}` : ''}</span>
-        <Progress percent={relationsProgress} size="small" strokeColor="#faad14" />
+        <div className="phase-text">
+          <span className="phase-label">图谱 {graphBuildTotal > 0 ? `${graphBuildDone}/${graphBuildTotal}` : ''}</span>
+          {graphBuildTotal > 0 && (
+            <span className="phase-detail">({entitiesTotal}实体+{relationsTotal}关系)</span>
+          )}
+        </div>
+        <Progress percent={graphBuildProgress} size="small" strokeColor="#52c41a" />
       </div>
     </div>
   )
@@ -142,7 +147,7 @@ const IndexStatusTag: React.FC<{ status: string }> = ({ status }) => {
     queued: { icon: <ClockCircleOutlined style={{ color: '#faad14' }} />, text: '排队中' },
     indexing: { icon: <LoadingOutlined />, text: '索引中' },
     indexed: { icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />, text: '已索引' },
-    failed: { icon: <CloseCircleOutlined />, text: '索引失败' },
+    failed: { icon: <CloseCircleOutlined style={{ color: '#ff4d4f' }} />, text: '索引失败' },
   }
   const cfg = config[status] || config.pending
 
@@ -180,6 +185,11 @@ const DocCenterPage: React.FC = () => {
   const [selectedRowKeys, setSelectedRowKeys] = useState<React.Key[]>([])
   const [pagination, setPagination] = useState({ current: 1, pageSize: 50, total: 0 })
 
+  // 筛选状态
+  const [filterKeyword, setFilterKeyword] = useState('')
+  const [filterSyncStatus, setFilterSyncStatus] = useState<string[]>([])
+  const [filterIndexStatus, setFilterIndexStatus] = useState<string[]>([])
+
   // 操作状态
   const [syncing, setSyncing] = useState(false)
   const [indexing, setIndexing] = useState(false)
@@ -192,6 +202,7 @@ const DocCenterPage: React.FC = () => {
 
   // 保存树节点信息用于查找文档
   const treeNodesRef = useRef<Map<string, TreeNode>>(new Map())
+  const rawTreeRef = useRef<TreeNode[]>([])
   const didInitExpandRef = useRef(false)
 
   // ============== 搜索功能 ==============
@@ -249,11 +260,90 @@ const DocCenterPage: React.FC = () => {
 
   // ============== 数据加载 ==============
 
+  // 将树节点转换为 Ant Design Tree 的 DataNode 格式
+  const convertToDataNode = useCallback((nodes: TreeNode[], search: string): DataNode[] => {
+    return nodes.map((node) => {
+      const index = node.title.toLowerCase().indexOf(search.toLowerCase())
+      const beforeStr = node.title.substring(0, index)
+      const matchStr = node.title.substring(index, index + search.length)
+      const afterStr = node.title.substring(index + search.length)
+      
+      const titleNode = search && index > -1 ? (
+        <span>
+          {beforeStr}
+          <span className="tree-search-highlight">{matchStr}</span>
+          {afterStr}
+        </span>
+      ) : (
+        <span>{node.title}</span>
+      )
+      
+      // 文件图标改为圆点，根据同步状态显示不同颜色
+      let nodeIcon: React.ReactNode
+      if (node.is_folder) {
+        nodeIcon = <FolderOutlined />
+      } else {
+        // 根据 sync_status 决定圆点颜色（从 treeNodesRef 获取最新状态）
+        const latestNode = treeNodesRef.current.get(node.id)
+        const syncStatus = latestNode?.sync_status || node.sync_status || 'pending'
+        let dotClass = 'doc-tree-dot'
+        if (syncStatus === 'synced') {
+          dotClass += ' doc-tree-dot--synced'
+        } else if (syncStatus === 'syncing') {
+          dotClass += ' doc-tree-dot--syncing'
+        } else {
+          dotClass += ' doc-tree-dot--pending'
+        }
+        nodeIcon = <span className={dotClass} />
+      }
+      
+      return {
+        key: node.id,
+        title: titleNode,
+        icon: nodeIcon,
+        isLeaf: !node.is_folder,
+        children: node.children?.length ? convertToDataNode(node.children, search) : undefined,
+      }
+    })
+  }, [])
+
+  // 刷新树数据（不重新请求，只根据当前状态重新渲染）
+  const refreshTreeData = useCallback((search: string = searchValue) => {
+    if (rawTreeRef.current.length > 0) {
+      setTreeData(convertToDataNode(rawTreeRef.current, search))
+    }
+  }, [convertToDataNode, searchValue])
+
+  // 更新树节点的同步状态（使用 ref 以便在 WebSocket 回调中调用）
+  const refreshTreeDataRef = useRef(refreshTreeData)
+  useEffect(() => {
+    refreshTreeDataRef.current = refreshTreeData
+  }, [refreshTreeData])
+
+  const updateTreeNodeSyncStatus = useCallback((documentId: string, syncStatus: string) => {
+    // 根据 document_id（本地ID）找到对应的树节点并更新
+    treeNodesRef.current.forEach((node) => {
+      if (node.local_id === documentId) {
+        node.sync_status = syncStatus
+      }
+    })
+    // 刷新树数据
+    refreshTreeDataRef.current()
+  }, [])
+
+  // 保存 updateTreeNodeSyncStatus 的引用，以便在 WebSocket 回调中使用
+  const updateTreeNodeSyncStatusRef = useRef(updateTreeNodeSyncStatus)
+  useEffect(() => {
+    updateTreeNodeSyncStatusRef.current = updateTreeNodeSyncStatus
+  }, [updateTreeNodeSyncStatus])
+
   // 加载目录树（从本地数据库）
   const loadTree = useCallback(async () => {
     setTreeLoading(true)
     try {
       const tree = await getDirectoryTree()
+      // 保存原始树结构
+      rawTreeRef.current = tree
       // 保存节点信息到ref
       const saveNodes = (nodes: TreeNode[]) => {
         nodes.forEach((node) => {
@@ -282,47 +372,29 @@ const DocCenterPage: React.FC = () => {
         didInitExpandRef.current = true
       }
 
-      const convertToDataNode = (nodes: TreeNode[], search: string): DataNode[] => {
-        return nodes.map((node) => {
-          const index = node.title.toLowerCase().indexOf(search.toLowerCase())
-          const beforeStr = node.title.substring(0, index)
-          const matchStr = node.title.substring(index, index + search.length)
-          const afterStr = node.title.substring(index + search.length)
-          
-          const titleNode = search && index > -1 ? (
-            <span>
-              {beforeStr}
-              <span className="tree-search-highlight">{matchStr}</span>
-              {afterStr}
-            </span>
-          ) : (
-            <span>{node.title}</span>
-          )
-          
-          return {
-            key: node.id,
-            title: titleNode,
-            icon: node.is_folder ? <FolderOutlined /> : <FileTextOutlined />,
-            isLeaf: !node.is_folder,
-            children: node.children?.length ? convertToDataNode(node.children, search) : undefined,
-          }
-        })
-      }
       setTreeData(convertToDataNode(tree, searchValue))
     } catch (e: any) {
       console.log('加载目录树:', e.message)
     } finally {
       setTreeLoading(false)
     }
-  }, [searchValue])
+  }, [searchValue, convertToDataNode])
 
   // 加载文档列表（管理模式）
-  const loadDocuments = useCallback(async (page = 1) => {
+  const loadDocuments = useCallback(async (
+    page = 1,
+    keyword?: string,
+    syncStatus?: string[],
+    indexStatus?: string[]
+  ) => {
     setDocumentsLoading(true)
     try {
       const result = await getDocuments({
         page,
         page_size: pagination.pageSize,
+        keyword: keyword || undefined,
+        sync_status: syncStatus && syncStatus.length > 0 ? syncStatus : undefined,
+        index_status: indexStatus && indexStatus.length > 0 ? indexStatus : undefined,
       })
       setDocuments(result.items as LocalDocument[])
       setPagination((prev) => ({ ...prev, current: page, total: result.total }))
@@ -332,6 +404,44 @@ const DocCenterPage: React.FC = () => {
       setDocumentsLoading(false)
     }
   }, [pagination.pageSize])
+
+  // 刷新正在索引的文档进度（从队列状态获取）
+  const refreshIndexingProgress = useCallback(async () => {
+    try {
+      const status = await getIndexQueueStatus()
+      if (status.current_task && status.is_running) {
+        const { document_id, phase, progress } = status.current_task
+        setDocuments((prev) =>
+          prev.map((d) =>
+            d.id === document_id
+              ? {
+                  ...d,
+                  index_status: 'indexing' as const,
+                  extraction_progress: progress,
+                }
+              : d
+          )
+        )
+      }
+    } catch (e) {
+      // 静默失败，不影响主流程
+    }
+  }, [])
+
+  // 查询按钮处理
+  const handleFilter = useCallback(async () => {
+    await loadDocuments(1, filterKeyword, filterSyncStatus.length > 0 ? filterSyncStatus : undefined, filterIndexStatus.length > 0 ? filterIndexStatus : undefined)
+    await refreshIndexingProgress()
+  }, [loadDocuments, filterKeyword, filterSyncStatus, filterIndexStatus, refreshIndexingProgress])
+
+  // 重置按钮处理
+  const handleResetFilter = useCallback(async () => {
+    setFilterKeyword('')
+    setFilterSyncStatus([])
+    setFilterIndexStatus([])
+    await loadDocuments(1, '', undefined, undefined)
+    await refreshIndexingProgress()
+  }, [loadDocuments, refreshIndexingProgress])
 
   // 加载单个文档内容（阅读模式）
   const loadDocumentContent = useCallback(async (docId: string) => {
@@ -366,12 +476,20 @@ const DocCenterPage: React.FC = () => {
 
   // 同步单个文档内容（进度由 WebSocket 推送到表格状态列显示）
   const handleSyncContent = async (doc: LocalDocument) => {
+    // 立即更新状态为 syncing
+    setDocuments((prev) =>
+      prev.map((d) => (d.id === doc.id ? { ...d, sync_status: 'syncing' as const } : d))
+    )
+    updateTreeNodeSyncStatus(doc.id, 'syncing')
+    
     try {
       await syncDocumentContent(doc.id)
       // 同步完成后刷新列表
       loadDocuments()
     } catch (e: any) {
       console.error(`同步失败: ${doc.title}`, e)
+      // 失败时也刷新列表获取最新状态
+      loadDocuments()
     }
   }
 
@@ -390,6 +508,28 @@ const DocCenterPage: React.FC = () => {
     })
   }
 
+  // 查看文档（跳转阅读模式，自动选中并加载内容）
+  const handleViewDocument = async (doc: LocalDocument) => {
+    // 切换到阅读模式
+    setViewMode('read')
+    // 设置当前文档
+    setCurrentDoc(doc)
+    // 选中左侧树节点（使用 source_doc_id）
+    setSelectedKey(doc.source_doc_id)
+    // 展开父节点路径
+    const node = treeNodesRef.current.get(doc.source_doc_id)
+    if (node?.parent_id && node.parent_id !== '0') {
+      const parentId = node.parent_id
+      setExpandedKeys((prev) => {
+        const newKeys = new Set(prev)
+        newKeys.add(parentId)
+        return Array.from(newKeys)
+      })
+    }
+    // 加载文档内容
+    await loadDocumentContent(doc.id)
+  }
+
   // 批量同步选中文档（进度由 WebSocket 推送到表格状态列显示）
   const [batchSyncing, setBatchSyncing] = useState(false)
   const handleBatchSync = async () => {
@@ -399,42 +539,97 @@ const DocCenterPage: React.FC = () => {
       return
     }
     setBatchSyncing(true)
+    
+    // 立即更新所有选中文档的状态为 syncing，让用户看到状态变化
+    const selectedIds = selectedDocs.map((d) => d.id)
+    setDocuments((prev) =>
+      prev.map((d) =>
+        selectedIds.includes(d.id) ? { ...d, sync_status: 'syncing' as const } : d
+      )
+    )
+    // 清除多选状态
+    setSelectedRowKeys([])
+    
     try {
-      for (const doc of selectedDocs) {
-        try {
-          await syncDocumentContent(doc.id)
-        } catch (e) {
-          console.error(`同步失败: ${doc.title}`, e)
-        }
-      }
-      setSelectedRowKeys([])
+      // 并行发起所有同步请求，每个文档的进度由 WebSocket 实时推送
+      await Promise.all(
+        selectedDocs.map((doc) =>
+          syncDocumentContent(doc.id).catch((e) => {
+            console.error(`同步失败: ${doc.title}`, e)
+          })
+        )
+      )
+      // 批量同步完成后刷新列表获取最新状态
       loadDocuments()
     } finally {
       setBatchSyncing(false)
     }
   }
 
-  // 索引选中文档
-  const handleIndex = async () => {
-    const syncedDocs = documents.filter(
-      (d) => selectedRowKeys.includes(d.id) && d.sync_status === 'synced'
-    )
-    if (syncedDocs.length === 0) {
-      message.warning('请先选择已同步的文档进行索引')
-      return
+  // 索引文档（支持批量和单个）
+  const handleIndex = async (docIds?: string[]) => {
+    let idsToIndex: string[]
+    if (docIds && docIds.length > 0) {
+      // 单个文档索引
+      idsToIndex = docIds
+    } else {
+      // 批量索引：从选中的行中筛选已同步的
+      const syncedDocs = documents.filter(
+        (d) => selectedRowKeys.includes(d.id) && d.sync_status === 'synced'
+      )
+      if (syncedDocs.length === 0) {
+        message.warning('请先选择已同步的文档进行索引')
+        return
+      }
+      idsToIndex = syncedDocs.map((d) => d.id)
     }
-    const docIds = syncedDocs.map((d) => d.id)
     setIndexing(true)
+    
+    // 立即更新状态为 queued，让用户看到状态变化
+    setDocuments((prev) =>
+      prev.map((d) =>
+        idsToIndex.includes(d.id)
+          ? { ...d, index_status: 'queued' as const, extraction_progress: 0, graph_build_progress: 0 }
+          : d
+      )
+    )
+    
     try {
-      const result = await createIndexTasks(docIds)
+      const result = await createIndexTasks(idsToIndex)
       const successCount = result.tasks.filter((t) => t.success).length
       message.success(`已创建 ${successCount} 个索引任务`)
-      setSelectedRowKeys([])
-      loadDocuments()
+      if (!docIds) setSelectedRowKeys([])
+      // 不立即刷新列表，避免覆盖 WS 推送的状态更新
+      // WS 会持续更新进度，任务完成后状态会自动更新
     } catch (e: any) {
       message.error(`创建索引任务失败: ${e.message}`)
+      // 失败时恢复状态
+      loadDocuments()
     } finally {
       setIndexing(false)
+    }
+  }
+
+  // 取消索引任务（排队中）
+  const handleCancelIndex = async (docId: string) => {
+    try {
+      await cancelIndexTask(docId)
+      message.success('已取消索引任务')
+      loadDocuments()
+    } catch (e: any) {
+      message.error(`取消失败: ${e.message}`)
+    }
+  }
+
+  // 停止索引任务（正在运行）
+  const handleStopIndex = async (docId: string) => {
+    try {
+      const res = await fetch(`/api/v1/doc-center/index/stop/${docId}`, { method: 'POST' })
+      const data = await res.json()
+      if (data.code !== 0) throw new Error(data.message)
+      message.success('已请求停止索引')
+    } catch (e: any) {
+      message.error(`停止失败: ${e.message}`)
     }
   }
 
@@ -467,10 +662,11 @@ const DocCenterPage: React.FC = () => {
           synced_at: null,
           index_status: (node.index_status as any) || 'pending',
           extraction_progress: 0,
+          graph_build_total: 0,
+          graph_build_done: 0,
+          graph_build_progress: 0,
           entities_total: 0,
-          entities_done: 0,
           relations_total: 0,
-          relations_done: 0,
           created_at: null,
         } as LocalDocument
         setCurrentDoc(docForRead)
@@ -488,25 +684,30 @@ const DocCenterPage: React.FC = () => {
   useEffect(() => {
     const ws = createDocCenterWS({
       onProgress: (msg: IndexProgressMessage) => {
-        // 更新文档列表中的三阶段进度
+        // 更新文档列表中的两阶段进度
         setDocuments((prev) =>
           prev.map((d) =>
             d.id === msg.document_id
               ? {
                   ...d,
-                  index_status: msg.current_phase === 'completed' ? 'indexed' as const : 'indexing' as const,
+                  index_status:
+                    msg.current_phase === 'completed'
+                      ? ('indexed' as const)
+                      : msg.current_phase === 'failed'
+                        ? ('failed' as const)
+                        : ('indexing' as const),
                   extraction_progress: msg.extraction_progress,
+                  graph_build_total: msg.graph_build_total,
+                  graph_build_done: msg.graph_build_done,
+                  graph_build_progress: msg.graph_build_progress,
                   entities_total: msg.entities_total,
-                  entities_done: msg.entities_done,
                   relations_total: msg.relations_total,
-                  relations_done: msg.relations_done,
                 }
               : d
           )
         )
       },
       onSyncProgress: (msg) => {
-        console.log('[DocCenter] Sync progress:', msg)
         if (msg.phase === 'image_processing') {
           // 更新同步进度
           setSyncProgress((prev) => ({
@@ -521,6 +722,8 @@ const DocCenterPage: React.FC = () => {
                 : d
             )
           )
+          // 更新树节点状态
+          updateTreeNodeSyncStatusRef.current(msg.document_id, 'syncing')
         } else if (msg.phase === 'completed') {
           // 同步完成，清除进度并更新状态
           setSyncProgress((prev) => {
@@ -535,6 +738,8 @@ const DocCenterPage: React.FC = () => {
                 : d
             )
           )
+          // 更新树节点状态
+          updateTreeNodeSyncStatusRef.current(msg.document_id, 'synced')
         } else if (msg.phase === 'failed') {
           // 同步失败
           setSyncProgress((prev) => {
@@ -549,10 +754,12 @@ const DocCenterPage: React.FC = () => {
                 : d
             )
           )
+          // 更新树节点状态
+          updateTreeNodeSyncStatusRef.current(msg.document_id, 'failed')
         }
       },
       onQueueStatus: (msg) => {
-        console.log('[DocCenter] Queue status:', msg)
+        void msg
       },
       onError: (err) => {
         console.error('[DocCenter] WS error:', err)
@@ -612,25 +819,32 @@ const DocCenterPage: React.FC = () => {
       key: 'index_progress',
       width: 200,
       render: (_, record) => (
-        <ThreePhaseProgress
+        <TwoPhaseProgress
           status={record.index_status}
           extractionProgress={record.extraction_progress}
+          graphBuildTotal={record.graph_build_total || 0}
+          graphBuildDone={record.graph_build_done || 0}
+          graphBuildProgress={record.graph_build_progress || 0}
           entitiesTotal={record.entities_total}
-          entitiesDone={record.entities_done}
           relationsTotal={record.relations_total}
-          relationsDone={record.relations_done}
         />
       ),
     },
     {
       title: '操作',
       key: 'action',
-      width: 180,
+      width: 280,
       render: (_, record) => (
         <Space size="small">
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            onClick={() => handleViewDocument(record)}
+          >
+            查看
+          </Button>
           {record.sync_status !== 'synced' ? (
             <Button
-              type="link"
               size="small"
               icon={<SyncOutlined />}
               onClick={() => handleSyncContent(record)}
@@ -639,12 +853,38 @@ const DocCenterPage: React.FC = () => {
             </Button>
           ) : (
             <Button
-              type="link"
               size="small"
               icon={<SyncOutlined />}
               onClick={() => handleResync(record)}
             >
               重新同步
+            </Button>
+          )}
+          {record.index_status === 'queued' ? (
+            <Button
+              size="small"
+              danger
+              onClick={() => handleCancelIndex(record.id)}
+            >
+              取消索引
+            </Button>
+          ) : record.index_status === 'indexing' ? (
+            <Button
+              size="small"
+              danger
+              icon={<StopOutlined />}
+              onClick={() => handleStopIndex(record.id)}
+            >
+              停止
+            </Button>
+          ) : (
+            <Button
+              size="small"
+              icon={<CloudUploadOutlined />}
+              disabled={record.sync_status !== 'synced'}
+              onClick={() => handleIndex([record.id])}
+            >
+              索引
             </Button>
           )}
         </Space>
@@ -765,29 +1005,77 @@ const DocCenterPage: React.FC = () => {
             }
             size="small"
             className="doc-center-card document-list-card"
-            extra={
-              <Space size={8}>
-                <Button
-                  size="small"
-                  icon={<SyncOutlined />}
-                  loading={batchSyncing}
-                  disabled={selectedRowKeys.length === 0}
-                  onClick={handleBatchSync}
-                >
-                  同步选中 ({selectedRowKeys.length})
-                </Button>
-                <Button
-                  size="small"
-                  icon={<CloudUploadOutlined />}
-                  loading={indexing}
-                  disabled={selectedRowKeys.length === 0}
-                  onClick={handleIndex}
-                >
-                  索引选中 ({selectedRowKeys.length})
-                </Button>
-              </Space>
-            }
           >
+            {/* 筛选区域 */}
+            <div className="document-filter-bar">
+              <div className="filter-bar-left">
+                <Space size={12} wrap>
+                  <Input
+                    placeholder="搜索文档标题"
+                    value={filterKeyword}
+                    onChange={(e) => setFilterKeyword(e.target.value)}
+                    onPressEnter={handleFilter}
+                    style={{ width: 180 }}
+                    allowClear
+                  />
+                  <Select
+                    mode="multiple"
+                    placeholder="同步状态"
+                    value={filterSyncStatus}
+                    onChange={(v) => setFilterSyncStatus(v)}
+                    style={{ minWidth: 200 }}
+                    allowClear
+                    maxTagCount={2}
+                    options={[
+                      { value: 'pending', label: '待同步' },
+                      { value: 'syncing', label: '同步中' },
+                      { value: 'synced', label: '已同步' },
+                      { value: 'failed', label: '同步失败' },
+                    ]}
+                  />
+                  <Select
+                    mode="multiple"
+                    placeholder="索引状态"
+                    value={filterIndexStatus}
+                    onChange={(v) => setFilterIndexStatus(v)}
+                    style={{ minWidth: 200 }}
+                    allowClear
+                    maxTagCount={2}
+                    options={[
+                      { value: 'pending', label: '待索引' },
+                      { value: 'queued', label: '排队中' },
+                      { value: 'indexing', label: '索引中' },
+                      { value: 'indexed', label: '已索引' },
+                      { value: 'failed', label: '索引失败' },
+                    ]}
+                  />
+                  <Button type="primary" onClick={handleFilter}>
+                    查询
+                  </Button>
+                  <Button onClick={handleResetFilter}>
+                    重置
+                  </Button>
+                </Space>
+              </div>
+              <div className="filter-bar-right">
+                <Space size={8}>
+                  <Button
+                    loading={batchSyncing}
+                    disabled={selectedRowKeys.length === 0}
+                    onClick={handleBatchSync}
+                  >
+                    批量同步 ({selectedRowKeys.length})
+                  </Button>
+                  <Button
+                    loading={indexing}
+                    disabled={selectedRowKeys.length === 0}
+                    onClick={() => handleIndex()}
+                  >
+                    批量索引 ({selectedRowKeys.length})
+                  </Button>
+                </Space>
+              </div>
+            </div>
             <div className="document-list-scroll">
               <Table
                 rowKey="id"
@@ -812,7 +1100,7 @@ const DocCenterPage: React.FC = () => {
                 showTotal={(total) => `共 ${total} 条`}
                 onChange={(page, pageSize) => {
                   setPagination((prev) => ({ ...prev, pageSize: pageSize || prev.pageSize }))
-                  loadDocuments(page)
+                  loadDocuments(page, filterKeyword, filterSyncStatus, filterIndexStatus)
                 }}
               />
             </div>

@@ -35,12 +35,13 @@ export interface LocalDocument {
   image_count?: number
   index_status: 'pending' | 'queued' | 'indexing' | 'indexed' | 'failed'
   index_error?: string | null
-  // 三阶段进度
+  // 两阶段进度（提取 + 图谱构建）
   extraction_progress: number  // 提取阶段进度 0-100
+  graph_build_total: number    // 图谱构建总数（实体+关系）
+  graph_build_done: number     // 图谱构建已完成数
+  graph_build_progress: number // 图谱构建进度 0-100
   entities_total: number       // 实体总数
-  entities_done: number        // 已处理实体数
   relations_total: number      // 关系总数
-  relations_done: number       // 已处理关系数
   // 统计信息
   chunk_count?: number
   entity_count?: number
@@ -101,19 +102,18 @@ export interface QueueStatus {
   } | null
 }
 
-// WebSocket 进度消息（三阶段）
+// WebSocket 进度消息（两阶段）
 export interface IndexProgressMessage {
   type: 'index_progress'
   task_id: string
   document_id: string
-  current_phase: 'extraction' | 'entities' | 'relations' | 'completed'
+  current_phase: 'extraction' | 'graph_building' | 'completed' | 'failed'
   extraction_progress: number
+  graph_build_total: number
+  graph_build_done: number
+  graph_build_progress: number
   entities_total: number
-  entities_done: number
-  entities_progress: number
   relations_total: number
-  relations_done: number
-  relations_progress: number
 }
 
 // WebSocket 同步进度消息

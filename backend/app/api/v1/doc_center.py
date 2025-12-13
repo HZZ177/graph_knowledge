@@ -104,16 +104,22 @@ async def get_documents(
     parent_id: Optional[str] = None,
     sync_status: Optional[str] = None,
     index_status: Optional[str] = None,
+    keyword: Optional[str] = None,
     page: int = 1,
     page_size: int = 50,
     db: Session = Depends(get_db)
 ):
     """
     获取本地文档列表
+    
+    参数:
+    - keyword: 按标题模糊搜索
+    - sync_status: 同步状态筛选 (pending/syncing/synced/failed)
+    - index_status: 索引状态筛选 (pending/queued/indexing/indexed/failed)
     """
     try:
         result = DocCenterService.get_documents(
-            db, parent_id, sync_status, index_status, page, page_size
+            db, parent_id, sync_status, index_status, keyword, page, page_size
         )
         return {"code": 0, "data": result, "message": "success"}
     except Exception as e:
@@ -278,6 +284,26 @@ async def trigger_process_queue(background_tasks: BackgroundTasks):
     """手动触发队列处理"""
     background_tasks.add_task(LightRAGIndexService.process_queue)
     return {"code": 0, "message": "已触发队列处理"}
+
+
+@router.delete("/index/{doc_id}")
+async def cancel_index_task(doc_id: str, db: Session = Depends(get_db)):
+    """取消排队中的索引任务"""
+    result = LightRAGIndexService.cancel_task(db, doc_id)
+    if result["success"]:
+        return {"code": 0, "data": result, "message": "已取消索引任务"}
+    else:
+        raise HTTPException(status_code=400, detail=result["error"])
+
+
+@router.post("/index/stop/{doc_id}")
+async def stop_index_task(doc_id: str, db: Session = Depends(get_db)):
+    """停止正在运行的索引任务"""
+    result = await LightRAGIndexService.stop_running_task(db, doc_id)
+    if result["success"]:
+        return {"code": 0, "data": result, "message": "已请求停止索引"}
+    else:
+        raise HTTPException(status_code=400, detail=result["error"])
 
 
 # ============== WebSocket 进度推送 ==============

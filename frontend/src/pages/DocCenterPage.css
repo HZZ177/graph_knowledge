@@ -331,33 +331,47 @@
   margin-bottom: 0;
 }
 
-/* 三阶段进度组件 */
-.three-phase-progress {
+/* 两阶段进度组件（提取 + 图谱构建） */
+.two-phase-progress {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  min-width: 160px;
+  gap: 6px;
+  min-width: 140px;
 }
 
-.three-phase-progress .phase-item {
+.two-phase-progress .phase-item {
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
-.three-phase-progress .phase-label {
-  font-size: 11px;
-  color: var(--dc-text-secondary);
-  min-width: 70px;
-  white-space: nowrap;
+.two-phase-progress .phase-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 50px;
+  flex-shrink: 0;
 }
 
-.three-phase-progress .ant-progress {
+.two-phase-progress .phase-label {
+  font-size: 11px;
+  color: var(--dc-text-secondary);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.two-phase-progress .phase-detail {
+  font-size: 10px;
+  color: var(--dc-text-tertiary, #999);
+  white-space: nowrap;
+  line-height: 1.4;
+}
+
+.two-phase-progress .ant-progress {
   flex: 1;
   margin: 0;
 }
 
-.three-phase-progress .ant-progress-inner {
+.two-phase-progress .ant-progress-inner {
   background: #f0f0f0;
 }
 
@@ -494,4 +508,45 @@
   .doc-center-sider .tree-container {
     max-height: 200px;
   }
+}
+
+/* 文件树圆点图标（根据同步状态显示不同颜色） */
+.doc-tree-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #d4d4d4;
+  transition: background 0.15s;
+}
+
+.doc-tree-dot--synced {
+  background: #52c41a;
+}
+
+.doc-tree-dot--syncing {
+  background: #faad14;
+}
+
+.doc-tree-dot--pending {
+  background: #ff4d4f;
+}
+
+/* 筛选区域 */
+.document-filter-bar {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--dc-border);
+  background: var(--dc-bg-secondary);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.document-filter-bar .filter-bar-left {
+  flex: 1;
+}
+
+.document-filter-bar .filter-bar-right {
+  flex-shrink: 0;
 }

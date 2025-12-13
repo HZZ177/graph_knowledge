@@ -110,40 +110,53 @@ from dataclasses import dataclass, field
 
 @dataclass
 class IndexProgress:
-    """索引进度数据（三阶段）"""
-    # 阶段1: 提取阶段 (LLM分块+提取)
+    """索引进度数据（两阶段）
+    
+    阶段1: 提取阶段 - LLM 分块 + 提取实体/关系
+    阶段2: 图谱构建 - 合并 Phase1(entities) + Phase2(relations)
+    
+    进度追踪策略：
+    - 从 "Chunk X of Y extracted N Ent + M Rel" 日志累计总数
+    - 用 embedding_func 调用次数追踪图谱构建进度
+    """
+    # 阶段1: 提取阶段
     extraction_progress: int = 0
-    # 阶段2: 实体处理 (Phase 1)
+    # 阶段2: 图谱构建（entities + relations 合并）
+    # 从 chunk 日志累计的总数
     entities_total: int = 0
-    entities_done: int = 0
-    # 阶段3: 关系处理 (Phase 2)
     relations_total: int = 0
+    # 图谱构建进度（通过 embedding 调用次数追踪）
+    graph_build_done: int = 0
+    # 兼容前端显示：按比例分配给 entities_done 和 relations_done
+    entities_done: int = 0
     relations_done: int = 0
-    # 当前阶段: extraction | entities | relations | completed
+    # 当前阶段: extraction | graph_building | completed
     current_phase: str = "extraction"
     
     @property
-    def entities_progress(self) -> int:
-        if self.entities_total == 0:
-            return 0
-        return min(100, int(self.entities_done / self.entities_total * 100))
+    def graph_build_total(self) -> int:
+        """entities + relations 总数"""
+        return self.entities_total + self.relations_total
     
     @property
-    def relations_progress(self) -> int:
-        if self.relations_total == 0:
+    def graph_build_progress(self) -> int:
+        """图谱构建进度百分比"""
+        total = self.graph_build_total
+        if total == 0:
             return 0
-        return min(100, int(self.relations_done / self.relations_total * 100))
+        return min(100, int(self.graph_build_done / total * 100))
     
     def to_dict(self) -> dict:
         return {
             "current_phase": self.current_phase,
             "extraction_progress": self.extraction_progress,
+            # 图谱构建阶段（合并 entities + relations）
+            "graph_build_total": self.graph_build_total,
+            "graph_build_done": self.graph_build_done,
+            "graph_build_progress": self.graph_build_progress,
+            # 详情：实体和关系的总数
             "entities_total": self.entities_total,
-            "entities_done": self.entities_done,
-            "entities_progress": self.entities_progress,
             "relations_total": self.relations_total,
-            "relations_done": self.relations_done,
-            "relations_progress": self.relations_progress,
         }
 
 
@@ -207,50 +220,73 @@ class LightRAGIndexer:
         indexer = self
         
         class ProgressLogHandler(logging.Handler):
-            """捕获 LightRAG 日志并解析 Phase 信息"""
+            """捕获 LightRAG 日志并解析进度信息
+            
+            进度追踪策略：
+            1. 从 "Chunk X of Y extracted N Ent + M Rel" 日志累计 entities 和 relations 总数
+            2. 从 "Merging stage" 进入图谱构建阶段
+            3. embedding_func 调用次数追踪图谱构建进度（在 embedding_func 中实现）
+            """
             
             def emit(self, record):
                 try:
                     message = self.format(record)
                     
-                    # 解析 Phase 1: Processing X entities
-                    match = re.search(
-                        r'Phase (\d+): Processing (\d+) (entities|relations)',
+                    # 解析 "Chunk X of Y extracted N Ent + M Rel chunk-xxx"
+                    # 累计 entities 和 relations 总数
+                    chunk_match = re.search(
+                        r'Chunk (\d+) of (\d+) extracted (\d+) Ent \+ (\d+) Rel',
                         message
                     )
-                    if match:
-                        total = int(match.group(2))
-                        phase_type = match.group(3)
+                    if chunk_match:
+                        chunk_done = int(chunk_match.group(1))
+                        chunk_total = int(chunk_match.group(2))
+                        ent_count = int(chunk_match.group(3))
+                        rel_count = int(chunk_match.group(4))
                         
-                        if phase_type == "entities":
-                            indexer._progress.extraction_progress = 100
-                            indexer._progress.current_phase = "entities"
-                            indexer._progress.entities_total = total
-                            indexer._progress.entities_done = 0
-                            logger.info(f"[LightRAGIndexer:LogHandler] Phase 1: 处理 {total} 个实体")
-                        else:
-                            indexer._progress.current_phase = "relations"
-                            indexer._progress.relations_total = total
-                            indexer._progress.relations_done = 0
-                            logger.info(f"[LightRAGIndexer:LogHandler] Phase 2: 处理 {total} 个关系")
+                        # 累计总数
+                        indexer._progress.entities_total += ent_count
+                        indexer._progress.relations_total += rel_count
+                        
+                        # 更新提取进度（10-90%）
+                        progress = 10 + int((chunk_done / max(chunk_total, 1)) * 80)
+                        indexer._progress.extraction_progress = min(progress, 90)
+                        
+                        logger.debug(
+                            f"[LightRAGIndexer:LogHandler] Chunk {chunk_done}/{chunk_total}: "
+                            f"+{ent_count} Ent, +{rel_count} Rel, "
+                            f"累计: {indexer._progress.entities_total} Ent, {indexer._progress.relations_total} Rel"
+                        )
+                        return
                     
-                    # 解析 Extracting stage X/Y
+                    # 解析 Extracting stage X/Y（备用，chunk 日志更准确）
                     extract_match = re.search(r'Extracting stage (\d+)/(\d+)', message)
                     if extract_match:
                         done = int(extract_match.group(1))
                         total = int(extract_match.group(2))
                         progress = 10 + int((done / max(total, 1)) * 80)
                         indexer._progress.extraction_progress = min(progress, 90)
+                        return
                     
-                    # 解析 Merging stage
+                    # 解析 Merging stage - 进入图谱构建阶段
                     merge_match = re.search(r'Merging stage (\d+)/(\d+)', message)
                     if merge_match:
-                        indexer._progress.extraction_progress = 95
+                        indexer._progress.extraction_progress = 100
+                        indexer._progress.current_phase = "graph_building"
+                        indexer._progress.graph_build_done = 0  # 重置图谱构建进度
+                        logger.info(
+                            f"[LightRAGIndexer:LogHandler] 进入图谱构建阶段: "
+                            f"{indexer._progress.entities_total} 实体, {indexer._progress.relations_total} 关系"
+                        )
+                        return
                     
                     # 检测完成
                     if "Completed merging" in message:
                         indexer._progress.current_phase = "completed"
                         indexer._progress.extraction_progress = 100
+                        # 完成时同步 done 到 total
+                        indexer._progress.entities_done = indexer._progress.entities_total
+                        indexer._progress.relations_done = indexer._progress.relations_total
                     
                 except Exception as e:
                     pass  # 日志处理不应影响主流程
@@ -318,14 +354,16 @@ class LightRAGIndexer:
                     await asyncio.sleep(2.5 - elapsed)
                 _last_embed_time["value"] = _time.time()
                 
-                # 根据当前阶段更新进度
+                # 图谱构建阶段：追踪 embedding 调用次数
                 progress = self._progress
-                if progress.current_phase == "entities":
-                    progress.entities_done += len(texts)
-                    logger.debug(f"[Embedding] entities: {progress.entities_done}/{progress.entities_total}")
-                elif progress.current_phase == "relations":
-                    progress.relations_done += len(texts)
-                    logger.debug(f"[Embedding] relations: {progress.relations_done}/{progress.relations_total}")
+                if progress.current_phase == "graph_building":
+                    batch_size = len(texts)
+                    progress.graph_build_done += batch_size
+                    
+                    logger.debug(
+                        f"[Embedding] 图谱构建: {progress.graph_build_done}/{progress.graph_build_total} "
+                        f"({progress.graph_build_progress}%)"
+                    )
                 
                 # 触发进度回调
                 await self._report_progress()
@@ -372,6 +410,56 @@ class LightRAGIndexer:
             logger.error(f"[LightRAGIndexer] 初始化失败: {e}")
             raise
 
+    async def _cleanup_lightrag_queue_documents(self) -> int:
+        if not self.rag:
+            return 0
+
+        from lightrag.base import DocStatus
+
+        total_deleted = 0
+        for status in (DocStatus.PENDING, DocStatus.PROCESSING, DocStatus.FAILED):
+            docs = await self.rag.doc_status.get_docs_by_status(status)
+            if not docs:
+                continue
+            logger.info(
+                f"[LightRAGIndexer] 清理残留文档: status={status.value}, count={len(docs)}"
+            )
+            for doc_id in list(docs.keys()):
+                await self.rag.adelete_by_doc_id(doc_id)
+                total_deleted += 1
+
+        if total_deleted:
+            logger.info(f"[LightRAGIndexer] 清理残留文档完成: deleted={total_deleted}")
+        return total_deleted
+
+    async def _validate_track_result(self, track_id: str) -> None:
+        if not self.rag:
+            raise RuntimeError("LightRAG 未初始化")
+
+        from lightrag.base import DocStatus
+
+        docs_by_track = await self.rag.aget_docs_by_track_id(track_id)
+        if not docs_by_track:
+            raise Exception(f"LightRAG 未找到 track_id 对应的文档状态: track_id={track_id}")
+
+        for doc_id, status_obj in docs_by_track.items():
+            raw_status = getattr(status_obj, "status", None)
+            try:
+                doc_status = raw_status if isinstance(raw_status, DocStatus) else DocStatus(str(raw_status))
+            except Exception:
+                doc_status = str(raw_status)
+
+            error_msg = getattr(status_obj, "error_msg", None)
+            if doc_status not in (DocStatus.PROCESSED, DocStatus.PREPROCESSED):
+                raise Exception(
+                    f"LightRAG 文档处理失败: doc_id={doc_id}, status={doc_status}, error={error_msg}"
+                )
+
+            if error_msg:
+                raise Exception(
+                    f"LightRAG 文档处理失败: doc_id={doc_id}, status={doc_status}, error={error_msg}"
+                )
+
     async def index_document(self, content: str, doc_title: str, source_url: str = None) -> Dict[str, Any]:
         """
         索引单个文档
@@ -404,6 +492,8 @@ class LightRAGIndexer:
 
             # 添加文档标识
             doc_content = f"[文档名称: {doc_title}]\n\n{content}"
+
+            await self._cleanup_lightrag_queue_documents()
 
             # 启动进度监听（解析 LightRAG 的 Phase 信息）
             start_time = time.time()
@@ -473,37 +563,46 @@ class LightRAGIndexer:
                                     self._progress.current_phase = "completed"
                                     await self._report_progress()
                                 
-                                # 解析 Phase 信息
-                                # 格式: "Phase 1: Processing 45 entities from doc-xxx"
-                                # 格式: "Phase 2: Processing 32 relations from doc-xxx"
-                                match = re.search(
-                                    r'Phase (\d+): Processing (\d+) (entities|relations)',
+                                # 解析 "Chunk X of Y extracted N Ent + M Rel"
+                                # 累计 entities 和 relations 总数
+                                chunk_match = re.search(
+                                    r'Chunk (\d+) of (\d+) extracted (\d+) Ent \+ (\d+) Rel',
                                     current_message
                                 )
-                                if match:
-                                    total = int(match.group(2))
-                                    phase_type = match.group(3)
-
-                                    if phase_type == "entities":
-                                        # 进入阶段2: 实体处理
-                                        self._progress.extraction_progress = 100
-                                        self._progress.current_phase = "entities"
-                                        self._progress.entities_total = total
-                                        self._progress.entities_done = 0
-                                        logger.info(f"[LightRAGIndexer] Phase 1: 处理 {total} 个实体")
-                                    else:
-                                        # 进入阶段3: 关系处理
-                                        self._progress.current_phase = "relations"
-                                        self._progress.relations_total = total
-                                        self._progress.relations_done = 0
-                                        logger.info(f"[LightRAGIndexer] Phase 2: 处理 {total} 个关系")
+                                if chunk_match:
+                                    chunk_done = int(chunk_match.group(1))
+                                    chunk_total = int(chunk_match.group(2))
+                                    ent_count = int(chunk_match.group(3))
+                                    rel_count = int(chunk_match.group(4))
                                     
+                                    # 累计总数
+                                    self._progress.entities_total += ent_count
+                                    self._progress.relations_total += rel_count
+                                    
+                                    # 更新提取进度
+                                    progress = 10 + int((chunk_done / max(chunk_total, 1)) * 80)
+                                    self._progress.extraction_progress = min(progress, 90)
+                                    await self._report_progress()
+                                
+                                # 解析 Merging stage - 进入图谱构建阶段
+                                merge_stage_match = re.search(r'Merging stage (\d+)/(\d+)', current_message)
+                                if merge_stage_match:
+                                    self._progress.extraction_progress = 100
+                                    self._progress.current_phase = "graph_building"
+                                    self._progress.graph_build_done = 0
+                                    logger.info(
+                                        f"[LightRAGIndexer] 进入图谱构建阶段: "
+                                        f"{self._progress.entities_total} 实体, {self._progress.relations_total} 关系"
+                                    )
                                     await self._report_progress()
 
                                 # 检测合并完成
-                                elif "Completed merging" in current_message or "completed" in current_message.lower():
+                                if "Completed merging" in current_message:
                                     self._progress.current_phase = "completed"
                                     self._progress.extraction_progress = 100
+                                    # 完成时同步 done 到 total
+                                    self._progress.entities_done = self._progress.entities_total
+                                    self._progress.relations_done = self._progress.relations_total
                                     await self._report_progress()
 
                                 last_message = current_message
@@ -515,7 +614,7 @@ class LightRAGIndexer:
             try:
                 # 执行索引
                 file_paths = [source_url] if source_url else None
-                insert_result = await self.rag.ainsert(doc_content, file_paths=file_paths)
+                track_id = await self.rag.ainsert(doc_content, file_paths=file_paths)
                 
                 monitor_task.cancel()
                 try:
@@ -525,13 +624,52 @@ class LightRAGIndexer:
                 
                 # 检查是否检测到错误
                 if detected_error["has_error"]:
-                    raise Exception(f"LightRAG 索引过程中发生错误: {detected_error['message']}")
-                
-                # 检查 LightRAG 返回的结果
-                if insert_result and isinstance(insert_result, dict):
-                    status = insert_result.get("status")
-                    if status and "failed" in str(status).lower():
-                        raise Exception(f"LightRAG 索引失败: {insert_result}")
+                    logger.warning(
+                        f"[LightRAGIndexer] pipeline_status 检测到错误消息(仅记录，不作为最终判定): {detected_error['message']}"
+                    )
+
+                try:
+                    await self._validate_track_result(track_id)
+                except Exception as track_error:
+                    track_error_text = str(track_error)
+                    if "未找到 track_id 对应的文档状态" in track_error_text:
+                        from lightrag.base import DocStatus
+
+                        existing_doc_data = None
+                        if source_url:
+                            existing_doc_data = await self.rag.doc_status.get_doc_by_file_path(source_url)
+
+                        if existing_doc_data is None:
+                            try:
+                                from lightrag.utils import compute_mdhash_id, sanitize_text_for_encoding
+
+                                doc_id = compute_mdhash_id(
+                                    sanitize_text_for_encoding(doc_content),
+                                    prefix="doc-",
+                                )
+                                existing_doc_data = await self.rag.doc_status.get_by_id(doc_id)
+                            except Exception:
+                                existing_doc_data = None
+
+                        if existing_doc_data:
+                            raw_status = existing_doc_data.get("status")
+                            existing_error_msg = existing_doc_data.get("error_msg")
+                            if raw_status in (DocStatus.PROCESSED.value, DocStatus.PREPROCESSED.value) and not existing_error_msg:
+                                elapsed = time.time() - start_time
+                                self._progress.current_phase = "completed"
+                                self._progress.extraction_progress = 100
+                                await self._report_progress()
+                                logger.info(
+                                    f"[LightRAGIndexer] 文档已存在于 LightRAG，跳过重复索引: {doc_title}, 耗时 {elapsed:.1f}s"
+                                )
+                                return {
+                                    "success": True,
+                                    "stats": None,
+                                    "skipped": True,
+                                    "error": None,
+                                }
+
+                    raise
 
                 elapsed = time.time() - start_time
                 
@@ -586,30 +724,27 @@ class LightRAGIndexService:
 
     @classmethod
     def reset_stale_tasks(cls, db: Session) -> int:
-        """重置卡在 running 状态的任务（服务启动时调用）
+        """清理未完成的任务（服务启动时调用）
         
-        当服务非正常退出时，任务可能卡在 running 状态。
-        此方法将这些任务重置为 pending，以便重新处理。
+        当服务重启时，清理所有 running 和 pending 状态的任务，
+        避免旧任务堆积影响新的索引请求。
         
         Returns:
-            重置的任务数量
+            清理的任务数量
         """
+        # 查找所有未完成的任务（running 和 pending）
         stale_tasks = db.query(DocCenterIndexTask).filter(
-            DocCenterIndexTask.status == "running"
+            DocCenterIndexTask.status.in_(["running", "pending"])
         ).all()
         
         reset_count = 0
         for task in stale_tasks:
-            task.status = "pending"
-            task.started_at = None
-            task.error_message = None
-            
-            # 同时重置对应文档的状态
+            # 重置对应文档的状态
             doc = db.query(DocCenterDocument).filter(
                 DocCenterDocument.id == task.document_id
             ).first()
             if doc:
-                doc.index_status = "queued"
+                doc.index_status = "pending"
                 doc.index_error = None
                 doc.extraction_progress = 0
                 doc.entities_total = 0
@@ -617,12 +752,14 @@ class LightRAGIndexService:
                 doc.relations_total = 0
                 doc.relations_done = 0
             
+            # 删除任务
+            db.delete(task)
             reset_count += 1
-            logger.info(f"[IndexService] 重置卡住的任务: task_id={task.id}, doc_id={task.document_id}")
+            logger.info(f"[IndexService] 清理未完成任务: task_id={task.id}, doc_id={task.document_id}, status={task.status}")
         
         if reset_count > 0:
             db.commit()
-            logger.info(f"[IndexService] 共重置 {reset_count} 个卡住的任务")
+            logger.info(f"[IndexService] 共清理 {reset_count} 个未完成任务")
         
         return reset_count
 
@@ -704,6 +841,69 @@ class LightRAGIndexService:
         db.commit()
         logger.info(f"[IndexService] 创建任务: task_id={task.id}, doc_id={document_id}")
         return task
+
+    @classmethod
+    def cancel_task(cls, db: Session, document_id: str) -> Dict[str, Any]:
+        """取消排队中的索引任务
+        
+        只能取消 pending 状态的任务，running 状态的任务无法取消
+        """
+        task = db.query(DocCenterIndexTask).filter(
+            DocCenterIndexTask.document_id == document_id,
+            DocCenterIndexTask.status == "pending"
+        ).first()
+        
+        if not task:
+            return {"success": False, "error": "没有找到排队中的任务"}
+        
+        # 重置文档状态
+        doc = db.query(DocCenterDocument).filter(
+            DocCenterDocument.id == document_id
+        ).first()
+        if doc:
+            doc.index_status = "pending"
+            doc.index_error = None
+        
+        # 删除任务
+        db.delete(task)
+        db.commit()
+        
+        logger.info(f"[IndexService] 取消任务: task_id={task.id}, doc_id={document_id}")
+        return {"success": True, "task_id": task.id}
+
+    @classmethod
+    async def stop_running_task(cls, db: Session, document_id: str) -> Dict[str, Any]:
+        """停止正在运行的索引任务
+        
+        通过设置 LightRAG 的 cancellation_requested 标志来请求停止
+        """
+        # 检查是否有正在运行的任务
+        task = db.query(DocCenterIndexTask).filter(
+            DocCenterIndexTask.document_id == document_id,
+            DocCenterIndexTask.status == "running"
+        ).first()
+        
+        if not task:
+            return {"success": False, "error": "没有找到正在运行的任务"}
+        
+        try:
+            from lightrag.kg.shared_storage import get_namespace_data, get_pipeline_status_lock
+            
+            pipeline_status = await get_namespace_data("pipeline_status")
+            pipeline_status_lock = get_pipeline_status_lock()
+            
+            async with pipeline_status_lock:
+                if not pipeline_status.get("busy", False):
+                    return {"success": False, "error": "索引服务未在运行"}
+                
+                # 设置取消标志
+                pipeline_status["cancellation_requested"] = True
+                logger.info(f"[IndexService] 请求停止任务: task_id={task.id}, doc_id={document_id}")
+            
+            return {"success": True, "task_id": task.id}
+        except Exception as e:
+            logger.error(f"[IndexService] 停止任务失败: {e}")
+            return {"success": False, "error": str(e)}
 
     @classmethod
     def get_pending_tasks(cls, db: Session, limit: int = 10) -> List[DocCenterIndexTask]:
@@ -794,12 +994,27 @@ class LightRAGIndexService:
                 if result.get("stats"):
                     doc.entity_count = result["stats"].get("entities_total", 0)
                     doc.relation_count = result["stats"].get("relations_total", 0)
+                
+                # 广播最终完成状态给前端
+                final_progress = IndexProgress(
+                    current_phase="completed",
+                    extraction_progress=100,
+                    entities_total=doc.entity_count or 0,
+                    entities_done=doc.entity_count or 0,
+                    relations_total=doc.relation_count or 0,
+                    relations_done=doc.relation_count or 0,
+                )
+                await cls._broadcast_progress(task_id, doc.id, final_progress)
             else:
                 task.status = "failed"
                 task.finished_at = datetime.utcnow()
                 task.error_message = result.get("error", "未知错误")
                 doc.index_status = "failed"
                 doc.index_error = task.error_message
+                
+                # 广播失败状态给前端
+                fail_progress = IndexProgress(current_phase="failed", extraction_progress=0)
+                await cls._broadcast_progress(task_id, doc.id, fail_progress)
 
             db.commit()
             cls._current_task_id = None

@@ -63,7 +63,7 @@ DEFAULT_PROJECT_ID = 55
 # ============== OSS 客户端（复用 doc_image_processor 逻辑）==============
 
 class SimpleOSSClient:
-    """简化的 OSS 客户端（基于 OpenList REST API）"""
+    """简化的 OSS 客户端（基于 OpenList REST API）- 异步实现"""
 
     def __init__(self, config: dict):
         self.base_url = config["endpoint"].rstrip("/")
@@ -71,12 +71,12 @@ class SimpleOSSClient:
         self.username = config["username"]
         self.password = config["password"]
         self.token = None
-        self.client = httpx.Client(timeout=60.0, verify=False)
+        self.client = httpx.AsyncClient(timeout=60.0, verify=False)
 
-    def _login(self):
+    async def _login(self):
         """登录获取 token"""
         logger.debug("[OSS] 登录 OpenList...")
-        resp = self.client.post(
+        resp = await self.client.post(
             f"{self.base_url}/api/auth/login",
             json={"username": self.username, "password": self.password},
             headers={"Content-Type": "application/json"}
@@ -88,16 +88,16 @@ class SimpleOSSClient:
         else:
             raise RuntimeError(f"OSS 登录失败: {data.get('message')}")
 
-    def ensure_login(self):
+    async def ensure_login(self):
         """确保已登录"""
         if not self.token:
-            self._login()
+            await self._login()
 
-    def upload(self, file_bytes: bytes, filename: str, content_type: str) -> str:
+    async def upload(self, file_bytes: bytes, filename: str, content_type: str) -> str:
         """上传文件，返回永久 URL"""
         import uuid
 
-        self.ensure_login()
+        await self.ensure_login()
 
         # 生成文件路径: /upload_path/2024-12-12/uuid/filename
         date_str = datetime.now().strftime("%Y-%m-%d")
@@ -110,7 +110,7 @@ class SimpleOSSClient:
             "File-Path": quote(full_path, safe="/"),
         }
 
-        resp = self.client.put(
+        resp = await self.client.put(
             f"{self.base_url}/api/fs/put",
             content=file_bytes,
             headers=headers,
@@ -124,25 +124,25 @@ class SimpleOSSClient:
         encoded_path = quote(full_path, safe="/")
         return f"{self.base_url}/d{encoded_path}"
 
-    def close(self):
+    async def close(self):
         """关闭客户端"""
         if self.client:
-            self.client.close()
+            await self.client.aclose()
 
 
 # ============== 帮助中心 API 客户端 ==============
 
 class HelpCenterAPIClient:
-    """帮助中心 API 客户端"""
+    """帮助中心 API 客户端 - 异步实现"""
 
     def __init__(self, base_url: str = HELP_API_BASE, token: str = HELP_API_TOKEN):
         self.base_url = base_url
         self.token = token
-        self.client = httpx.Client(timeout=30.0, verify=False)
+        self.client = httpx.AsyncClient(timeout=30.0, verify=False)
 
-    def get_share_url(self, doc_id: str) -> Optional[str]:
+    async def get_share_url(self, doc_id: str) -> Optional[str]:
         """获取文档分享码"""
-        resp = self.client.post(
+        resp = await self.client.post(
             f"{self.base_url}/HelpDoc/getShareShowUrl",
             json={"docId": doc_id},
             headers={
@@ -158,9 +158,9 @@ class HelpCenterAPIClient:
             logger.warning(f"[HelpAPI] 获取分享码失败: {data.get('resMsg')}")
             return None
 
-    def get_doc_content(self, share_url: str) -> Optional[dict]:
+    async def get_doc_content(self, share_url: str) -> Optional[dict]:
         """通过分享码获取文档内容"""
-        resp = self.client.post(
+        resp = await self.client.post(
             f"{self.base_url}/HelpDoc/getShareDocInfo",
             json={"shareUrl": share_url},
             headers={"Content-Type": "application/json"}
@@ -175,10 +175,10 @@ class HelpCenterAPIClient:
             logger.warning(f"[HelpAPI] 获取文档内容失败: {data.get('resMsg')}")
             return None
 
-    def close(self):
+    async def close(self):
         """关闭客户端"""
         if self.client:
-            self.client.close()
+            await self.client.aclose()
 
 
 # ============== 图片处理函数（复用 doc_image_processor 逻辑）==============
@@ -398,6 +398,7 @@ class DocCenterService:
         parent_id: Optional[str] = None,
         sync_status: Optional[str] = None,
         index_status: Optional[str] = None,
+        keyword: Optional[str] = None,
         page: int = 1,
         page_size: int = 50
     ) -> Dict[str, Any]:
@@ -409,9 +410,21 @@ class DocCenterService:
         if parent_id:
             query = query.filter(DocCenterDocument.source_parent_id == parent_id)
         if sync_status:
-            query = query.filter(DocCenterDocument.sync_status == sync_status)
+            # 支持逗号分隔的多状态筛选
+            statuses = [s.strip() for s in sync_status.split(',') if s.strip()]
+            if len(statuses) == 1:
+                query = query.filter(DocCenterDocument.sync_status == statuses[0])
+            elif len(statuses) > 1:
+                query = query.filter(DocCenterDocument.sync_status.in_(statuses))
         if index_status:
-            query = query.filter(DocCenterDocument.index_status == index_status)
+            # 支持逗号分隔的多状态筛选
+            statuses = [s.strip() for s in index_status.split(',') if s.strip()]
+            if len(statuses) == 1:
+                query = query.filter(DocCenterDocument.index_status == statuses[0])
+            elif len(statuses) > 1:
+                query = query.filter(DocCenterDocument.index_status.in_(statuses))
+        if keyword:
+            query = query.filter(DocCenterDocument.title.ilike(f"%{keyword}%"))
 
         total = query.count()
         items = query.offset((page - 1) * page_size).limit(page_size).all()
@@ -502,15 +515,15 @@ class DocCenterService:
         try:
             # 1. 获取分享URL
             help_client = HelpCenterAPIClient()
-            share_url = help_client.get_share_url(source_doc_id)
+            share_url = await help_client.get_share_url(source_doc_id)
             if not share_url:
                 raise Exception("获取分享码失败")
 
-            # 保存云端地址
-            doc.source_url = share_url
+            # 保存云端地址（拼接成完整的帮助中心分享链接）
+            doc.source_url = f"https://yunwei-help.keytop.cn/helpCenter/shareDoc/{share_url}"
 
             # 2. 获取文档内容
-            doc_data = help_client.get_doc_content(share_url)
+            doc_data = await help_client.get_doc_content(share_url)
             if not doc_data or not doc_data.get("md"):
                 raise Exception("获取文档内容失败")
 
@@ -539,13 +552,13 @@ class DocCenterService:
                         try:
                             filename = get_filename_from_url(url)
                             content_type = get_content_type(filename)
-                            new_url = oss_client.upload(image_bytes, filename, content_type)
+                            new_url = await oss_client.upload(image_bytes, filename, content_type)
                             url_mapping[url] = new_url
                             logger.debug(f"[DocCenter] 图片上传成功: {new_url[:60]}...")
                         except Exception as e:
                             logger.warning(f"[DocCenter] 图片上传失败: {e}")
 
-                oss_client.close()
+                await oss_client.close()
 
                 # 替换 URL
                 for old_url, new_url in url_mapping.items():
@@ -563,7 +576,7 @@ class DocCenterService:
             db.commit()
             logger.info(f"[DocCenter] 文档内容已保存到数据库, 长度={len(content)}")
 
-            help_client.close()
+            await help_client.close()
 
             return {
                 "success": True,
