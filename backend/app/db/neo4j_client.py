@@ -13,4 +13,8 @@ def get_neo4j_driver() -> Driver:
     return GraphDatabase.driver(
         DEFAULT_NEO4J_URI,
         auth=(DEFAULT_NEO4J_USER, DEFAULT_NEO4J_PASSWORD),
+        max_connection_pool_size=50,        # 降低连接池大小，适配Aura Free tier
+        connection_timeout=30,            # 连接超时30秒
+        max_connection_lifetime=1800,       # 连接存活30分钟
+        max_transaction_retry_time=30,    # 事务重试30秒
     )
