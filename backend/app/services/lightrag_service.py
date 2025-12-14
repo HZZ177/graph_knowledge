@@ -467,7 +467,7 @@ class LightRAGService:
             # 提取来源文档
             sources = cls._extract_sources(context)
             
-            logger.info(f"[LightRAG] 检索完成: context_length={len(context)}")
+            logger.info(f"[LightRAG] 检索完成: context_length={len(context)}, sources={len(sources)}")
             
             return {
                 "context": context,
@@ -484,10 +484,11 @@ class LightRAGService:
     
     @classmethod
     def _extract_sources(cls, context: str) -> list[dict]:
-        """从 context 中提取文档来源标识
+        """从 context 中提取 LightRAG 的 Reference Document List
         
-        LightRAG 在索引时会保留 [文档名称: xxx] 和 [文档地址: xxx] 标记，
-        这里通过正则提取这些标记作为来源引用。
+        LightRAG 在 context 末尾会附加 Reference Document List，格式如：
+        [1] 文档名称 (https://xxx/doc/ABC123)
+        [2] 另一个文档 (https://xxx/doc/DEF456)
         
         Args:
             context: LightRAG 返回的上下文文本
@@ -495,31 +496,17 @@ class LightRAGService:
         Returns:
             去重后的来源文档列表，每个元素为 {"name": "文档名", "url": "文档地址"}
         """
-        # 提取 [文档名称: xxx] 标记
-        doc_names = re.findall(r'\[文档名称:\s*([^\]]+)\]', context)
-        # 提取 [文档地址: xxx] 标记
-        doc_urls = re.findall(r'\[文档地址:\s*([^\]]+)\]', context)
-        
-        # 构建名称到URL的映射（按出现顺序，名称在前，URL紧随其后）
-        name_to_url = {}
-        for i, name in enumerate(doc_names):
-            name = name.strip()
-            # 尝试找到对应的URL（假设URL紧跟在名称后面）
-            if i < len(doc_urls):
-                name_to_url[name] = doc_urls[i].strip()
-            elif name not in name_to_url:
-                name_to_url[name] = ""
-        
-        # 去重并保持顺序
-        seen = set()
         sources = []
-        for name in doc_names:
+        seen = set()
+        
+        # 格式: [数字] 文档名称 (URL)
+        matches = re.findall(r'\[\d+\]\s*([^(\n]+?)\s*\((https?://[^)]+)\)', context)
+        for name, url in matches:
             name = name.strip()
-            if name and name not in seen:
-                seen.add(name)
-                sources.append({
-                    "name": name,
-                    "url": name_to_url.get(name, "")
-                })
+            url = url.strip()
+            if url not in seen:
+                seen.add(url)
+                sources.append({"name": name, "url": url})
         
         return sources
+    

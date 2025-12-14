@@ -616,7 +616,11 @@ class LightRAGIndexer:
 
             try:
                 # 执行索引
-                file_paths = [source_url] if source_url else None
+                # file_paths 会作为 Reference Document List 返回，格式：文档名称 (URL)
+                if source_url:
+                    file_paths = [f"{doc_title} ({source_url})"]
+                else:
+                    file_paths = [doc_title] if doc_title else None
                 track_id = await self.rag.ainsert(doc_content, file_paths=file_paths)
                 
                 monitor_task.cancel()
