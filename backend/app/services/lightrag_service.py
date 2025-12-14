@@ -483,25 +483,43 @@ class LightRAGService:
             }
     
     @classmethod
-    def _extract_sources(cls, context: str) -> list[str]:
+    def _extract_sources(cls, context: str) -> list[dict]:
         """从 context 中提取文档来源标识
         
-        LightRAG 在索引时会保留 [DOC_ID:xxx] 和 [TITLE:xxx] 标记，
+        LightRAG 在索引时会保留 [文档名称: xxx] 和 [文档地址: xxx] 标记，
         这里通过正则提取这些标记作为来源引用。
         
         Args:
             context: LightRAG 返回的上下文文本
             
         Returns:
-            去重后的来源文档列表
+            去重后的来源文档列表，每个元素为 {"name": "文档名", "url": "文档地址"}
         """
-        # 提取 [DOC_ID:xxx] 标记
-        doc_ids = re.findall(r'\[DOC_ID:([^\]]+)\]', context)
+        # 提取 [文档名称: xxx] 标记
+        doc_names = re.findall(r'\[文档名称:\s*([^\]]+)\]', context)
+        # 提取 [文档地址: xxx] 标记
+        doc_urls = re.findall(r'\[文档地址:\s*([^\]]+)\]', context)
         
-        # 提取 [TITLE:xxx] 标记
-        titles = re.findall(r'\[TITLE:([^\]]+)\]', context)
+        # 构建名称到URL的映射（按出现顺序，名称在前，URL紧随其后）
+        name_to_url = {}
+        for i, name in enumerate(doc_names):
+            name = name.strip()
+            # 尝试找到对应的URL（假设URL紧跟在名称后面）
+            if i < len(doc_urls):
+                name_to_url[name] = doc_urls[i].strip()
+            elif name not in name_to_url:
+                name_to_url[name] = ""
         
-        # 合并去重
-        sources = list(set(doc_ids + titles))
+        # 去重并保持顺序
+        seen = set()
+        sources = []
+        for name in doc_names:
+            name = name.strip()
+            if name and name not in seen:
+                seen.add(name)
+                sources.append({
+                    "name": name,
+                    "url": name_to_url.get(name, "")
+                })
         
         return sources

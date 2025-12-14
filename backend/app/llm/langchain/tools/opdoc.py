@@ -62,11 +62,18 @@ async def search_yongce_docs(question: str) -> str:
         # 格式化输出
         output_parts = ["## 检索结果\n", context]
         
-        # 添加来源引用
+        # 添加来源引用（Reference Document List）
         if sources:
-            output_parts.append("\n\n## 来源文档")
+            output_parts.append("\n\n## Reference Document List")
+            output_parts.append("以下是检索到的文档来源，请在回答末尾以Markdown链接格式引用：")
             for idx, source in enumerate(sources, 1):
-                output_parts.append(f"{idx}. {source}")
+                name = source.get("name", "") if isinstance(source, dict) else source
+                url = source.get("url", "") if isinstance(source, dict) else ""
+                if url:
+                    output_parts.append(f"[{idx}] 文档标题: {name}")
+                    output_parts.append(f"    文档地址: {url}")
+                else:
+                    output_parts.append(f"[{idx}] 文档标题: {name}")
         
         output = "\n".join(output_parts)
         

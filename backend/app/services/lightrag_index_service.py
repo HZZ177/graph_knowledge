@@ -490,8 +490,11 @@ class LightRAGIndexer:
             self._progress.extraction_progress = 10
             await self._report_progress()
 
-            # 添加文档标识
-            doc_content = f"[文档名称: {doc_title}]\n\n{content}"
+            # 添加文档标识（包含名称和URL，便于检索时提取来源）
+            if source_url:
+                doc_content = f"[文档名称: {doc_title}]\n[文档地址: {source_url}]\n\n{content}"
+            else:
+                doc_content = f"[文档名称: {doc_title}]\n\n{content}"
 
             await self._cleanup_lightrag_queue_documents()
 
