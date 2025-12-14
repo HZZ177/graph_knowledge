@@ -374,7 +374,7 @@ async def call_vlm_for_image(
                 if not result:
                     logger.warning(f"[VLM] API 返回空内容 (尝试 {attempt}/{max_retries})")
                 else:
-                    logger.warning(f"[VLM] 返回内容过短({len(result)}字)，疑似截断 (尝试 {attempt}/{max_retries})")
+                    logger.warning(f"[VLM] 返回内容过短({len(result)}字)，疑似截断 (尝试 {attempt}/{max_retries})\n原文：{result}]")
                 if attempt < max_retries:
                     await asyncio.sleep(1 * attempt)
                     continue
