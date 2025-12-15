@@ -443,8 +443,9 @@ class LightRAGService:
             context = await rag.aquery(
                 question,
                 param=QueryParam(
-                    mode="mix",
+                    mode="hybrid",
                     only_need_context=True,  # 只返回上下文，不生成回答
+                    chunk_top_k=40
                 )
             )
             

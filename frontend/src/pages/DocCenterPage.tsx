@@ -177,7 +177,7 @@ const UnifiedProgress: React.FC<UnifiedProgressProps> = ({
 
 const IndexStatusTag: React.FC<{ status: string }> = ({ status }) => {
   const config: Record<string, { icon: React.ReactNode; text: string }> = {
-    pending: { icon: <ClockCircleOutlined />, text: '待索引' },
+    pending: { icon: <ClockCircleOutlined style={{ color: '#2165e4ff' }} />, text: '待索引' },
     queued: { icon: <ClockCircleOutlined style={{ color: '#faad14' }} />, text: '排队中' },
     indexing: { icon: <LoadingOutlined />, text: '索引中' },
     indexed: { icon: <CheckCircleOutlined style={{ color: '#52c41a' }} />, text: '已索引' },

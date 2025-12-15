@@ -49,8 +49,8 @@ RERANK_BASE_URL = "https://api.siliconflow.cn/v1/rerank"
 CHUNK_TOKEN_SIZE = 1200
 CHUNK_OVERLAP_TOKEN_SIZE = 100
 EMBEDDING_BATCH_NUM = 10
-EMBEDDING_FUNC_MAX_ASYNC = 8  # 硅基流动 RPM 限制较严格
-LLM_MODEL_MAX_ASYNC = 4  # 图谱并发 = 此值 * 2，Neo4j Aura 限制需保持较低
+EMBEDDING_FUNC_MAX_ASYNC = 16  # 硅基流动 RPM 限制较严格
+LLM_MODEL_MAX_ASYNC = 6  # 图谱并发 = 此值 * 2，Neo4j Aura 限制需保持较低
 
 
 # ============== 存储类型 ==============
