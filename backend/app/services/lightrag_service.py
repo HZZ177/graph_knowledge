@@ -156,6 +156,27 @@ class LightRAGService:
         # 自定义 Embedding 函数（使用统一配置）
         async def embedding_func(texts: list[str]):
             logger.debug(f"[LightRAG] Embedding: {len(texts)} texts, model={EMBEDDING_MODEL}")
+            
+            # 🔥 主动推送 Embedding 进度
+            ws = cls._progress_websocket
+            tool_id = cls._progress_tool_id
+            tool_name = cls._progress_tool_name
+            if ws and tool_id is not None:
+                try:
+                    loop = asyncio.get_running_loop()
+                    # 根据文本数量调整描述
+                    if len(texts) == 1:
+                        detail = "正在分析文本语义..."
+                    else:
+                        detail = f"正在处理 {len(texts)} 段内容..."
+                    
+                    asyncio.run_coroutine_threadsafe(
+                        cls._send_progress(ws, tool_name, tool_id, "embedding", detail),
+                        loop
+                    )
+                except RuntimeError:
+                    pass
+            
             return await openai_embed(
                 texts,
                 model=EMBEDDING_MODEL,
@@ -316,30 +337,75 @@ class LightRAGService:
         Returns:
             (phase, detail) 元组，或 None 表示不是阶段日志
         """
+        # 🔥 新增：Workers 初始化
+        match = re.search(r'(LLM|Embedding) func: (\d+) new workers initialized', message)
+        if match:
+            worker_type = "智能分析" if match.group(1) == "LLM" else "文本处理"
+            return ("init_workers", f"准备{worker_type}引擎...")
+        
+        # 🔥 新增：关键词提取开始（捕获LLM请求）
+        if 'keyword extractor' in message.lower() and 'User Query:' in message:
+            return ("extracting_keywords", "正在理解您的问题...")
+        
+        # 🔥 新增：关键词提取完成
+        if ' == LLM cache == saving:' in message and ':keywords:' in message:
+            return ("keywords_extracted", "已识别问题要点")
+        
+        # 🔥 新增：Query nodes（实体查询）
+        match = re.search(r'Query nodes: ([^(]+) \(top_k:(\d+)', message)
+        if match:
+            keywords = match.group(1).strip()
+            # 截断关键词显示
+            keywords_short = keywords[:20] + '...' if len(keywords) > 20 else keywords
+            return ("querying_entities", f"查找与 \"{keywords_short}\" 相关的内容")
+        
+        # 🔥 新增：Query edges（关系查询）
+        match = re.search(r'Query edges: ([^(]+) \(top_k:(\d+)', message)
+        if match:
+            return ("querying_relations", "分析内容之间的关联...")
+        
+        # 🔥 新增：Naive query（纯向量检索）
+        match = re.search(r'Naive query: (\d+) chunks', message)
+        if match:
+            chunk_count = match.group(1)
+            return ("vector_search", f"找到 {chunk_count} 段相关内容")
+        
         # Local query 阶段
         match = re.match(r'Local query: (\d+) entites?, (\d+) relations?', message)
         if match:
-            return ("local_query", f"{match.group(1)} 实体, {match.group(2)} 关系")
+            total = int(match.group(1)) + int(match.group(2))
+            return ("local_query", f"已定位 {total} 条相关信息")
         
         # Global query 阶段
         match = re.match(r'Global query: (\d+) entites?, (\d+) relations?', message)
         if match:
-            return ("global_query", f"{match.group(1)} 实体, {match.group(2)} 关系")
+            total = int(match.group(1)) + int(match.group(2))
+            return ("global_query", f"扩展搜索，累计 {total} 条信息")
         
         # Rerank 阶段
         match = re.match(r'Successfully reranked: (\d+) chunks from (\d+)', message)
         if match:
-            return ("rerank", f"从 {match.group(2)} 个片段中筛选出 {match.group(1)} 个")
+            selected = match.group(1)
+            return ("rerank", f"从海量内容中精选出最相关的 {selected} 条")
         
         # Final context 阶段
         match = re.match(r'Final context: (\d+) entities?, (\d+) relations?, (\d+) chunks?', message)
         if match:
-            return ("finalize", f"{match.group(1)} 实体, {match.group(2)} 关系, {match.group(3)} 片段")
+            chunks = match.group(3)
+            return ("finalize", f"正在整理 {chunks} 条内容为您准备答案")
         
         # Raw search results（检索完成）
         match = re.match(r'Raw search results: (\d+) entities?, (\d+) relations?, (\d+) vector chunks?', message)
         if match:
-            return ("search_complete", f"{match.group(1)} 实体, {match.group(2)} 关系, {match.group(3)} 向量片段")
+            chunks = match.group(3)
+            return ("search_complete", f"检索完成，共找到 {chunks} 段相关内容")
+        
+        # 🔥 新增：Selecting chunks (向量相似度筛选)
+        match = re.search(r'Selecting (\d+) from (\d+) (entity|relation)-related chunks', message)
+        if match:
+            selected = match.group(1)
+            total = match.group(2)
+            return ("selecting_chunks", f"从 {total} 条中筛选出 {selected} 条最相关内容")
         
         return None
     
@@ -439,11 +505,27 @@ class LightRAGService:
             
             logger.info(f"[LightRAG] 开始检索: question={question[:50]}...")
             
+            # 🔥 立即推送开始检索的进度
+            ws = cls._progress_websocket
+            tool_id = cls._progress_tool_id
+            tool_name = cls._progress_tool_name
+            if ws and tool_id is not None:
+                try:
+                    # 截断问题显示，更简洁友好
+                    question_short = question[:15] + '...' if len(question) > 15 else question
+                    await cls._send_progress(
+                        ws, tool_name, tool_id,
+                        "start_search",
+                        f"开始为您查找关于「{question_short}」的信息"
+                    )
+                except Exception as e:
+                    logger.warning(f"[LightRAG] 推送开始进度失败: {e}")
+            
             # 调用 LightRAG 查询（only_need_context=True 只返回检索结果）
             context = await rag.aquery(
                 question,
                 param=QueryParam(
-                    mode="hybrid",
+                    mode="mix",
                     only_need_context=True,  # 只返回上下文，不生成回答
                     chunk_top_k=40
                 )

@@ -39,7 +39,7 @@ EMBEDDING_DIM = 4096
 # ============== Rerank 配置 ==============
 # 硅基流动平台，兼容 Cohere API
 
-RERANK_MODEL = "Qwen/Qwen3-Reranker-8B"
+RERANK_MODEL = "Qwen/Qwen3-Reranker-0.6B"
 RERANK_API_KEY = "sk-vxyvdnryevgolxatlsqilklzpiyfadxpkkqpvsagrgvuzavi"
 RERANK_BASE_URL = "https://api.siliconflow.cn/v1/rerank"
 

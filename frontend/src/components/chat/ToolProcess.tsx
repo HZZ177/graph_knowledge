@@ -11,13 +11,22 @@ import { BatchToolItemInfo, ToolProgressStep } from '../../types/chat'
 // 单个工具调用展示
 // ==========================================
 
-// 阶段名称映射（英文 -> 中文）
+// 阶段名称映射（英文 -> 中文，用户友好版本）
 const PHASE_LABELS: Record<string, string> = {
-  local_query: '本地查询',
-  global_query: '全局查询',
+  start_search: '开始检索',
+  init_workers: '初始化引擎',
+  extracting_keywords: '理解问题',
+  keywords_extracted: '问题分析完成',
+  embedding: '语义分析',
+  querying_entities: '查找相关信息',
+  querying_relations: '关联分析',
+  local_query: '精准定位',
+  global_query: '全局搜索',
+  vector_search: '内容检索',
   search_complete: '检索完成',
-  rerank: '结果重排',
-  finalize: '生成上下文',
+  selecting_chunks: '筛选内容',
+  rerank: '智能排序',
+  finalize: '整理结果',
 }
 
 interface ToolProcessProps {
