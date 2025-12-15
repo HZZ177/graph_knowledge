@@ -246,7 +246,6 @@ def _generate_tool_summaries(tool_name: str, tool_input: dict, tool_output: str)
             # 统计来源文档数量
             if "## 来源文档" in tool_output:
                 # 提取来源数量
-                import re
                 sources = re.findall(r'^\d+\.\s+(.+)$', tool_output, re.MULTILINE)
                 output_summary = f"找到相关文档 ({len(sources)} 个来源)"
             else:
