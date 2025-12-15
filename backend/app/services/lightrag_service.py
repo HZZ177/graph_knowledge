@@ -486,13 +486,19 @@ class LightRAGService:
             logger.warning(f"[LightRAG] 预热失败（首次查询时会自动初始化）: {e}")
     
     @classmethod
-    async def search_context(cls, question: str, db: Session) -> dict:
+    async def search_context(cls, question: str, db: Session, mode: str = "mix") -> dict:
         """检索永策Pro企业知识库上下文（只返回检索结果，不生成回答）
         
-        使用 LightRAG 的混合检索模式（向量 + 图谱）检索永策Pro项目的相关文档内容。
+        使用 LightRAG 的多种检索模式检索永策Pro项目的相关文档内容。
         
         Args:
             question: 用户问题，如 "权限管理功能说明"、"订单流程设计"
+            mode: 检索模式，可选值：
+                  - naive: 纯向量检索（最快）
+                  - local: 实体中心图谱检索（常用）
+                  - global: 关系中心图谱检索
+                  - hybrid: 深度图谱推理（最全）
+                  - mix: 平衡模式（默认，推荐）
             
         Returns:
             {
@@ -503,7 +509,7 @@ class LightRAGService:
         try:
             rag = await cls.get_instance(db)
             
-            logger.info(f"[LightRAG] 开始检索: question={question[:50]}...")
+            logger.info(f"[LightRAG] 开始检索: question={question[:50]}..., mode={mode}")
             
             # 🔥 立即推送开始检索的进度
             ws = cls._progress_websocket
@@ -521,13 +527,23 @@ class LightRAGService:
                 except Exception as e:
                     logger.warning(f"[LightRAG] 推送开始进度失败: {e}")
             
+            # 根据模式动态调整 chunk_top_k
+            chunk_top_k_map = {
+                "naive": 20,    # 纯向量，少一些
+                "local": 30,    # 局部图谱
+                "global": 40,   # 全局图谱
+                "hybrid": 50,   # 深度分析，多一些
+                "mix": 40,      # 平衡模式
+            }
+            chunk_top_k = chunk_top_k_map.get(mode, 40)
+            
             # 调用 LightRAG 查询（only_need_context=True 只返回检索结果）
             context = await rag.aquery(
                 question,
                 param=QueryParam(
-                    mode="mix",
+                    mode=mode,
                     only_need_context=True,  # 只返回上下文，不生成回答
-                    chunk_top_k=40
+                    chunk_top_k=chunk_top_k
                 )
             )
             

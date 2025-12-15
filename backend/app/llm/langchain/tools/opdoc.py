@@ -17,14 +17,45 @@ class SearchYongceDocsInput(BaseModel):
         ..., 
         description="要查询的问题，如 '权限管理功能说明'、'订单流程设计'、'API接口文档'、'部署操作步骤'"
     )
+    mode: str = Field(
+        default="mix",
+        description="""
+检索模式，根据问题类型选择最优模式：
+
+- **naive**（最快，2-4秒）：纯向量相似度检索
+  适用场景：简单概念查询，如"什么是XX"、"XX的定义"
+  特点：速度最快，仅基于语义相似性，无关系分析
+
+- **local**（较快，5-8秒）：实体中心的图谱检索
+  适用场景：特定实体查询，如"XX功能如何配置"、"XX模块的使用方法"
+  特点：从实体出发，遍历1度关系，侧重实体描述和直接关联
+
+- **global**（较慢，10-15秒）：关系中心的图谱检索
+  适用场景：关系分析问题，如"XX和YY如何关联"、"影响链分析"
+  特点：从关系出发，跨领域连接，侧重关系模式和全局结构
+
+- **hybrid**（最慢，15-25秒）：深度图谱推理
+  适用场景：复杂分析问题，需要全面视角，如"完整的配置和使用流程"
+  特点：并行执行local和global，深度探索多层关系，最全面但最慢
+
+- **mix**（推荐，8-12秒）：图谱+向量平衡检索【默认】
+  适用场景：通用查询，不确定问题类型时使用
+  特点：并行执行local和naive，平衡结构与语义，容错性强
+
+选择建议：
+- 90%的问题使用默认的 mix 即可
+- 只有明确需要深度分析时才使用 hybrid
+- 简单定义查询可用 naive 加速
+"""
+    )
 
 
 @tool(args_schema=SearchYongceDocsInput)
-async def search_yongce_docs(question: str) -> str:
+async def search_yongce_docs(question: str, mode: str = "mix") -> str:
     """搜索永策Pro企业知识库
     
     从永策Pro项目的全量文档中检索相关内容，包括产品文档、技术文档、API文档、操作手册、开发指南等。
-    使用 LightRAG 的混合检索模式（向量 + 知识图谱），能够理解语义并发现文档间的关联。
+    支持多种检索模式，可根据问题类型选择最优策略（默认使用mix模式，适合90%的场景）。
     
     知识库范围：
     - 产品功能：功能说明、使用方法、配置项
@@ -36,18 +67,30 @@ async def search_yongce_docs(question: str) -> str:
     
     Args:
         question: 要查询的问题，使用自然语言描述即可
+        mode: 检索模式（默认"mix"），根据问题选择：
+              - naive: 简单概念查询（最快）
+              - local: 特定功能/实体查询（常用）
+              - global: 关系分析查询
+              - hybrid: 复杂深度分析（最慢最全）
+              - mix: 通用平衡模式（推荐，默认）
         
     Returns:
         检索到的相关文档内容，包含详细说明和来源引用
     """
-    logger.info(f"[YongceTool] 收到检索请求: {question[:50]}...")
+    logger.info(f"[YongceTool] 收到检索请求: question={question[:50]}..., mode={mode}")
+    
+    # 验证mode参数
+    valid_modes = ["naive", "local", "global", "hybrid", "mix"]
+    if mode not in valid_modes:
+        logger.warning(f"[YongceTool] 无效的mode={mode}，使用默认值mix")
+        mode = "mix"
     
     # 获取数据库会话
     db = SessionLocal()
     
     try:
         # 调用 LightRAG 服务检索
-        result = await LightRAGService.search_context(question, db)
+        result = await LightRAGService.search_context(question, db, mode=mode)
         
         context = result.get("context", "")
         sources = result.get("sources", [])
