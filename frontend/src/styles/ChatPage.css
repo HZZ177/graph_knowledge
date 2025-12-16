@@ -2216,3 +2216,37 @@
   cursor: not-allowed;
 }
 
+/* 回到底部按钮 - 浮于输入框上方，右侧与输入框对齐 */
+.scroll-to-bottom-btn {
+  position: absolute;
+  /* 居中后偏移到输入框右边缘 */
+  left: 50%;
+  transform: translateX(calc(var(--max-width) / 2 - 40px));
+  bottom: 100px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-color);
+  border: 1px solid var(--border-color);
+  border-radius: 50%;
+  box-shadow: var(--shadow-md);
+  cursor: pointer;
+  z-index: 20;
+  transition: background 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s;
+  color: var(--text-secondary);
+  font-size: 16px;
+}
+
+.scroll-to-bottom-btn:hover {
+  background: var(--bg-secondary);
+  border-color: var(--accent-color);
+  color: var(--text-primary);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.scroll-to-bottom-btn:active {
+  box-shadow: var(--shadow-sm);
+}
+

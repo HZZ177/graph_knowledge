@@ -8,7 +8,7 @@
  */
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { CheckCircleOutlined, LoadingOutlined } from '@ant-design/icons'
+import { CheckCircleOutlined, LoadingOutlined, ArrowDownOutlined } from '@ant-design/icons'
 import {
   createChatClient,
   ChatClient,
@@ -122,6 +122,7 @@ const ChatPage: React.FC = () => {
   const [isIterationOpen, setIsIterationOpen] = useState(false)
   const [isIssueOpen, setIsIssueOpen] = useState(false)
   const [isFileToolsOpen, setIsFileToolsOpen] = useState(false)
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false)
   
   // 智能测试任务看板 Hook
   const {
@@ -213,6 +214,10 @@ const ChatPage: React.FC = () => {
     const currentScrollTop = container.scrollTop
     const scrollingUp = currentScrollTop < lastScrollTopRef.current
     lastScrollTopRef.current = currentScrollTop
+    
+    // 显示/隐藏回到底部按钮（距离底部超过300px时显示）
+    const distanceFromBottom = container.scrollHeight - container.scrollTop - container.clientHeight
+    setShowScrollToBottom(distanceFromBottom > 300)
     
     if (isLoading) {
       if (scrollingUp && !isNearBottom()) {
@@ -1406,6 +1411,17 @@ const ChatPage: React.FC = () => {
             )}
           </div>
         </div>
+
+        {/* 回到底部按钮 - 浮于输入框上方 */}
+        {showScrollToBottom && (
+          <button
+            className="scroll-to-bottom-btn"
+            onClick={() => scrollToBottom(true)}
+            title="回到底部"
+          >
+            <ArrowDownOutlined />
+          </button>
+        )}
 
         {/* 输入区域 */}
         <ChatInputArea

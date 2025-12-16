@@ -27,7 +27,9 @@ from backend.app.services.chat.history_service import (
     truncate_conversation,
     generate_conversation_title,
     get_testing_history,
+    get_raw_messages,
 )
+from backend.app.services.lightrag_service import LightRAGService
 from backend.app.core.utils import success_response, error_response
 from backend.app.core.logger import logger, trace_id_var
 
@@ -189,8 +191,49 @@ async def _handle_opdoc_qa(
     - 基于 LightRAG 的操作文档检索
     - 混合检索模式（向量 + 知识图谱）
     - 支持多轮对话
-    - 无需额外配置上下文
+    - 首次对话强制预检索
     """
+    # 判断是否首次对话（无历史消息）
+    pre_search_context = None
+    is_first_message = False
+    
+    if request.thread_id:
+        raw_messages = await get_raw_messages(request.thread_id)
+        is_first_message = len(raw_messages) == 0
+    else:
+        is_first_message = True
+    
+    # 首次对话：代码强制执行轻量预检索
+    if is_first_message:
+        logger.info(f"[OpdocQA] 首次对话，执行预检索: {request.question[:50]}...")
+        try:
+            # 发送预检索进度
+            await websocket.send_text(json.dumps({
+                "type": "pre_search_start",
+                "message": "正在快速分析您的问题...",
+            }, ensure_ascii=False))
+            
+            # 使用 naive 模式进行轻量检索
+            pre_db = SessionLocal()
+            try:
+                result = await LightRAGService.search_context(
+                    request.question, pre_db, mode="naive"
+                )
+                pre_search_context = result.get("context", "")
+                pre_search_sources = result.get("sources", [])
+                logger.info(f"[OpdocQA] 预检索完成: context_length={len(pre_search_context)}")
+            finally:
+                pre_db.close()
+            
+            # 发送预检索完成
+            await websocket.send_text(json.dumps({
+                "type": "pre_search_end",
+                "message": "分析完成，正在为您解答...",
+            }, ensure_ascii=False))
+        except Exception as e:
+            logger.warning(f"[OpdocQA] 预检索失败，继续正常流程: {e}")
+            pre_search_context = None
+    
     # 调用通用流式对话服务
     await streaming_chat(
         db=db,
@@ -198,7 +241,7 @@ async def _handle_opdoc_qa(
         websocket=websocket,
         thread_id=request.thread_id,
         agent_type="opdoc_qa",
-        agent_context=None,
+        agent_context={"pre_search_context": pre_search_context} if pre_search_context else None,
         attachments=[att.model_dump() for att in (request.attachments or [])],
     )
 
