@@ -232,9 +232,14 @@ def _generate_tool_summaries(tool_name: str, tool_input: dict, tool_output: str)
     # ========== 永策Pro企业知识库检索 ==========
     elif tool_name == "search_yongce_docs":
         question = tool_input.get("question", "")
+        mode = tool_input.get("mode", "mix")
+        
+        parts = []
         if question:
             display_q = question[:30] + "..." if len(question) > 30 else question
-            input_summary = f"问题: {display_q}"
+            parts.append(f"问题: {display_q}")
+        parts.append(f"模式: {mode}")
+        input_summary = " | ".join(parts)
         
         # 解析输出
         if "## 检索结果" in tool_output:
@@ -509,6 +514,15 @@ async def stream_agent_with_events(
                             LightRAGService.set_progress_context(websocket, placeholder_id, tool_name)
                             logger.info(f"{log_prefix} 已设置 LightRAG 进度上下文: tool_id={placeholder_id}")
                             found = True
+                            # 推送检索模式信息
+                            mode = tool_input.get("mode", "mix")
+                            await websocket.send_text(json.dumps({
+                                "type": "tool_progress",
+                                "tool_name": tool_name,
+                                "tool_id": placeholder_id,
+                                "phase": "mode_info",
+                                "detail": f"{mode}",
+                            }, ensure_ascii=False))
                         break
                 if not found:
                     logger.warning(f"{log_prefix} 未找到 search_yongce_docs 的 placeholder_id")

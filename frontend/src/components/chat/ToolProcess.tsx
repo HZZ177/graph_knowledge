@@ -13,6 +13,7 @@ import { BatchToolItemInfo, ToolProgressStep } from '../../types/chat'
 
 // 阶段名称映射（英文 -> 中文，用户友好版本）
 const PHASE_LABELS: Record<string, string> = {
+  mode_info: '查询模式',
   start_search: '开始检索',
   init_workers: '初始化引擎',
   extracting_keywords: '理解问题',

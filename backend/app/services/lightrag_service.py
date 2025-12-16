@@ -527,15 +527,15 @@ class LightRAGService:
                 except Exception as e:
                     logger.warning(f"[LightRAG] 推送开始进度失败: {e}")
             
-            # 根据模式动态调整 chunk_top_k
+            # 根据模式动态调整 chunk_top_k（每个 chunk 约 2500 字）
             chunk_top_k_map = {
-                "naive": 20,    # 纯向量，少一些
-                "local": 30,    # 局部图谱
-                "global": 40,   # 全局图谱
-                "hybrid": 50,   # 深度分析，多一些
-                "mix": 40,      # 平衡模式
+                "naive": 5,     # 轻量补充，约 1.2 万字
+                "local": 5,    # 局部图谱，约 1.2 万字
+                "global": 20,   # 全局图谱，约 5 万字
+                "hybrid": 20,   # 深度分析，约 5 万字
+                "mix": 20,      # 平衡模式，约 5 万字
             }
-            chunk_top_k = chunk_top_k_map.get(mode, 40)
+            chunk_top_k = chunk_top_k_map.get(mode, 20)
             
             # 调用 LightRAG 查询（only_need_context=True 只返回检索结果）
             context = await rag.aquery(
