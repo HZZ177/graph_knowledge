@@ -121,6 +121,8 @@ class IndexProgress:
     """
     # 阶段1: 提取阶段
     extraction_progress: int = 0
+    total_chunks: int = 0
+    processed_chunks: int = 0
     # 阶段2: 图谱构建（entities + relations 合并）
     # 从 chunk 日志累计的总数
     entities_total: int = 0
@@ -150,6 +152,8 @@ class IndexProgress:
         return {
             "current_phase": self.current_phase,
             "extraction_progress": self.extraction_progress,
+            "total_chunks": self.total_chunks,
+            "processed_chunks": self.processed_chunks,
             # 图谱构建阶段（合并 entities + relations）
             "graph_build_total": self.graph_build_total,
             "graph_build_done": self.graph_build_done,
@@ -157,6 +161,8 @@ class IndexProgress:
             # 详情：实体和关系的总数
             "entities_total": self.entities_total,
             "relations_total": self.relations_total,
+            "entities_done": self.entities_done,
+            "relations_done": self.relations_done,
         }
 
 
@@ -243,6 +249,9 @@ class LightRAGIndexer:
                         chunk_total = int(chunk_match.group(2))
                         ent_count = int(chunk_match.group(3))
                         rel_count = int(chunk_match.group(4))
+                        
+                        indexer._progress.total_chunks = chunk_total
+                        indexer._progress.processed_chunks = chunk_done
                         
                         # 累计总数
                         indexer._progress.entities_total += ent_count
@@ -359,6 +368,13 @@ class LightRAGIndexer:
                 if progress.current_phase == "graph_building":
                     batch_size = len(texts)
                     progress.graph_build_done += batch_size
+                    total = progress.graph_build_total
+                    if total > 0:
+                        ent_done = int(progress.graph_build_done * progress.entities_total / total)
+                        ent_done = min(progress.entities_total, max(0, ent_done))
+                        rel_done = min(progress.relations_total, max(0, progress.graph_build_done - ent_done))
+                        progress.entities_done = ent_done
+                        progress.relations_done = rel_done
                     
                     logger.debug(
                         f"[Embedding] 图谱构建: {progress.graph_build_done}/{progress.graph_build_total} "
@@ -520,6 +536,11 @@ class LightRAGIndexer:
                         current_snapshot = (
                             self._progress.extraction_progress,
                             self._progress.current_phase,
+                            self._progress.total_chunks,
+                            self._progress.processed_chunks,
+                            self._progress.entities_total,
+                            self._progress.relations_total,
+                            self._progress.graph_build_done,
                             self._progress.entities_done,
                             self._progress.relations_done,
                         )
@@ -557,6 +578,27 @@ class LightRAGIndexer:
                                     progress = 10 + int((done / max(total, 1)) * 80)
                                     self._progress.extraction_progress = min(progress, 90)
                                     await self._report_progress()
+
+                                # 解析 Phase 1/2 的总量（比 chunk 日志更可靠：chunk 日志可能在 0.3s 轮询间隔内被跳过）
+                                # 示例："Phase 1: Processing 364 entities from doc-xxx (async: 8)"
+                                phase_entities_match = re.search(r'Phase\s*1: Processing\s*(\d+)\s*entities', current_message)
+                                if phase_entities_match:
+                                    entities_total = int(phase_entities_match.group(1))
+                                    # 只做单调递增更新，避免被较小值覆盖
+                                    if entities_total > self._progress.entities_total:
+                                        self._progress.entities_total = entities_total
+                                    # Phase 1 / 2 出现通常意味着进入图谱构建阶段
+                                    self._progress.current_phase = "graph_building"
+                                    await self._report_progress()
+
+                                # 示例："Phase 2: Processing 123 relations from doc-xxx (async: 8)"
+                                phase_relations_match = re.search(r'Phase\s*2: Processing\s*(\d+)\s*relations', current_message)
+                                if phase_relations_match:
+                                    relations_total = int(phase_relations_match.group(1))
+                                    if relations_total > self._progress.relations_total:
+                                        self._progress.relations_total = relations_total
+                                    self._progress.current_phase = "graph_building"
+                                    await self._report_progress()
                                 
                                 # 检测缓存跳过（文档已索引）
                                 # 格式: "Document xxx already indexed, skipping"
@@ -577,6 +619,9 @@ class LightRAGIndexer:
                                     chunk_total = int(chunk_match.group(2))
                                     ent_count = int(chunk_match.group(3))
                                     rel_count = int(chunk_match.group(4))
+                                    
+                                    self._progress.total_chunks = chunk_total
+                                    self._progress.processed_chunks = chunk_done
                                     
                                     # 累计总数
                                     self._progress.entities_total += ent_count
@@ -964,16 +1009,63 @@ class LightRAGIndexService:
 
             # 设置进度回调
             indexer = cls.get_indexer(db)
+            last_commit_time = 0.0
+            last_committed_snapshot = None
 
             async def progress_callback(progress: IndexProgress):
                 # 更新数据库（三阶段进度）
-                nonlocal task, doc
+                nonlocal task, doc, last_commit_time, last_committed_snapshot
                 doc.extraction_progress = progress.extraction_progress
                 doc.entities_total = progress.entities_total
                 doc.entities_done = progress.entities_done
                 doc.relations_total = progress.relations_total
                 doc.relations_done = progress.relations_done
-                db.commit()
+
+                task.current_phase = progress.current_phase
+                if progress.current_phase == "extraction":
+                    task.phase_progress = progress.extraction_progress
+                    task.overall_progress = int(progress.extraction_progress * 0.6)
+                elif progress.current_phase == "graph_building":
+                    task.phase_progress = progress.graph_build_progress
+                    task.overall_progress = 60 + int(progress.graph_build_progress * 0.4)
+                elif progress.current_phase == "completed":
+                    task.phase_progress = 100
+                    task.overall_progress = 100
+                else:
+                    task.phase_progress = progress.extraction_progress
+                    task.overall_progress = progress.extraction_progress
+
+                task.total_chunks = progress.total_chunks
+                task.processed_chunks = progress.processed_chunks
+                task.total_entities = progress.entities_total
+                task.extracted_entities = progress.entities_total if progress.current_phase == "extraction" else progress.entities_done
+
+                now = time.monotonic()
+                snapshot = (
+                    doc.extraction_progress,
+                    doc.entities_total,
+                    doc.entities_done,
+                    doc.relations_total,
+                    doc.relations_done,
+                    task.current_phase,
+                    task.phase_progress,
+                    task.overall_progress,
+                    task.total_chunks,
+                    task.processed_chunks,
+                    task.total_entities,
+                    task.extracted_entities,
+                )
+
+                should_commit = False
+                if snapshot != last_committed_snapshot and (now - last_commit_time) >= 2.0:
+                    should_commit = True
+                if progress.current_phase in ("completed", "failed"):
+                    should_commit = True
+
+                if should_commit:
+                    db.commit()
+                    last_commit_time = now
+                    last_committed_snapshot = snapshot
 
                 # 广播给订阅者（三阶段进度数据）
                 await cls._broadcast_progress(task_id, doc.id, progress)
@@ -993,6 +1085,12 @@ class LightRAGIndexService:
             if result["success"]:
                 task.status = "completed"
                 task.finished_at = datetime.now()
+                task.current_phase = "completed"
+                task.phase_progress = 100
+                task.overall_progress = 100
+                if task.total_chunks and task.processed_chunks < task.total_chunks:
+                    task.processed_chunks = task.total_chunks
+
                 doc.index_status = "indexed"
                 doc.extraction_progress = 100
                 doc.index_finished_at = datetime.now()
@@ -1001,26 +1099,35 @@ class LightRAGIndexService:
                 if result.get("stats"):
                     doc.entity_count = result["stats"].get("entities_total", 0)
                     doc.relation_count = result["stats"].get("relations_total", 0)
-                
-                # 广播最终完成状态给前端
+
                 final_progress = IndexProgress(
                     current_phase="completed",
                     extraction_progress=100,
+                    total_chunks=task.total_chunks or 0,
+                    processed_chunks=task.processed_chunks or 0,
                     entities_total=doc.entity_count or 0,
                     entities_done=doc.entity_count or 0,
                     relations_total=doc.relation_count or 0,
                     relations_done=doc.relation_count or 0,
+                    graph_build_done=(doc.entity_count or 0) + (doc.relation_count or 0),
                 )
                 await cls._broadcast_progress(task_id, doc.id, final_progress)
             else:
                 task.status = "failed"
                 task.finished_at = datetime.now()
                 task.error_message = result.get("error", "未知错误")
+                task.current_phase = "failed"
+                task.phase_progress = 0
+                task.overall_progress = 0
                 doc.index_status = "failed"
                 doc.index_error = task.error_message
-                
-                # 广播失败状态给前端
-                fail_progress = IndexProgress(current_phase="failed", extraction_progress=0)
+
+                fail_progress = IndexProgress(
+                    current_phase="failed",
+                    extraction_progress=0,
+                    total_chunks=task.total_chunks or 0,
+                    processed_chunks=task.processed_chunks or 0,
+                )
                 await cls._broadcast_progress(task_id, doc.id, fail_progress)
 
             db.commit()

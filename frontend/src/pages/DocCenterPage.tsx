@@ -228,6 +228,11 @@ const DocCenterPage: React.FC = () => {
   const [syncing, setSyncing] = useState(false)
   const [indexing, setIndexing] = useState(false)
 
+  // 索引操作按钮 loading（按文档维度）
+  const [cancelIndexLoading, setCancelIndexLoading] = useState<Record<string, boolean>>({})
+  const [stopIndexLoading, setStopIndexLoading] = useState<Record<string, boolean>>({})
+  const [indexRowLoading, setIndexRowLoading] = useState<Record<string, boolean>>({})
+
   // 同步进度状态 { docId: { current, total, phase?, detail? } }
   const [syncProgress, setSyncProgress] = useState<Record<string, { current: number; total: number; phase?: string; detail?: string }>>({})
 
@@ -468,6 +473,17 @@ const DocCenterPage: React.FC = () => {
     await refreshIndexingProgress()
   }, [loadDocuments, filterKeyword, filterSyncStatus, filterIndexStatus, refreshIndexingProgress])
 
+  const reloadDocumentsWithCurrentFilter = useCallback(async (page?: number) => {
+    const currentPage = page ?? pagination.current
+    await loadDocuments(
+      currentPage,
+      filterKeyword,
+      filterSyncStatus.length > 0 ? filterSyncStatus : undefined,
+      filterIndexStatus.length > 0 ? filterIndexStatus : undefined
+    )
+    await refreshIndexingProgress()
+  }, [loadDocuments, pagination.current, filterKeyword, filterSyncStatus, filterIndexStatus, refreshIndexingProgress])
+
   // 重置按钮处理
   const handleResetFilter = useCallback(async () => {
     setFilterKeyword('')
@@ -500,7 +516,7 @@ const DocCenterPage: React.FC = () => {
       const result = await syncFromHelpCenter()
       message.success(`同步完成: ${result.folders_synced} 目录, ${result.documents_synced} 文档`)
       loadTree()
-      loadDocuments()
+      reloadDocumentsWithCurrentFilter(1)
     } catch (e: any) {
       message.error(`同步失败: ${e.message}`)
     } finally {
@@ -519,11 +535,11 @@ const DocCenterPage: React.FC = () => {
     try {
       await syncDocumentContent(doc.id)
       // 同步完成后刷新列表
-      loadDocuments()
+      reloadDocumentsWithCurrentFilter()
     } catch (e: any) {
       console.error(`同步失败: ${doc.title}`, e)
       // 失败时也刷新列表获取最新状态
-      loadDocuments()
+      reloadDocumentsWithCurrentFilter()
     }
   }
 
@@ -594,7 +610,7 @@ const DocCenterPage: React.FC = () => {
         )
       )
       // 批量同步完成后刷新列表获取最新状态
-      loadDocuments()
+      reloadDocumentsWithCurrentFilter()
     } finally {
       setBatchSyncing(false)
     }
@@ -617,53 +633,106 @@ const DocCenterPage: React.FC = () => {
       }
       idsToIndex = syncedDocs.map((d) => d.id)
     }
+    const isRowIndex = !!docIds && docIds.length > 0
+    if (isRowIndex) {
+      setIndexRowLoading((prev) => {
+        const next = { ...prev }
+        idsToIndex.forEach((id) => {
+          next[id] = true
+        })
+        return next
+      })
+    }
+
     setIndexing(true)
-    
-    // 立即更新状态为 queued，让用户看到状态变化
-    setDocuments((prev) =>
-      prev.map((d) =>
-        idsToIndex.includes(d.id)
-          ? { ...d, index_status: 'queued' as const, extraction_progress: 0, graph_build_progress: 0 }
-          : d
+
+    if (!isRowIndex) {
+      // 批量索引：立即更新状态为 queued，让用户看到状态变化
+      setDocuments((prev) =>
+        prev.map((d) =>
+          idsToIndex.includes(d.id)
+            ? { ...d, index_status: 'queued' as const, extraction_progress: 0, graph_build_progress: 0 }
+            : d
+        )
       )
-    )
+    }
     
     try {
       const result = await createIndexTasks(idsToIndex)
       const successCount = result.tasks.filter((t) => t.success).length
       message.success(`已创建 ${successCount} 个索引任务`)
+
+      if (isRowIndex && successCount > 0) {
+        // 单行索引：仅在成功后切换为 queued（显示取消索引按钮）
+        setDocuments((prev) =>
+          prev.map((d) =>
+            idsToIndex.includes(d.id)
+              ? { ...d, index_status: 'queued' as const, extraction_progress: 0, graph_build_progress: 0 }
+              : d
+          )
+        )
+      }
+
       if (!docIds) setSelectedRowKeys([])
       // 不立即刷新列表，避免覆盖 WS 推送的状态更新
       // WS 会持续更新进度，任务完成后状态会自动更新
     } catch (e: any) {
       message.error(`创建索引任务失败: ${e.message}`)
       // 失败时恢复状态
-      loadDocuments()
+      if (!isRowIndex) {
+        reloadDocumentsWithCurrentFilter()
+      }
     } finally {
       setIndexing(false)
+      if (isRowIndex) {
+        setIndexRowLoading((prev) => {
+          const next = { ...prev }
+          idsToIndex.forEach((id) => {
+            delete next[id]
+          })
+          return next
+        })
+      }
     }
   }
 
   // 取消索引任务（排队中）
   const handleCancelIndex = async (docId: string) => {
+    if (cancelIndexLoading[docId]) return
+    setCancelIndexLoading((prev) => ({ ...prev, [docId]: true }))
     try {
       await cancelIndexTask(docId)
       message.success('已取消索引任务')
-      loadDocuments()
+      reloadDocumentsWithCurrentFilter()
     } catch (e: any) {
       message.error(`取消失败: ${e.message}`)
+    } finally {
+      setCancelIndexLoading((prev) => {
+        const next = { ...prev }
+        delete next[docId]
+        return next
+      })
     }
   }
 
   // 停止索引任务（正在运行）
   const handleStopIndex = async (docId: string) => {
+    if (stopIndexLoading[docId]) return
+    setStopIndexLoading((prev) => ({ ...prev, [docId]: true }))
     try {
       const res = await fetch(`/api/v1/doc-center/index/stop/${docId}`, { method: 'POST' })
       const data = await res.json()
       if (data.code !== 0) throw new Error(data.message)
       message.success('已请求停止索引')
+      reloadDocumentsWithCurrentFilter()
     } catch (e: any) {
       message.error(`停止失败: ${e.message}`)
+    } finally {
+      setStopIndexLoading((prev) => {
+        const next = { ...prev }
+        delete next[docId]
+        return next
+      })
     }
   }
 
@@ -914,6 +983,8 @@ const DocCenterPage: React.FC = () => {
             <Button
               size="small"
               danger
+              loading={!!cancelIndexLoading[record.id]}
+              disabled={!!cancelIndexLoading[record.id]}
               onClick={() => handleCancelIndex(record.id)}
             >
               取消索引
@@ -923,6 +994,8 @@ const DocCenterPage: React.FC = () => {
               size="small"
               danger
               icon={<StopOutlined />}
+              loading={!!stopIndexLoading[record.id]}
+              disabled={!!stopIndexLoading[record.id]}
               onClick={() => handleStopIndex(record.id)}
             >
               停止
@@ -931,7 +1004,8 @@ const DocCenterPage: React.FC = () => {
             <Button
               size="small"
               icon={<CloudUploadOutlined />}
-              disabled={record.sync_status !== 'synced'}
+              loading={!!indexRowLoading[record.id]}
+              disabled={record.sync_status !== 'synced' || !!indexRowLoading[record.id]}
               onClick={() => handleIndex([record.id])}
             >
               索引
